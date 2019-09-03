@@ -7,3 +7,10 @@ void dahl_randompartition__crp__sample(int32_t n_partitions,
                                        int32_t n_items,
                                        double mass,
                                        int32_t *ptr);
+
+void dahl_randompartition__rfp__sample(int32_t n_partitions,
+                                       int32_t n_items,
+                                       const int32_t *focal_ptr,
+                                       const double *weights_ptr,
+                                       double mass,
+                                       int32_t *ptr);

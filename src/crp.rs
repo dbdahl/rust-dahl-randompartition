@@ -3,7 +3,6 @@ extern crate dahl_partition;
 extern crate dahl_salso;
 
 use dahl_partition::*;
-use dahl_salso::psm::psm;
 
 use rand::distributions::{Distribution, WeightedIndex};
 use std::convert::TryFrom;
@@ -49,7 +48,7 @@ mod tests {
         for _ in 0..n_partitions {
             samples.push_partition(&sample(n_items, mass));
         }
-        let mut psm = psm(&samples.view(), true);
+        let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
         let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_partitions as f64).sqrt();
         assert!(psm.view().data().iter().all(|prob| {
