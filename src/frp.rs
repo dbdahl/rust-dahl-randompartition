@@ -41,15 +41,16 @@ pub fn sample(focal: &Partition, weights: &[f64], mass: f64) -> Partition {
         ensure_empty_subset(&mut p);
         let probs = p.subsets().iter().map(|subset| {
             if subset.is_empty() {
-                mass + if focal_permutation_intersection.n_items() == 0 && focal_permutation_intersection.contains(ii) { this_weight } else { 0.0 }
+                mass + if focal_permutation_intersection.n_items() == 1 && focal_permutation_intersection.contains(ii) { this_weight } else { 0.0 }
             } else {
                 ( subset.n_items() as f64 ) + this_weight * (focal_subset.intersection(&subset).n_items() as f64) / denominator
             }
         });
         let dist = WeightedIndex::new(probs).unwrap();
         let subset_index = dist.sample(&mut rng);
-        p.add_with_index(i, subset_index);
+        p.add_with_index(ii, subset_index);
     }
+    p.canonicalize();
     p
 }
 
