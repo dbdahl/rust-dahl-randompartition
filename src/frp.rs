@@ -1,10 +1,10 @@
-extern crate rand;
 extern crate dahl_partition;
 extern crate dahl_salso;
+extern crate rand;
 
 use dahl_partition::*;
-use rand::seq::SliceRandom;
 use rand::distributions::{Distribution, WeightedIndex};
+use rand::seq::SliceRandom;
 use std::convert::TryFrom;
 use std::slice;
 
@@ -20,14 +20,27 @@ fn ensure_empty_subset(partition: &mut Partition) {
 }
 
 pub fn sample(focal: &Partition, weights: &[f64], mass: f64) -> Partition {
-    assert!(focal.is_canonical());
-    assert_eq!(focal.n_subsets(), weights.len());
-    assert!(weights.iter().all(|w| !w.is_nan() && w.is_finite() && *w >= 0.0));
+    assert!(
+        focal.is_canonical(),
+        "Focal partition must be in canonical form."
+    );
+    assert_eq!(
+        focal.n_subsets(),
+        weights.len(),
+        "Length of weights must equal the number of subsets of the focal partition."
+    );
+    assert!(
+        weights
+            .iter()
+            .all(|w| !w.is_nan() && w.is_finite() && *w >= 0.0),
+        "Weights must be non-negative."
+    );
     assert!(mass > 0.0, "Mass must be greater than 0.0.");
     let ni = focal.n_items();
     let mut rng = rand::thread_rng();
-    let mut p = Partition::new(ni);
     let mut permutation: Vec<usize> = (0..ni).collect();
+
+    let mut p = Partition::new(ni);
     permutation.shuffle(&mut rng);
     let mut permutation_subset = Subset::new();
     for i in 0..ni {
@@ -36,14 +49,22 @@ pub fn sample(focal: &Partition, weights: &[f64], mass: f64) -> Partition {
         let focal_subset_index = focal.label_of(ii).unwrap();
         let focal_subset = &focal.subsets()[focal_subset_index];
         let this_weight = weights[focal_subset_index];
-        let focal_permutation_intersection= focal_subset.intersection(&permutation_subset);
-        let denominator= focal_permutation_intersection.n_items() as f64;
+        let focal_permutation_intersection = focal_subset.intersection(&permutation_subset);
+        let denominator = focal_permutation_intersection.n_items() as f64;
         ensure_empty_subset(&mut p);
         let probs = p.subsets().iter().map(|subset| {
             if subset.is_empty() {
-                mass + if focal_permutation_intersection.n_items() == 1 && focal_permutation_intersection.contains(ii) { this_weight } else { 0.0 }
+                mass + if focal_permutation_intersection.n_items() == 1
+                    && focal_permutation_intersection.contains(ii)
+                {
+                    this_weight
+                } else {
+                    0.0
+                }
             } else {
-                ( subset.n_items() as f64 ) + this_weight * (focal_subset.intersection(&subset).n_items() as f64) / denominator
+                (subset.n_items() as f64)
+                    + this_weight * (focal_subset.intersection(&subset).n_items() as f64)
+                        / denominator
             }
         });
         let dist = WeightedIndex::new(probs).unwrap();
