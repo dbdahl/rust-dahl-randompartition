@@ -50,7 +50,12 @@ fn ensure_empty_subset(partition: &mut Partition) {
     }
 }
 
-pub fn sample(focal: &Partition, weights: &Weights, mass: f64) -> Partition {
+pub fn sample(
+    focal: &Partition,
+    weights: &Weights,
+    permutation: &Permutation,
+    mass: f64,
+) -> Partition {
     assert!(
         focal.is_canonical(),
         "Focal partition must be in canonical form."
@@ -63,14 +68,12 @@ pub fn sample(focal: &Partition, weights: &Weights, mass: f64) -> Partition {
     assert!(mass > 0.0, "Mass must be greater than 0.0.");
     let ni = focal.n_items();
     let mut rng = rand::thread_rng();
-    let mut permutation = Permutation::natural(ni);
 
     let mut p = Partition::new(ni);
     let mut focal_tracker = Partition::new(ni);
     for _ in 0..focal.n_subsets() {
         focal_tracker.new_subset();
     }
-    permutation.shuffle(&mut rng);
     for i in 0..ni {
         let ii = permutation[i];
         let focal_subset_index = focal.label_of(ii).unwrap();
@@ -109,9 +112,12 @@ mod tests {
         let mass = 2.0;
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         let focal = Partition::one_subset(n_items);
+        let mut permutation = Permutation::natural(n_items);
+        let mut rng = rand::thread_rng();
         let weights = Weights::zero(1);
         for _ in 0..n_partitions {
-            samples.push_partition(&sample(&focal, &weights, mass));
+            permutation.shuffle(&mut rng);
+            samples.push_partition(&sample(&focal, &weights, &permutation, mass));
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -129,6 +135,7 @@ pub unsafe extern "C" fn dahl_randompartition__rfp__sample(
     n_items: i32,
     focal_ptr: *const i32,
     weights_ptr: *const f64,
+    permutation_ptr: *const i32,
     mass: f64,
     ptr: *mut i32,
 ) -> () {
@@ -137,8 +144,21 @@ pub unsafe extern "C" fn dahl_randompartition__rfp__sample(
     let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
     let focal = Partition::from(slice::from_raw_parts(focal_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, focal.n_subsets())).unwrap();
+    let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
+    let random_permutation = permutation_slice[0] == -1;
+    let mut permutation = if !random_permutation {
+        let permutation_vector: Vec<usize> =
+            permutation_slice.iter().map(|x| *x as usize).collect();
+        Permutation::from_vector(permutation_vector).unwrap()
+    } else {
+        Permutation::natural(ni)
+    };
+    let mut rng = rand::thread_rng();
     for i in 0..np {
-        let p = sample(&focal, &weights, mass);
+        if random_permutation {
+            permutation.shuffle(&mut rng);
+        }
+        let p = sample(&focal, &weights, &permutation, mass);
         let labels = p.labels();
         for j in 0..ni {
             array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
