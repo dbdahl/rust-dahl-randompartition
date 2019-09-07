@@ -10,7 +10,6 @@ use std::slice;
 pub struct Weights(Vec<f64>);
 
 impl Weights {
-
     pub fn zero(n_subsets: usize) -> Weights {
         Weights::constant(0.0, n_subsets)
     }
@@ -67,30 +66,28 @@ pub fn sample(focal: &Partition, weights: &Weights, mass: f64) -> Partition {
     let mut permutation = Permutation::natural(ni);
 
     let mut p = Partition::new(ni);
+    let mut focal_tracker = Partition::new(ni);
+    for _ in 0..focal.n_subsets() {
+        focal_tracker.new_subset();
+    }
     permutation.shuffle(&mut rng);
-    let mut permutation_subset = Subset::new();
     for i in 0..ni {
         let ii = permutation[i];
-        permutation_subset.add(ii);
         let focal_subset_index = focal.label_of(ii).unwrap();
-        let focal_subset = &focal.subsets()[focal_subset_index];
-        let this_weight = weights[focal_subset_index];
-        let focal_permutation_intersection = focal_subset.intersection(&permutation_subset);
-        let denominator = focal_permutation_intersection.n_items() as f64;
+        focal_tracker.add_with_index(ii, focal_subset_index);
+        let focal_subset = focal_tracker.subset_of(ii).unwrap();
+        let constant = weights[focal_subset_index] / (focal_subset.n_items() as f64);
         ensure_empty_subset(&mut p);
         let probs = p.subsets().iter().map(|subset| {
             if subset.is_empty() {
-                mass + if focal_permutation_intersection.n_items() == 1
-                    && focal_permutation_intersection.contains(ii)
-                {
-                    this_weight
+                if focal_subset.n_items() == 1 {
+                    mass + constant
                 } else {
-                    0.0
+                    mass
                 }
             } else {
                 (subset.n_items() as f64)
-                    + this_weight * (focal_subset.intersection(&subset).n_items() as f64)
-                        / denominator
+                    + constant * (focal_subset.intersection_count(&subset) as f64)
             }
         });
         let dist = WeightedIndex::new(probs).unwrap();
