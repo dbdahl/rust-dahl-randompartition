@@ -4,9 +4,41 @@ extern crate rand;
 
 use dahl_partition::*;
 use rand::distributions::{Distribution, WeightedIndex};
-use rand::seq::SliceRandom;
 use std::convert::TryFrom;
 use std::slice;
+
+pub struct Weights(Vec<f64>);
+
+impl Weights {
+
+    pub fn zero(n_subsets: usize) -> Weights {
+        Weights::constant(0.0, n_subsets)
+    }
+
+    pub fn constant(value: f64, n_subsets: usize) -> Weights {
+        Weights(vec![value; n_subsets])
+    }
+
+    pub fn from(w: &[f64]) -> Option<Weights> {
+        for ww in w.iter() {
+            if ww.is_nan() || ww.is_infinite() || *ww < 0.0 {
+                return None;
+            }
+        }
+        Some(Weights(Vec::from(w)))
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl std::ops::Index<usize> for Weights {
+    type Output = f64;
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.0[i]
+    }
+}
 
 fn ensure_empty_subset(partition: &mut Partition) {
     match partition.subsets().last() {
@@ -19,7 +51,7 @@ fn ensure_empty_subset(partition: &mut Partition) {
     }
 }
 
-pub fn sample(focal: &Partition, weights: &[f64], mass: f64) -> Partition {
+pub fn sample(focal: &Partition, weights: &Weights, mass: f64) -> Partition {
     assert!(
         focal.is_canonical(),
         "Focal partition must be in canonical form."
@@ -29,16 +61,10 @@ pub fn sample(focal: &Partition, weights: &[f64], mass: f64) -> Partition {
         weights.len(),
         "Length of weights must equal the number of subsets of the focal partition."
     );
-    assert!(
-        weights
-            .iter()
-            .all(|w| !w.is_nan() && w.is_finite() && *w >= 0.0),
-        "Weights must be non-negative."
-    );
     assert!(mass > 0.0, "Mass must be greater than 0.0.");
     let ni = focal.n_items();
     let mut rng = rand::thread_rng();
-    let mut permutation: Vec<usize> = (0..ni).collect();
+    let mut permutation = Permutation::natural(ni);
 
     let mut p = Partition::new(ni);
     permutation.shuffle(&mut rng);
@@ -86,9 +112,9 @@ mod tests {
         let mass = 2.0;
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         let focal = Partition::one_subset(n_items);
-        let weight = &[0.0];
+        let weights = Weights::zero(1);
         for _ in 0..n_partitions {
-            samples.push_partition(&sample(&focal, weight, mass));
+            samples.push_partition(&sample(&focal, &weights, mass));
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -113,9 +139,9 @@ pub unsafe extern "C" fn dahl_randompartition__rfp__sample(
     let ni = n_items as usize;
     let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
     let focal = Partition::from(slice::from_raw_parts(focal_ptr, ni));
-    let weights = slice::from_raw_parts(weights_ptr, focal.n_subsets());
+    let weights = Weights::from(slice::from_raw_parts(weights_ptr, focal.n_subsets())).unwrap();
     for i in 0..np {
-        let p = sample(&focal, weights, mass);
+        let p = sample(&focal, &weights, mass);
         let labels = p.labels();
         for j in 0..ni {
             array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
