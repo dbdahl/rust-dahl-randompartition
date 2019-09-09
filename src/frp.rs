@@ -83,17 +83,17 @@ pub fn sample(
     );
     assert!(mass > 0.0, "Mass must be greater than 0.0.");
     let ni = focal.n_items();
+    let ns = focal.n_subsets();
     let mut rng = rand::thread_rng();
 
     let mut p = Partition::new(ni);
-    let mut focal_tracker = mk_focal_tracker(ni, focal.n_subsets());
-    let mut intersection_counter = mk_intersection_counter(focal.n_subsets());
+    let mut total_counter = vec![0; ns];
+    let mut intersection_counter = mk_intersection_counter(ns);
     for i in 0..ni {
         let ii = permutation[i];
         let focal_subset_index = focal.label_of(ii).unwrap();
-        focal_tracker.add_with_index(ii, focal_subset_index);
-        let focal_subset = focal_tracker.subset_of(ii).unwrap();
-        let constant = weights[focal_subset_index] / (focal_subset.n_items() as f64);
+        total_counter[focal_subset_index] += 1;
+        let constant = weights[focal_subset_index] / (total_counter[focal_subset_index] as f64);
         ensure_empty_subset(&mut p);
         let probs = p
             .subsets()
@@ -101,7 +101,7 @@ pub fn sample(
             .enumerate()
             .map(|(subset_index, subset)| {
                 if subset.is_empty() {
-                    if focal_subset.n_items() == 1 {
+                    if total_counter[focal_subset_index] == 1 {
                         mass + constant
                     } else {
                         mass
