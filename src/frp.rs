@@ -50,7 +50,7 @@ fn ensure_empty_subset(partition: &mut Partition) {
     }
 }
 
-fn mk_intersection_counter(n_subsets: usize) -> Vec<Vec<usize>> {
+fn mk_intersection_counter(n_subsets: usize) -> Vec<Vec<f64>> {
     let mut counter = Vec::with_capacity(n_subsets);
     for _ in 0..n_subsets {
         counter.push(Vec::new())
@@ -79,13 +79,13 @@ pub fn sample(
     let mut rng = rand::thread_rng();
 
     let mut p = Partition::new(ni);
-    let mut total_counter = vec![0; ns];
+    let mut total_counter = vec![0.0; ns];
     let mut intersection_counter = mk_intersection_counter(ns);
     for i in 0..ni {
         let ii = permutation[i];
         let focal_subset_index = focal.label_of(ii).unwrap();
-        total_counter[focal_subset_index] += 1;
-        let constant = weights[focal_subset_index] / (total_counter[focal_subset_index] as f64);
+        total_counter[focal_subset_index] += 1.0;
+        let constant = weights[focal_subset_index] / total_counter[focal_subset_index];
         ensure_empty_subset(&mut p);
         let probs = p
             .subsets()
@@ -93,24 +93,24 @@ pub fn sample(
             .enumerate()
             .map(|(subset_index, subset)| {
                 if subset.is_empty() {
-                    if total_counter[focal_subset_index] == 1 {
+                    if total_counter[focal_subset_index] == 1.0 {
                         mass + constant
                     } else {
                         mass
                     }
                 } else {
                     (subset.n_items() as f64)
-                        + constant * (intersection_counter[focal_subset_index][subset_index] as f64)
+                        + constant * intersection_counter[focal_subset_index][subset_index]
                 }
             });
         let dist = WeightedIndex::new(probs).unwrap();
         let subset_index = dist.sample(&mut rng);
         if subset_index == intersection_counter[0].len() {
             for counter in intersection_counter.iter_mut() {
-                counter.push(0);
+                counter.push(0.0);
             }
         }
-        intersection_counter[focal_subset_index][subset_index] += 1;
+        intersection_counter[focal_subset_index][subset_index] += 1.0;
         p.add_with_index(ii, subset_index);
     }
     p.canonicalize();
