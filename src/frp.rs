@@ -50,14 +50,6 @@ fn ensure_empty_subset(partition: &mut Partition) {
     }
 }
 
-fn mk_focal_tracker(n_items: usize, n_subsets: usize) -> Partition {
-    let mut focal_tracker = Partition::new(n_items);
-    for _ in 0..n_subsets {
-        focal_tracker.new_subset();
-    }
-    focal_tracker
-}
-
 fn mk_intersection_counter(n_subsets: usize) -> Vec<Vec<usize>> {
     let mut counter = Vec::with_capacity(n_subsets);
     for _ in 0..n_subsets {
