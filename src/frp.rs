@@ -58,11 +58,12 @@ fn mk_intersection_counter(n_subsets: usize) -> Vec<Vec<f64>> {
     counter
 }
 
-pub fn sample(
+pub fn engine(
     focal: &Partition,
     weights: &Weights,
     permutation: &Permutation,
     mass: f64,
+    target: Option<&Partition>,
 ) -> Partition {
     assert!(
         focal.is_canonical(),
@@ -74,9 +75,16 @@ pub fn sample(
         "Length of weights must equal the number of subsets of the focal partition."
     );
     assert!(mass > 0.0, "Mass must be greater than 0.0.");
+    let rng_option = if let Some(x) = target {
+        assert!(x.is_canonical());
+        assert_eq!(x.n_items(), focal.n_items());
+        assert_eq!(x.n_subsets(), focal.n_subsets());
+        None
+    } else {
+        Some(rand::thread_rng())
+    };
     let ni = focal.n_items();
     let ns = focal.n_subsets();
-    let mut rng = rand::thread_rng();
 
     let mut p = Partition::new(ni);
     let mut total_counter = vec![0.0; ns];
@@ -103,8 +111,13 @@ pub fn sample(
                         + constant * intersection_counter[focal_subset_index][subset_index]
                 }
             });
-        let dist = WeightedIndex::new(probs).unwrap();
-        let subset_index = dist.sample(&mut rng);
+        let subset_index = match rng_option {
+            Some(mut rng) => {
+                let dist = WeightedIndex::new(probs).unwrap();
+                dist.sample(&mut rng)
+            }
+            None => target.unwrap().label_of(ii).unwrap(),
+        };
         if subset_index == intersection_counter[0].len() {
             for counter in intersection_counter.iter_mut() {
                 counter.push(0.0);
@@ -133,7 +146,7 @@ mod tests {
         let weights = Weights::zero(1);
         for _ in 0..n_partitions {
             permutation.shuffle(&mut rng);
-            samples.push_partition(&sample(&focal, &weights, &permutation, mass));
+            samples.push_partition(&engine(&focal, &weights, &permutation, mass, None));
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -174,7 +187,7 @@ pub unsafe extern "C" fn dahl_randompartition__rfp__sample(
         if random_permutation {
             permutation.shuffle(&mut rng);
         }
-        let p = sample(&focal, &weights, &permutation, mass);
+        let p = engine(&focal, &weights, &permutation, mass, None);
         let labels = p.labels();
         for j in 0..ni {
             array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
