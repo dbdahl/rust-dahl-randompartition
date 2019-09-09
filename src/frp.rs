@@ -50,6 +50,22 @@ fn ensure_empty_subset(partition: &mut Partition) {
     }
 }
 
+fn mk_focal_tracker(n_items: usize, n_subsets: usize) -> Partition {
+    let mut focal_tracker = Partition::new(n_items);
+    for _ in 0..n_subsets {
+        focal_tracker.new_subset();
+    }
+    focal_tracker
+}
+
+fn mk_intersection_counter(n_subsets: usize) -> Vec<Vec<usize>> {
+    let mut counter = Vec::with_capacity(n_subsets);
+    for _ in 0..n_subsets {
+        counter.push(Vec::new())
+    }
+    counter
+}
+
 pub fn sample(
     focal: &Partition,
     weights: &Weights,
@@ -70,10 +86,8 @@ pub fn sample(
     let mut rng = rand::thread_rng();
 
     let mut p = Partition::new(ni);
-    let mut focal_tracker = Partition::new(ni);
-    for _ in 0..focal.n_subsets() {
-        focal_tracker.new_subset();
-    }
+    let mut focal_tracker = mk_focal_tracker(ni, focal.n_subsets());
+    let mut intersection_counter = mk_intersection_counter(focal.n_subsets());
     for i in 0..ni {
         let ii = permutation[i];
         let focal_subset_index = focal.label_of(ii).unwrap();
@@ -81,20 +95,30 @@ pub fn sample(
         let focal_subset = focal_tracker.subset_of(ii).unwrap();
         let constant = weights[focal_subset_index] / (focal_subset.n_items() as f64);
         ensure_empty_subset(&mut p);
-        let probs = p.subsets().iter().map(|subset| {
-            if subset.is_empty() {
-                if focal_subset.n_items() == 1 {
-                    mass + constant
+        let probs = p
+            .subsets()
+            .iter()
+            .enumerate()
+            .map(|(subset_index, subset)| {
+                if subset.is_empty() {
+                    if focal_subset.n_items() == 1 {
+                        mass + constant
+                    } else {
+                        mass
+                    }
                 } else {
-                    mass
+                    (subset.n_items() as f64)
+                        + constant * (intersection_counter[focal_subset_index][subset_index] as f64)
                 }
-            } else {
-                (subset.n_items() as f64)
-                    + constant * (focal_subset.intersection_count(&subset) as f64)
-            }
-        });
+            });
         let dist = WeightedIndex::new(probs).unwrap();
         let subset_index = dist.sample(&mut rng);
+        if subset_index == intersection_counter[0].len() {
+            for counter in intersection_counter.iter_mut() {
+                counter.push(0);
+            }
+        }
+        intersection_counter[focal_subset_index][subset_index] += 1;
         p.add_with_index(ii, subset_index);
     }
     p.canonicalize();
