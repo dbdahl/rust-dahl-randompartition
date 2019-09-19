@@ -4,6 +4,8 @@ extern crate rand;
 
 use dahl_partition::*;
 use rand::distributions::{Distribution, WeightedIndex};
+use rand::thread_rng;
+use rand::Rng;
 use std::convert::TryFrom;
 use std::slice;
 
@@ -58,13 +60,18 @@ fn mk_intersection_counter(n_subsets: usize) -> Vec<Vec<f64>> {
     counter
 }
 
+enum TargetOrRandom<'a> {
+    Target(&'a Partition),
+    Random(rand::prelude::ThreadRng),
+}
+
 pub fn engine(
     focal: &Partition,
     weights: &Weights,
     permutation: &Permutation,
     mass: f64,
-    target: Option<&Partition>,
-) -> Partition {
+    target: Option<&mut Partition>,
+) -> (Partition, f64) {
     assert!(
         focal.is_canonical(),
         "Focal partition must be in canonical form."
@@ -74,49 +81,60 @@ pub fn engine(
         weights.len(),
         "Length of weights must equal the number of subsets of the focal partition."
     );
+    assert_eq!(permutation.len(), focal.n_items());
     assert!(mass > 0.0, "Mass must be greater than 0.0.");
-    let rng_option = if let Some(x) = target {
-        assert!(x.is_canonical());
-        assert_eq!(x.n_items(), focal.n_items());
-        assert_eq!(x.n_subsets(), focal.n_subsets());
-        None
-    } else {
-        Some(rand::thread_rng())
+    let either = match target {
+        Some(t) => {
+            assert!(t.is_canonical());
+            assert_eq!(t.n_items(), focal.n_items());
+            t.canonicalize_by_permutation(Some(&permutation));
+            TargetOrRandom::Target(t)
+        }
+        None => TargetOrRandom::Random(thread_rng()),
     };
     let ni = focal.n_items();
-    let ns = focal.n_subsets();
+    let nsf = focal.n_subsets();
 
-    let mut p = Partition::new(ni);
-    let mut total_counter = vec![0.0; ns];
-    let mut intersection_counter = mk_intersection_counter(ns);
+    let mut log_probability = 0.0;
+    let mut partition = Partition::new(ni);
+    let mut total_counter = vec![0.0; nsf];
+    let mut intersection_counter = mk_intersection_counter(nsf);
     for i in 0..ni {
         let ii = permutation[i];
+        ensure_empty_subset(&mut partition);
         let focal_subset_index = focal.label_of(ii).unwrap();
-        total_counter[focal_subset_index] += 1.0;
-        let constant = weights[focal_subset_index] / total_counter[focal_subset_index];
-        ensure_empty_subset(&mut p);
-        let probs = p
+        let constant = if total_counter[focal_subset_index] == 0.0 {
+            0.0
+        } else {
+            weights[focal_subset_index] / total_counter[focal_subset_index]
+        };
+        let mut probs = partition
             .subsets()
             .iter()
             .enumerate()
             .map(|(subset_index, subset)| {
-                if subset.is_empty() {
-                    if total_counter[focal_subset_index] == 1.0 {
-                        mass + constant
+                let prob = if subset.is_empty() {
+                    if total_counter[focal_subset_index] == 0.0 {
+                        mass + weights[focal_subset_index]
                     } else {
                         mass
                     }
                 } else {
                     (subset.n_items() as f64)
                         + constant * intersection_counter[focal_subset_index][subset_index]
-                }
+                };
+                (subset_index, prob)
             });
-        let subset_index = match rng_option {
-            Some(mut rng) => {
-                let dist = WeightedIndex::new(probs).unwrap();
+        let subset_index = match either {
+            TargetOrRandom::Random(mut rng) => {
+                let dist = WeightedIndex::new(probs.map(|x| x.1)).unwrap();
                 dist.sample(&mut rng)
             }
-            None => target.unwrap().label_of(ii).unwrap(),
+            TargetOrRandom::Target(t) => {
+                let index = t.label_of(ii).unwrap();
+                log_probability += probs.nth(index).unwrap().1.ln();
+                index
+            }
         };
         if subset_index == intersection_counter[0].len() {
             for counter in intersection_counter.iter_mut() {
@@ -124,10 +142,18 @@ pub fn engine(
             }
         }
         intersection_counter[focal_subset_index][subset_index] += 1.0;
-        p.add_with_index(ii, subset_index);
+        total_counter[focal_subset_index] += 1.0;
+        for fi in 0..focal.n_subsets() {
+            assert_eq!(
+                intersection_counter[fi].iter().fold(0.0, |sum, x| sum + *x),
+                total_counter[fi]
+            );
+        }
+        partition.add_with_index(ii, subset_index);
     }
-    p.canonicalize();
-    p
+    partition.canonicalize();
+    let log_denominator = (0..ni).fold(0.0, |sum, x| sum + (mass + weights[0] + (x as f64)).ln());
+    (partition, log_probability - log_denominator)
 }
 
 #[cfg(test)]
@@ -141,12 +167,12 @@ mod tests {
         let mass = 2.0;
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         let focal = Partition::one_subset(n_items);
-        let mut permutation = Permutation::natural(n_items);
-        let mut rng = rand::thread_rng();
         let weights = Weights::zero(1);
+        let mut permutation = Permutation::natural(n_items);
+        let mut rng = thread_rng();
         for _ in 0..n_partitions {
             permutation.shuffle(&mut rng);
-            samples.push_partition(&engine(&focal, &weights, &permutation, mass, None));
+            samples.push_partition(&engine(&focal, &weights, &permutation, mass, None).0);
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -156,6 +182,38 @@ mod tests {
         }));
     }
 
+    #[test]
+    fn test_pmf() {
+        let n_items = 4;
+        let mass = 3.0;
+        let mut permutation = Permutation::natural(n_items);
+        let mut rng = thread_rng();
+        for focal in Partition::iter(n_items) {
+            permutation.shuffle(&mut rng);
+            let focal = Partition::from(&focal[..]);
+            let weights = Weights::constant(2.0, focal.n_subsets());
+            //let mut vec = Vec::with_capacity(focal.n_subsets());
+            //for _ in 0..focal.n_subsets() {
+            //    vec.push(rng.gen_range(0.0, 10.0));
+            //}
+            //let weights = Weights::from(&vec[..]).unwrap();
+            let sum = Partition::iter(n_items)
+                .map(|p| {
+                    engine(
+                        &focal,
+                        &weights,
+                        &permutation,
+                        mass,
+                        Some(&mut Partition::from(&p[..])),
+                    )
+                    .1
+                    .exp()
+                })
+                .sum();
+            assert!(0.9999999 <= sum, format!("{}", sum));
+            assert!(sum <= 1.0000001, format!("{}", sum));
+        }
+    }
 }
 
 #[no_mangle]
@@ -182,13 +240,13 @@ pub unsafe extern "C" fn dahl_randompartition__rfp__sample(
     } else {
         Permutation::natural(ni)
     };
-    let mut rng = rand::thread_rng();
+    let mut rng = thread_rng();
     for i in 0..np {
         if random_permutation {
             permutation.shuffle(&mut rng);
         }
         let p = engine(&focal, &weights, &permutation, mass, None);
-        let labels = p.labels();
+        let labels = p.0.labels();
         for j in 0..ni {
             array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
         }
