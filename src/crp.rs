@@ -1,7 +1,3 @@
-extern crate rand;
-extern crate dahl_partition;
-extern crate dahl_salso;
-
 use dahl_partition::*;
 
 use rand::distributions::{Distribution, WeightedIndex};

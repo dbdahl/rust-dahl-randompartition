@@ -1,11 +1,6 @@
-extern crate dahl_partition;
-extern crate dahl_salso;
-extern crate rand;
-
 use dahl_partition::*;
 use rand::distributions::{Distribution, WeightedIndex};
-use rand::thread_rng;
-use rand::Rng;
+use rand::prelude::*;
 use std::convert::TryFrom;
 use std::slice;
 
@@ -41,28 +36,9 @@ impl std::ops::Index<usize> for Weights {
     }
 }
 
-fn ensure_empty_subset(partition: &mut Partition) {
-    match partition.subsets().last() {
-        None => partition.new_subset(),
-        Some(last) => {
-            if !last.is_empty() {
-                partition.new_subset()
-            }
-        }
-    }
-}
-
-fn mk_intersection_counter(n_subsets: usize) -> Vec<Vec<f64>> {
-    let mut counter = Vec::with_capacity(n_subsets);
-    for _ in 0..n_subsets {
-        counter.push(Vec::new())
-    }
-    counter
-}
-
 enum TargetOrRandom<'a> {
     Target(&'a Partition),
-    Random(rand::prelude::ThreadRng),
+    Random(ThreadRng),
 }
 
 pub fn engine(
@@ -98,10 +74,21 @@ pub fn engine(
     let mut log_probability = 0.0;
     let mut partition = Partition::new(ni);
     let mut total_counter = vec![0.0; nsf];
-    let mut intersection_counter = mk_intersection_counter(nsf);
+    let mut intersection_counter = Vec::with_capacity(nsf);
+    for _ in 0..nsf {
+        intersection_counter.push(Vec::new())
+    }
     for i in 0..ni {
         let ii = permutation[i];
-        ensure_empty_subset(&mut partition);
+        // Ensure there is an empty subset
+        match partition.subsets().last() {
+            None => partition.new_subset(),
+            Some(last) => {
+                if !last.is_empty() {
+                    partition.new_subset()
+                }
+            }
+        }
         let focal_subset_index = focal.label_of(ii).unwrap();
         let scaled_weight = if total_counter[focal_subset_index] == 0.0 {
             0.0
@@ -132,7 +119,7 @@ pub fn engine(
             }
             TargetOrRandom::Target(t) => {
                 let index = t.label_of(ii).unwrap();
-                let mut numerator = -1.0;
+                let mut numerator = -1.0; // Nonsense initial value;
                 let denominator = probs.fold(0.0, |sum, x| {
                     if x.0 == index {
                         numerator = x.1;
