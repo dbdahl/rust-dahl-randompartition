@@ -139,7 +139,7 @@ pub fn engine(
                     }
                     sum + x.1
                 });
-                log_probability += (numerator/denominator).ln();
+                log_probability += (numerator / denominator).ln();
                 index
             }
         };
@@ -197,12 +197,11 @@ mod tests {
         for focal in Partition::iter(n_items) {
             permutation.shuffle(&mut rng);
             let focal = Partition::from(&focal[..]);
-            let weights = Weights::constant(2.0, focal.n_subsets());
-            //let mut vec = Vec::with_capacity(focal.n_subsets());
-            //for _ in 0..focal.n_subsets() {
-            //    vec.push(rng.gen_range(0.0, 10.0));
-            //}
-            //let weights = Weights::from(&vec[..]).unwrap();
+            let mut vec = Vec::with_capacity(focal.n_subsets());
+            for _ in 0..focal.n_subsets() {
+                vec.push(rng.gen_range(0.0, 10.0));
+            }
+            let weights = Weights::from(&vec[..]).unwrap();
             let sum = Partition::iter(n_items)
                 .map(|p| {
                     engine(
