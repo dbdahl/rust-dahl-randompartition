@@ -103,7 +103,7 @@ pub fn engine(
         let ii = permutation[i];
         ensure_empty_subset(&mut partition);
         let focal_subset_index = focal.label_of(ii).unwrap();
-        let constant = if total_counter[focal_subset_index] == 0.0 {
+        let scaled_weight = if total_counter[focal_subset_index] == 0.0 {
             0.0
         } else {
             weights[focal_subset_index] / total_counter[focal_subset_index]
@@ -121,7 +121,7 @@ pub fn engine(
                     }
                 } else {
                     (subset.n_items() as f64)
-                        + constant * intersection_counter[focal_subset_index][subset_index]
+                        + scaled_weight * intersection_counter[focal_subset_index][subset_index]
                 };
                 (subset_index, prob)
             });
@@ -150,12 +150,6 @@ pub fn engine(
         }
         intersection_counter[focal_subset_index][subset_index] += 1.0;
         total_counter[focal_subset_index] += 1.0;
-        for fi in 0..focal.n_subsets() {
-            assert_eq!(
-                intersection_counter[fi].iter().fold(0.0, |sum, x| sum + *x),
-                total_counter[fi]
-            );
-        }
         partition.add_with_index(ii, subset_index);
     }
     partition.canonicalize();
@@ -190,8 +184,8 @@ mod tests {
 
     #[test]
     fn test_pmf() {
-        let n_items = 4;
-        let mass = 3.0;
+        let n_items = 5;
+        let mass = 2.0;
         let mut permutation = Permutation::natural(n_items);
         let mut rng = thread_rng();
         for focal in Partition::iter(n_items) {
