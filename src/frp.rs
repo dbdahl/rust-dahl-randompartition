@@ -108,7 +108,7 @@ pub fn engine(
         } else {
             weights[focal_subset_index] / total_counter[focal_subset_index]
         };
-        let mut probs = partition
+        let probs = partition
             .subsets()
             .iter()
             .enumerate()
@@ -132,7 +132,14 @@ pub fn engine(
             }
             TargetOrRandom::Target(t) => {
                 let index = t.label_of(ii).unwrap();
-                log_probability += probs.nth(index).unwrap().1.ln();
+                let mut numerator = -1.0;
+                let denominator = probs.fold(0.0, |sum, x| {
+                    if x.0 == index {
+                        numerator = x.1;
+                    }
+                    sum + x.1
+                });
+                log_probability += (numerator/denominator).ln();
                 index
             }
         };
@@ -152,8 +159,7 @@ pub fn engine(
         partition.add_with_index(ii, subset_index);
     }
     partition.canonicalize();
-    let log_denominator = (0..ni).fold(0.0, |sum, x| sum + (mass + weights[0] + (x as f64)).ln());
-    (partition, log_probability - log_denominator)
+    (partition, log_probability)
 }
 
 #[cfg(test)]
