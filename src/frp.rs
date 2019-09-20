@@ -203,38 +203,53 @@ mod tests {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__rfp__sample(
+pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     n_partitions: i32,
     n_items: i32,
     focal_ptr: *const i32,
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     mass: f64,
-    ptr: *mut i32,
+    do_sampling: i32,
+    use_random_permutation: i32,
+    partition_labels_ptr: *mut i32,
+    partition_probs_ptr: *mut f64,
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
-    let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
     let focal = Partition::from(slice::from_raw_parts(focal_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, focal.n_subsets())).unwrap();
     let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
-    let random_permutation = permutation_slice[0] == -1;
-    let mut permutation = if !random_permutation {
+    let mut permutation = if use_random_permutation != 0 {
         let permutation_vector: Vec<usize> =
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     } else {
         Permutation::natural(ni)
     };
-    let mut rng = thread_rng();
-    for i in 0..np {
-        if random_permutation {
-            permutation.shuffle(&mut rng);
+    let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
+    let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
+    if do_sampling != 0 {
+        let mut rng = thread_rng();
+        for i in 0..np {
+            if use_random_permutation != 0 {
+                permutation.shuffle(&mut rng);
+            }
+            let p = engine(&focal, &weights, &permutation, mass, None);
+            let labels = p.0.labels();
+            for j in 0..ni {
+                matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+            }
         }
-        let p = engine(&focal, &weights, &permutation, mass, None);
-        let labels = p.0.labels();
-        for j in 0..ni {
-            array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+    } else {
+        for i in 0..np {
+            let mut target_labels = Vec::with_capacity(ni);
+            for j in 0..ni {
+                target_labels.push(matrix[np * j + i]);
+            }
+            let mut target = Partition::from(&target_labels[..]);
+            let p = engine(&focal, &weights, &permutation, mass, Some(&mut target));
+            probs[i] = p.1;
         }
     }
 }
