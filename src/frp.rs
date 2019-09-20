@@ -95,7 +95,7 @@ pub fn engine(
         } else {
             weights[focal_subset_index] / total_counter[focal_subset_index]
         };
-        let probs = partition
+        let probs: Vec<(usize, f64)> = partition
             .subsets()
             .iter()
             .enumerate()
@@ -111,25 +111,18 @@ pub fn engine(
                         + scaled_weight * intersection_counter[focal_subset_index][subset_index]
                 };
                 (subset_index, prob)
-            });
+            })
+            .collect();
         let subset_index = match either {
             TargetOrRandom::Random(mut rng) => {
-                let dist = WeightedIndex::new(probs.map(|x| x.1)).unwrap();
+                let dist = WeightedIndex::new(probs.iter().map(|x| x.1)).unwrap();
                 dist.sample(&mut rng)
             }
-            TargetOrRandom::Target(t) => {
-                let index = t.label_of(ii).unwrap();
-                let mut numerator = -1.0; // Nonsense initial value;
-                let denominator = probs.fold(0.0, |sum, x| {
-                    if x.0 == index {
-                        numerator = x.1;
-                    }
-                    sum + x.1
-                });
-                log_probability += (numerator / denominator).ln();
-                index
-            }
+            TargetOrRandom::Target(t) => t.label_of(ii).unwrap(),
         };
+        let numerator = probs[subset_index].1;
+        let denominator = probs.iter().fold(0.0, |sum, x| sum + x.1);
+        log_probability += (numerator / denominator).ln();
         if subset_index == intersection_counter[0].len() {
             for counter in intersection_counter.iter_mut() {
                 counter.push(0.0);
@@ -219,13 +212,13 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     let ni = n_items as usize;
     let focal = Partition::from(slice::from_raw_parts(focal_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, focal.n_subsets())).unwrap();
-    let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
     let mut permutation = if use_random_permutation != 0 {
+        Permutation::natural(ni)
+    } else {
+        let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
         let permutation_vector: Vec<usize> =
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
-    } else {
-        Permutation::natural(ni)
     };
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
@@ -240,6 +233,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
             for j in 0..ni {
                 matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
             }
+            probs[i] = p.1;
         }
     } else {
         for i in 0..np {
