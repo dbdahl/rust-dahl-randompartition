@@ -204,7 +204,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     permutation_ptr: *const i32,
     mass: f64,
     do_sampling: i32,
-    use_random_permutation: i32,
+    use_random_permutations: i32,
     partition_labels_ptr: *mut i32,
     partition_probs_ptr: *mut f64,
 ) -> () {
@@ -212,7 +212,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     let ni = n_items as usize;
     let focal = Partition::from(slice::from_raw_parts(focal_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, focal.n_subsets())).unwrap();
-    let mut permutation = if use_random_permutation != 0 {
+    let mut permutation = if use_random_permutations != 0 {
         Permutation::natural(ni)
     } else {
         let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     if do_sampling != 0 {
         let mut rng = thread_rng();
         for i in 0..np {
-            if use_random_permutation != 0 {
+            if use_random_permutations != 0 {
                 permutation.shuffle(&mut rng);
             }
             let p = engine(&focal, &weights, &permutation, mass, None);
