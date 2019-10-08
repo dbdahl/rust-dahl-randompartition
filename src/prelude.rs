@@ -34,6 +34,7 @@ impl Add<Mass> for f64 {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Rate(f64);
 
 impl Rate {
