@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use dahl_partition::*;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
@@ -45,7 +46,7 @@ pub fn engine(
     focal: &Partition,
     weights: &Weights,
     permutation: &Permutation,
-    mass: f64,
+    mass: Mass,
     target: Option<&mut Partition>,
 ) -> (Partition, f64) {
     assert!(
@@ -58,7 +59,6 @@ pub fn engine(
         "Length of weights must equal the number of subsets of the focal partition."
     );
     assert_eq!(permutation.len(), focal.n_items());
-    assert!(mass > 0.0, "Mass must be greater than 0.0.");
     let either = match target {
         Some(t) => {
             assert!(t.is_canonical());
@@ -104,7 +104,7 @@ pub fn engine(
                     if total_counter[focal_subset_index] == 0.0 {
                         mass + weights[focal_subset_index]
                     } else {
-                        mass
+                        mass.as_f64()
                     }
                 } else {
                     (subset.n_items() as f64)
@@ -144,7 +144,7 @@ mod tests {
     fn test_sample() {
         let n_partitions = 10000;
         let n_items = 4;
-        let mass = 2.0;
+        let mass = Mass::new(2.0);
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         let focal = Partition::one_subset(n_items);
         let weights = Weights::zero(1);
@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn test_pmf() {
         let n_items = 5;
-        let mass = 2.0;
+        let mass = Mass::new(2.0);
         let mut permutation = Permutation::natural(n_items);
         let mut rng = thread_rng();
         for focal in Partition::iter(n_items) {
@@ -222,6 +222,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     };
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
+    let mass = Mass::new(mass);
     if do_sampling != 0 {
         let mut rng = thread_rng();
         for i in 0..np {

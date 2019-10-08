@@ -6,3 +6,5 @@ extern crate rand;
 
 pub mod crp;
 pub mod frp;
+pub mod mcmc;
+pub mod prelude;
