@@ -2,6 +2,7 @@ use crate::prelude::*;
 use dahl_partition::*;
 
 use rand::distributions::{Distribution, WeightedIndex};
+use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
 use std::slice;
 
@@ -29,6 +30,18 @@ pub fn sample(n_items: usize, mass: Mass) -> Partition {
         p.add_with_index(i, subset_index);
     }
     p
+}
+
+pub fn pmf(x: &Partition, mass: Mass) -> f64 {
+    let ni = x.n_items() as f64;
+    let ns = x.n_subsets() as f64;
+    let m = mass.as_f64();
+    let lm = mass.log();
+    let mut result = ns * lm + ln_gamma(m) - ln_gamma(m + ni);
+    for subset in x.subsets() {
+        result += ln_gamma(subset.n_items() as f64);
+    }
+    result
 }
 
 #[cfg(test)]

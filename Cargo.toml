@@ -13,3 +13,4 @@ dahl-partition = { git="https://dahl-git.byu.edu/dahl/rust-dahl-partition.git" }
 dahl-salso = { git="https://dahl-git.byu.edu/dahl/rust-dahl-salso.git" }
 #dahl-salso = { path="/home/dahl/docs/devel/rust-dahl-salso" }
 rand = "0.7.2"
+statrs = "0.12.0"

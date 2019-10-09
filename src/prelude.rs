@@ -9,6 +9,10 @@ impl Mass {
         Mass(x)
     }
 
+    pub fn log(self) -> f64 {
+        self.0.ln()
+    }
+
     pub fn as_f64(self) -> f64 {
         self.0
     }
@@ -39,7 +43,7 @@ pub struct Rate(f64);
 
 impl Rate {
     pub fn new(x: f64) -> Self {
-        assert!(x > 0.0, "Rate must be greater than zero.");
+        assert!(x >= 0.0, "Rate must be greater than or equal to zero.");
         Rate(x)
     }
 
@@ -53,7 +57,7 @@ impl Add<f64> for Rate {
 
     fn add(self, other: f64) -> f64 {
         let ans = self.0 + other;
-        assert!(ans > 0.0);
+        assert!(ans >= 0.0);
         ans
     }
 }
@@ -63,7 +67,7 @@ impl Add<Rate> for f64 {
 
     fn add(self, other: Rate) -> f64 {
         let ans = self + other.0;
-        assert!(ans > 0.0);
+        assert!(ans >= 0.0);
         ans
     }
 }
