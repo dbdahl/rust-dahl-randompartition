@@ -3,6 +3,7 @@ use crate::prelude::*;
 use dahl_partition::*;
 use rand::thread_rng;
 use rand::Rng;
+use std::slice;
 
 fn update<T>(
     n_updates: u32,
@@ -45,6 +46,48 @@ where
     (state, accepts)
 }
 
+fn make_posterior<'a, T: 'a, U: 'a>(
+    log_prior: T,
+    log_likelihood: U,
+) -> Box<dyn Fn(&Partition) -> f64 + 'a>
+where
+    T: Fn(&Partition) -> f64,
+    U: Fn(&[usize]) -> f64,
+{
+    let log_target = move |partition: &Partition| {
+        partition
+            .subsets()
+            .iter()
+            .fold(log_prior(partition), |sum, subset| {
+                sum + log_likelihood(&subset.items()[..])
+            })
+    };
+    Box::new(log_target)
+}
+
+fn update_under_posterior<T, U>(
+    n_updates: u32,
+    current: &mut Partition,
+    rate: Rate,
+    mass: Mass,
+    log_prior: T,
+    log_likelihood: U,
+) -> (Partition, u32)
+where
+    T: Fn(&Partition) -> f64,
+    U: Fn(&[usize]) -> f64,
+{
+    let log_target = |partition: &Partition| {
+        partition
+            .subsets()
+            .iter()
+            .fold(log_prior(partition), |sum, subset| {
+                sum + log_likelihood(&subset.items()[..])
+            })
+    };
+    update(n_updates, current, rate, mass, log_target)
+}
+
 #[cfg(test)]
 mod tests_mcmc {
     use super::*;
@@ -53,20 +96,45 @@ mod tests_mcmc {
     fn test_crp() {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
-        let mut n_accepts = 0;
         let rate = Rate::new(5.0);
         let mass = Mass::new(1.0);
-        let log_target = |p: &Partition| crate::crp::pmf(&p, mass);
+        let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
+        let log_likelihood = |_indices: &[usize]| 0.0;
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            let result = update(1, &mut current, rate, mass, log_target);
+            let result =
+                update_under_posterior(1, &mut current, rate, mass, log_prior, log_likelihood);
             current = result.0;
-            n_accepts += result.1;
             sum += current.n_subsets();
         }
         let mean_number_of_subsets = (sum as f64) / (n_samples as f64);
-        let Zstat = (mean_number_of_subsets - 2.283333) / (0.8197222 / n_samples as f64).sqrt();
-        assert!(Zstat.abs() < 3.290527);
+        let z_stat = (mean_number_of_subsets - 2.283333) / (0.8197222 / n_samples as f64).sqrt();
+        assert!(z_stat.abs() < 3.290527);
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
+    n_updates: i32,
+    n_items: i32,
+    rate: f64,
+    mass: f64,
+    partition_ptr: *mut i32,
+    n_accepts: *mut i32,
+) -> () {
+    let nu = n_updates as u32;
+    let ni = n_items as usize;
+    let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
+    let mut partition = Partition::from(partition_slice);
+    let rate = Rate::new(rate);
+    let mass = Mass::new(mass);
+    let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
+    let log_likelihood = |_indices: &[usize]| 0.0;
+    let log_target = make_posterior(log_prior, log_likelihood);
+    let results = update(nu, &mut partition, rate, mass, log_target);
+    results
+        .0
+        .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
+    *n_accepts = results.1 as i32;
 }
