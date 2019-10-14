@@ -3,6 +3,7 @@ use crate::prelude::*;
 use dahl_partition::*;
 use rand::thread_rng;
 use rand::Rng;
+use std::ffi::c_void;
 use std::slice;
 
 fn update<T>(
@@ -114,6 +115,15 @@ mod tests_mcmc {
     }
 }
 
+extern "C" {
+    fn callRFunction_indices_f64(
+        fn_ptr: *const c_void,
+        indices_ptr: *const c_void,
+        len: i32,
+        env_ptr: *const c_void,
+    ) -> f64;
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     n_updates: i32,
@@ -121,6 +131,8 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     rate: f64,
     mass: f64,
     partition_ptr: *mut i32,
+    log_likelihood_function_ptr: *const c_void,
+    env_ptr: *const c_void,
     n_accepts: *mut i32,
 ) -> () {
     let nu = n_updates as u32;
@@ -130,7 +142,15 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let rate = Rate::new(rate);
     let mass = Mass::new(mass);
     let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
-    let log_likelihood = |_indices: &[usize]| 0.0;
+    let log_likelihood = |indices: &[usize]| {
+        let indices_ptr = indices.as_ptr() as *const c_void;
+        callRFunction_indices_f64(
+            log_likelihood_function_ptr,
+            indices_ptr,
+            indices.len() as i32,
+            env_ptr,
+        )
+    };
     let log_target = make_posterior(log_prior, log_likelihood);
     let results = update(nu, &mut partition, rate, mass, log_target);
     results
