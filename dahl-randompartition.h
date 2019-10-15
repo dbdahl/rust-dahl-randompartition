@@ -3,9 +3,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct {
+  const void *sexp_ptr;
+  int32_t *data_ptr;
+  int32_t len;
+} RR_SEXP_vector_INTSXP;
+
 extern double callRFunction_indices_f64(const void *fn_ptr,
-                                        const void *indices_ptr,
-                                        int32_t len,
+                                        RR_SEXP_vector_INTSXP indices,
                                         const void *env_ptr);
 
 void dahl_randompartition__crp__sample(int32_t n_partitions,
@@ -32,3 +37,5 @@ void dahl_randompartition__mhrw_update(int32_t n_updates,
                                        const void *log_likelihood_function_ptr,
                                        const void *env_ptr,
                                        int32_t *n_accepts);
+
+extern RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);

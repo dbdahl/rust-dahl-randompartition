@@ -115,13 +115,32 @@ mod tests_mcmc {
     }
 }
 
+#[repr(C)]
+pub struct RR_SEXP_vector_INTSXP {
+    pub sexp_ptr: *const c_void,
+    pub data_ptr: *mut i32,
+    pub len: i32,
+}
+
+impl RR_SEXP_vector_INTSXP {
+    fn from_slice(slice: &[usize]) -> Self {
+        let result = unsafe { rrAllocVectorINTSXP(slice.len() as i32) };
+        let into_slice: &mut [i32] =
+            unsafe { slice::from_raw_parts_mut(result.data_ptr, result.len as usize) };
+        for (x, y) in into_slice.iter_mut().zip(slice) {
+            *x = (*y as i32) + 1;
+        }
+        result
+    }
+}
+
 extern "C" {
     fn callRFunction_indices_f64(
         fn_ptr: *const c_void,
-        indices_ptr: *const c_void,
-        len: i32,
+        indices: RR_SEXP_vector_INTSXP,
         env_ptr: *const c_void,
     ) -> f64;
+    fn rrAllocVectorINTSXP(len: i32) -> RR_SEXP_vector_INTSXP;
 }
 
 #[no_mangle]
@@ -143,12 +162,9 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let mass = Mass::new(mass);
     let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
     let log_likelihood = |indices: &[usize]| {
-        let indices_as_i32: Vec<i32> = indices.iter().map(|i| (*i as i32) + 1).collect();
-        let indices_ptr = indices_as_i32.as_ptr() as *const c_void;
         callRFunction_indices_f64(
             log_likelihood_function_ptr,
-            indices_ptr,
-            indices.len() as i32,
+            RR_SEXP_vector_INTSXP::from_slice(indices),
             env_ptr,
         )
     };
