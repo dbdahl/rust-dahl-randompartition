@@ -9,9 +9,9 @@ typedef struct {
   int32_t len;
 } RR_SEXP_vector_INTSXP;
 
-extern double callRFunction_indices_f64(const void *fn_ptr,
-                                        RR_SEXP_vector_INTSXP indices,
-                                        const void *env_ptr);
+extern double callRFunction_logIntegratedLikelihoodOfSubset(const void *fn_ptr,
+                                                            RR_SEXP_vector_INTSXP indices,
+                                                            const void *env_ptr);
 
 void dahl_randompartition__crp__sample(int32_t n_partitions,
                                        int32_t n_items,

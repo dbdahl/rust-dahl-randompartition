@@ -115,6 +115,15 @@ mod tests_mcmc {
     }
 }
 
+extern "C" {
+    fn callRFunction_logIntegratedLikelihoodOfSubset(
+        fn_ptr: *const c_void,
+        indices: RR_SEXP_vector_INTSXP,
+        env_ptr: *const c_void,
+    ) -> f64;
+    fn rrAllocVectorINTSXP(len: i32) -> RR_SEXP_vector_INTSXP;
+}
+
 #[repr(C)]
 pub struct RR_SEXP_vector_INTSXP {
     pub sexp_ptr: *const c_void,
@@ -132,15 +141,6 @@ impl RR_SEXP_vector_INTSXP {
         }
         result
     }
-}
-
-extern "C" {
-    fn callRFunction_indices_f64(
-        fn_ptr: *const c_void,
-        indices: RR_SEXP_vector_INTSXP,
-        env_ptr: *const c_void,
-    ) -> f64;
-    fn rrAllocVectorINTSXP(len: i32) -> RR_SEXP_vector_INTSXP;
 }
 
 #[no_mangle]
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let mass = Mass::new(mass);
     let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
     let log_likelihood = |indices: &[usize]| {
-        callRFunction_indices_f64(
+        callRFunction_logIntegratedLikelihoodOfSubset(
             log_likelihood_function_ptr,
             RR_SEXP_vector_INTSXP::from_slice(indices),
             env_ptr,
