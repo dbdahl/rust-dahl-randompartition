@@ -143,7 +143,8 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let mass = Mass::new(mass);
     let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
     let log_likelihood = |indices: &[usize]| {
-        let indices_ptr = indices.as_ptr() as *const c_void;
+        let indices_as_i32: Vec<i32> = indices.iter().map(|i| (*i as i32) + 1).collect();
+        let indices_ptr = indices_as_i32.as_ptr() as *const c_void;
         callRFunction_indices_f64(
             log_likelihood_function_ptr,
             indices_ptr,
