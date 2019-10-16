@@ -11,7 +11,7 @@ fn update<T>(
     current: &mut Partition,
     rate: Rate,
     mass: Mass,
-    log_target: T,
+    log_target: &T,
 ) -> (Partition, u32)
 where
     T: Fn(&Partition) -> f64,
@@ -23,6 +23,7 @@ where
     let mut log_target_state = log_target(&state);
     let mut weights_state = Weights::constant(rate.as_f64(), state.n_subsets());
     for _ in 0..n_updates {
+        state.canonicalize();
         permutation.shuffle(&mut rng);
         let proposal = engine(&state, &weights_state, &permutation, mass, None);
         let weights_proposal = Weights::constant(rate.as_f64(), proposal.0.n_subsets());
@@ -40,7 +41,7 @@ where
         if log_mh_ratio >= 1.0 || rng.gen_range(0.0, 1.0) < log_mh_ratio.exp() {
             accepts += 1;
             state = proposal.0;
-            log_target_state = log_ratio_proposal;
+            log_target_state = log_target_proposal;
             weights_state = weights_proposal;
         };
     }
@@ -66,29 +67,6 @@ where
     Box::new(log_target)
 }
 
-fn update_under_posterior<T, U>(
-    n_updates: u32,
-    current: &mut Partition,
-    rate: Rate,
-    mass: Mass,
-    log_prior: T,
-    log_likelihood: U,
-) -> (Partition, u32)
-where
-    T: Fn(&Partition) -> f64,
-    U: Fn(&[usize]) -> f64,
-{
-    let log_target = |partition: &Partition| {
-        partition
-            .subsets()
-            .iter()
-            .fold(log_prior(partition), |sum, subset| {
-                sum + log_likelihood(&subset.items()[..])
-            })
-    };
-    update(n_updates, current, rate, mass, log_target)
-}
-
 #[cfg(test)]
 mod tests_mcmc {
     use super::*;
@@ -101,11 +79,11 @@ mod tests_mcmc {
         let mass = Mass::new(1.0);
         let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
         let log_likelihood = |_indices: &[usize]| 0.0;
+        let log_target = make_posterior(log_prior, log_likelihood);
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            let result =
-                update_under_posterior(1, &mut current, rate, mass, log_prior, log_likelihood);
+            let result = update(2, &mut current, rate, mass, &log_target);
             current = result.0;
             sum += current.n_subsets();
         }
@@ -169,7 +147,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
         )
     };
     let log_target = make_posterior(log_prior, log_likelihood);
-    let results = update(nu, &mut partition, rate, mass, log_target);
+    let results = update(nu, &mut partition, rate, mass, &log_target);
     results
         .0
         .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
