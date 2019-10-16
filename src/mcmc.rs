@@ -7,7 +7,7 @@ use std::ffi::c_void;
 use std::slice;
 
 fn update<T>(
-    n_updates: u32,
+    n_attempts: u32,
     current: &mut Partition,
     rate: Rate,
     mass: Mass,
@@ -22,7 +22,7 @@ where
     let mut permutation = Permutation::natural(state.n_items());
     let mut log_target_state = log_target(&state);
     let mut weights_state = Weights::constant(rate.as_f64(), state.n_subsets());
-    for _ in 0..n_updates {
+    for _ in 0..n_attempts {
         state.canonicalize();
         permutation.shuffle(&mut rng);
         let proposal = engine(&state, &weights_state, &permutation, mass, None);
@@ -123,7 +123,7 @@ impl RR_SEXP_vector_INTSXP {
 
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
-    n_updates: i32,
+    n_attempts: i32,
     n_items: i32,
     rate: f64,
     mass: f64,
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     env_ptr: *const c_void,
     n_accepts: *mut i32,
 ) -> () {
-    let nu = n_updates as u32;
+    let na = n_attempts as u32;
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let mut partition = Partition::from(partition_slice);
@@ -147,7 +147,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
         )
     };
     let log_target = make_posterior(log_prior, log_likelihood);
-    let results = update(nu, &mut partition, rate, mass, &log_target);
+    let results = update(na, &mut partition, rate, mass, &log_target);
     results
         .0
         .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
