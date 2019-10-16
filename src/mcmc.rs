@@ -8,7 +8,7 @@ use std::slice;
 
 fn update<T>(
     n_attempts: u32,
-    current: &mut Partition,
+    current: &Partition,
     rate: Rate,
     mass: Mass,
     log_target: &T,
@@ -83,7 +83,7 @@ mod tests_mcmc {
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            let result = update(2, &mut current, rate, mass, &log_target);
+            let result = update(2, &current, rate, mass, &log_target);
             current = result.0;
             sum += current.n_subsets();
         }
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let na = n_attempts as u32;
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
-    let mut partition = Partition::from(partition_slice);
+    let partition = Partition::from(partition_slice);
     let rate = Rate::new(rate);
     let mass = Mass::new(mass);
     let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
@@ -147,7 +147,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
         )
     };
     let log_target = make_posterior(log_prior, log_likelihood);
-    let results = update(na, &mut partition, rate, mass, &log_target);
+    let results = update(na, &partition, rate, mass, &log_target);
     results
         .0
         .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
