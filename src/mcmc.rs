@@ -121,6 +121,18 @@ impl RR_SEXP_vector_INTSXP {
     }
 }
 
+pub enum PartitionPrior {
+    CRP {
+        mass: Mass,
+    },
+    Focal {
+        focal: Partition,
+        permutation: Permutation,
+        weights: Weights,
+        mass: Mass,
+    },
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     n_attempts: i32,

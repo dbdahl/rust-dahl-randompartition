@@ -53,23 +53,23 @@ pub fn engine(
         focal.is_canonical(),
         "Focal partition must be in canonical form."
     );
+    let nsf = focal.n_subsets();
+    let ni = focal.n_items();
     assert_eq!(
-        focal.n_subsets(),
+        nsf,
         weights.len(),
         "Length of weights must equal the number of subsets of the focal partition."
     );
-    assert_eq!(permutation.len(), focal.n_items());
+    assert_eq!(permutation.len(), ni);
     let either = match target {
         Some(t) => {
             assert!(t.is_canonical());
-            assert_eq!(t.n_items(), focal.n_items());
+            assert_eq!(t.n_items(), ni);
             t.canonicalize_by_permutation(Some(&permutation));
             TargetOrRandom::Target(t)
         }
         None => TargetOrRandom::Random(thread_rng()),
     };
-    let ni = focal.n_items();
-    let nsf = focal.n_subsets();
 
     let mut log_probability = 0.0;
     let mut partition = Partition::new(ni);
@@ -144,11 +144,11 @@ mod tests {
     fn test_sample() {
         let n_partitions = 10000;
         let n_items = 4;
-        let mass = Mass::new(2.0);
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         let focal = Partition::one_subset(n_items);
         let weights = Weights::zero(1);
         let mut permutation = Permutation::natural(n_items);
+        let mass = Mass::new(2.0);
         let mut rng = thread_rng();
         for _ in 0..n_partitions {
             permutation.shuffle(&mut rng);
@@ -165,8 +165,8 @@ mod tests {
     #[test]
     fn test_pmf() {
         let n_items = 5;
-        let mass = Mass::new(2.0);
         let mut permutation = Permutation::natural(n_items);
+        let mass = Mass::new(2.0);
         let mut rng = thread_rng();
         for focal in Partition::iter(n_items) {
             permutation.shuffle(&mut rng);
@@ -220,9 +220,9 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
+    let mass = Mass::new(mass);
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
-    let mass = Mass::new(mass);
     if do_sampling != 0 {
         let mut rng = thread_rng();
         for i in 0..np {
