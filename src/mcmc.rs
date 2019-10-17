@@ -1,12 +1,69 @@
 use crate::frp::{engine, Weights};
 use crate::prelude::*;
 use dahl_partition::*;
+use rand::distributions::{Distribution, WeightedIndex};
 use rand::thread_rng;
 use rand::Rng;
 use std::ffi::c_void;
 use std::slice;
 
-fn update<T>(
+fn update_neal_algorithm3<T>(
+    n_updates: u32,
+    current: &Partition,
+    mass: Mass,
+    log_posterior_predictive: &T,
+) -> Partition
+where
+    T: Fn(usize, &[usize]) -> f64,
+{
+    let mut rng = thread_rng();
+    let ni = current.n_items();
+    let mut state = current.clone();
+    state.canonicalize();
+    state.new_subset();
+    let mut empty_subset_at_end = true;
+    for _ in 0..n_updates {
+        for i in 0..ni {
+            // Remove 'i', ensure there is one and only one empty subset, and be efficient.
+            let k = state.label_of(i).unwrap();
+            state.remove(i);
+            state.clean_subset(k);
+            if state.subsets()[k].is_empty() {
+                if empty_subset_at_end {
+                    state.pop_subset();
+                    empty_subset_at_end = k == state.n_subsets() - 1;
+                } else {
+                    state.canonicalize();
+                    state.new_subset();
+                    empty_subset_at_end = true;
+                }
+            }
+            let weights = state.subsets().iter().map(|subset| {
+                let pp = if subset.is_empty() {
+                    mass.as_f64()
+                } else {
+                    subset.n_items() as f64
+                };
+                log_posterior_predictive(i, &subset.items()[..]).exp() * pp
+            });
+            let dist = WeightedIndex::new(weights).unwrap();
+            let subset_index = dist.sample(&mut rng);
+            state.add_with_index(i, subset_index);
+            if state.subsets()[subset_index].n_items() == 1 {
+                state.new_subset();
+                empty_subset_at_end = true;
+            }
+        }
+    }
+    if empty_subset_at_end {
+        state.pop_subset();
+    } else {
+        state.canonicalize();
+    }
+    state
+}
+
+fn update_rwmh<T>(
     n_attempts: u32,
     current: &Partition,
     rate: Rate,
@@ -72,7 +129,7 @@ mod tests_mcmc {
     use super::*;
 
     #[test]
-    fn test_crp() {
+    fn test_crp_rwmh() {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
         let rate = Rate::new(5.0);
@@ -83,8 +140,25 @@ mod tests_mcmc {
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            let result = update(2, &current, rate, mass, &log_target);
+            let result = update_rwmh(2, &current, rate, mass, &log_target);
             current = result.0;
+            sum += current.n_subsets();
+        }
+        let mean_number_of_subsets = (sum as f64) / (n_samples as f64);
+        let z_stat = (mean_number_of_subsets - 2.283333) / (0.8197222 / n_samples as f64).sqrt();
+        assert!(z_stat.abs() < 3.290527);
+    }
+
+    #[test]
+    fn test_crp_neal_algorithm3() {
+        let n_items = 5;
+        let mut current = Partition::one_subset(n_items);
+        let mass = Mass::new(1.0);
+        let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
+        let mut sum = 0;
+        let n_samples = 10000;
+        for _ in 0..n_samples {
+            current = update_neal_algorithm3(2, &current, mass, &log_posterior_predictive);
             sum += current.n_subsets();
         }
         let mean_number_of_subsets = (sum as f64) / (n_samples as f64);
@@ -94,6 +168,12 @@ mod tests_mcmc {
 }
 
 extern "C" {
+    fn callRFunction_logIntegratedLikelihoodOfItem(
+        fn_ptr: *const c_void,
+        i: i32,
+        indices: RR_SEXP_vector_INTSXP,
+        env_ptr: *const c_void,
+    ) -> f64;
     fn callRFunction_logIntegratedLikelihoodOfSubset(
         fn_ptr: *const c_void,
         indices: RR_SEXP_vector_INTSXP,
@@ -134,6 +214,32 @@ pub enum PartitionPrior {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
+    n_updates: i32,
+    n_items: i32,
+    mass: f64,
+    partition_ptr: *mut i32,
+    log_likelihood_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+) -> () {
+    let nu = n_updates as u32;
+    let ni = n_items as usize;
+    let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
+    let partition = Partition::from(partition_slice);
+    let mass = Mass::new(mass);
+    let log_posterior_predictive = |i: usize, indices: &[usize]| {
+        callRFunction_logIntegratedLikelihoodOfItem(
+            log_likelihood_function_ptr,
+            i as i32,
+            RR_SEXP_vector_INTSXP::from_slice(indices),
+            env_ptr,
+        )
+    };
+    let results = update_neal_algorithm3(nu, &partition, mass, &log_posterior_predictive);
+    results.labels_into_slice(partition_slice, |x| x.unwrap() as i32);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     n_attempts: i32,
     n_items: i32,
@@ -159,7 +265,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
         )
     };
     let log_target = make_posterior(log_prior, log_likelihood);
-    let results = update(na, &partition, rate, mass, &log_target);
+    let results = update_rwmh(na, &partition, rate, mass, &log_target);
     results
         .0
         .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
