@@ -9,6 +9,11 @@ typedef struct {
   int32_t len;
 } RR_SEXP_vector_INTSXP;
 
+extern double callRFunction_logIntegratedLikelihoodOfItem(const void *fn_ptr,
+                                                          int32_t i,
+                                                          RR_SEXP_vector_INTSXP indices,
+                                                          const void *env_ptr);
+
 extern double callRFunction_logIntegratedLikelihoodOfSubset(const void *fn_ptr,
                                                             RR_SEXP_vector_INTSXP indices,
                                                             const void *env_ptr);
@@ -29,7 +34,7 @@ void dahl_randompartition__focal_partition(int32_t n_partitions,
                                            int32_t *partition_labels_ptr,
                                            double *partition_probs_ptr);
 
-void dahl_randompartition__mhrw_update(int32_t n_updates,
+void dahl_randompartition__mhrw_update(int32_t n_attempts,
                                        int32_t n_items,
                                        double rate,
                                        double mass,
@@ -37,5 +42,12 @@ void dahl_randompartition__mhrw_update(int32_t n_updates,
                                        const void *log_likelihood_function_ptr,
                                        const void *env_ptr,
                                        int32_t *n_accepts);
+
+void dahl_randompartition__neal_algorithm3_update(int32_t n_updates,
+                                                  int32_t n_items,
+                                                  double mass,
+                                                  int32_t *partition_ptr,
+                                                  const void *log_likelihood_function_ptr,
+                                                  const void *env_ptr);
 
 extern RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);
