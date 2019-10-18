@@ -230,7 +230,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     let log_posterior_predictive = |i: usize, indices: &[usize]| {
         callRFunction_logIntegratedLikelihoodOfItem(
             log_likelihood_function_ptr,
-            i as i32,
+            (i as i32) + 1,
             RR_SEXP_vector_INTSXP::from_slice(indices),
             env_ptr,
         )
