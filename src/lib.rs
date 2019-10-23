@@ -8,4 +8,5 @@ extern crate statrs;
 pub mod crp;
 pub mod frp;
 pub mod mcmc;
+pub mod nggp;
 pub mod prelude;

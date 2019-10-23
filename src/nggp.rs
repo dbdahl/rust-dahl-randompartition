@@ -1,4 +1,4 @@
-// Chinese restaurant process
+// Normalized generalized gamma process
 
 use crate::prelude::*;
 use dahl_partition::*;
@@ -8,10 +8,15 @@ use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
 use std::slice;
 
-pub fn sample(n_items: usize, mass: Mass) -> Partition {
+pub fn sample(
+    n_items: usize,
+    mass: Mass,
+    reinforcement: Reinforcement,
+    u: NonnegativeDouble,
+) -> Partition {
     let mut rng = rand::thread_rng();
     let mut p = Partition::new(n_items);
-    let mass = mass.as_f64();
+    let weight_of_new = mass.as_f64() * (u + 1.0).powf(reinforcement.as_f64());
     for i in 0..p.n_items() {
         match p.subsets().last() {
             None => p.new_subset(),
@@ -23,9 +28,9 @@ pub fn sample(n_items: usize, mass: Mass) -> Partition {
         }
         let probs = p.subsets().iter().map(|subset| {
             if subset.is_empty() {
-                mass
+                weight_of_new
             } else {
-                subset.n_items() as f64
+                subset.n_items() as f64 - reinforcement.as_f64()
             }
         });
         let dist = WeightedIndex::new(probs).unwrap();
@@ -56,9 +61,11 @@ mod tests {
         let n_partitions = 10000;
         let n_items = 4;
         let mass = Mass::new(2.0);
+        let reinforcement = Reinforcement::new(0.5);
+        let u = NonnegativeDouble::new(0.2);
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         for _ in 0..n_partitions {
-            samples.push_partition(&sample(n_items, mass));
+            samples.push_partition(&sample(n_items, mass, reinforcement, u));
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -70,18 +77,22 @@ mod tests {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__crp__sample(
+pub unsafe extern "C" fn dahl_randompartition__nggp__sample(
     n_partitions: i32,
     n_items: i32,
     mass: f64,
+    reinforcement: f64,
+    u: f64,
     ptr: *mut i32,
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
     let mass = Mass::new(mass);
+    let reinforcement = Reinforcement::new(reinforcement);
+    let u = NonnegativeDouble::new(u);
     let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
     for i in 0..np {
-        let p = sample(ni, mass);
+        let p = sample(ni, mass, reinforcement, u);
         let labels = p.labels();
         for j in 0..ni {
             array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();

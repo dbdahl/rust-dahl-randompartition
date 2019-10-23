@@ -22,9 +22,9 @@ impl Add<f64> for Mass {
     type Output = f64;
 
     fn add(self, other: f64) -> f64 {
-        let ans = self.0 + other;
-        assert!(ans > 0.0);
-        ans
+        let x = self.0 + other;
+        assert!(x > 0.0, "Mass must be greater than zero.");
+        x
     }
 }
 
@@ -32,19 +32,19 @@ impl Add<Mass> for f64 {
     type Output = f64;
 
     fn add(self, other: Mass) -> f64 {
-        let ans = self + other.0;
-        assert!(ans > 0.0);
-        ans
+        let x = self + other.0;
+        assert!(x > 0.0, "Mass must be greater than zero.");
+        x
     }
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Rate(f64);
+pub struct NonnegativeDouble(f64);
 
-impl Rate {
+impl NonnegativeDouble {
     pub fn new(x: f64) -> Self {
-        assert!(x >= 0.0, "Rate must be greater than or equal to zero.");
-        Rate(x)
+        assert!(x >= 0.0, "Value must be greater than or equal to zero.");
+        NonnegativeDouble(x)
     }
 
     pub fn as_f64(self) -> f64 {
@@ -52,22 +52,60 @@ impl Rate {
     }
 }
 
-impl Add<f64> for Rate {
+impl Add<f64> for NonnegativeDouble {
     type Output = f64;
 
     fn add(self, other: f64) -> f64 {
-        let ans = self.0 + other;
-        assert!(ans >= 0.0);
-        ans
+        let x = self.0 + other;
+        assert!(x >= 0.0, "Value must be greater than or equal to zero.");
+        x
     }
 }
 
-impl Add<Rate> for f64 {
+impl Add<NonnegativeDouble> for f64 {
     type Output = f64;
 
-    fn add(self, other: Rate) -> f64 {
-        let ans = self + other.0;
-        assert!(ans >= 0.0);
-        ans
+    fn add(self, other: NonnegativeDouble) -> f64 {
+        let x = self + other.0;
+        assert!(x >= 0.0, "Value must be greater than or equal to zero.");
+        x
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Reinforcement(f64);
+
+impl Reinforcement {
+    pub fn new(x: f64) -> Self {
+        assert!(0.0 <= x && x < 1.0, "Reinforcement must be in [0,1).");
+        Reinforcement(x)
+    }
+
+    pub fn log(self) -> f64 {
+        self.0.ln()
+    }
+
+    pub fn as_f64(self) -> f64 {
+        self.0
+    }
+}
+
+impl Add<f64> for Reinforcement {
+    type Output = f64;
+
+    fn add(self, other: f64) -> f64 {
+        let x = self.0 + other;
+        assert!(0.0 <= x && x < 1.0, "Reinforcement must be in [0,1).");
+        x
+    }
+}
+
+impl Add<Reinforcement> for f64 {
+    type Output = f64;
+
+    fn add(self, other: Reinforcement) -> f64 {
+        let x = self + other.0;
+        assert!(0.0 <= x && x < 1.0, "Reinforcement must be in [0,1).");
+        x
     }
 }

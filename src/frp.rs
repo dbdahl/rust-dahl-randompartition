@@ -1,3 +1,5 @@
+// Focal random partition distribution
+
 use crate::prelude::*;
 use dahl_partition::*;
 use rand::distributions::{Distribution, WeightedIndex};
@@ -61,6 +63,7 @@ pub fn engine(
         "Length of weights must equal the number of subsets of the focal partition."
     );
     assert_eq!(permutation.len(), ni);
+    let mass = mass.as_f64();
     let either = match target {
         Some(t) => {
             assert!(t.is_canonical());
@@ -104,7 +107,7 @@ pub fn engine(
                     if total_counter[focal_subset_index] == 0.0 {
                         mass + weights[focal_subset_index]
                     } else {
-                        mass.as_f64()
+                        mass
                     }
                 } else {
                     (subset.n_items() as f64)

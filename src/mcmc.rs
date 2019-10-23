@@ -66,7 +66,7 @@ where
 fn update_rwmh<T>(
     n_attempts: u32,
     current: &Partition,
-    rate: Rate,
+    rate: NonnegativeDouble,
     mass: Mass,
     log_target: &T,
 ) -> (Partition, u32)
@@ -132,7 +132,7 @@ mod tests_mcmc {
     fn test_crp_rwmh() {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
-        let rate = Rate::new(5.0);
+        let rate = NonnegativeDouble::new(5.0);
         let mass = Mass::new(1.0);
         let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
         let log_likelihood = |_indices: &[usize]| 0.0;
@@ -254,7 +254,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let partition = Partition::from(partition_slice);
-    let rate = Rate::new(rate);
+    let rate = NonnegativeDouble::new(rate);
     let mass = Mass::new(mass);
     let log_prior = |p: &Partition| crate::crp::pmf(&p, mass);
     let log_likelihood = |indices: &[usize]| {
