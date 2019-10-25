@@ -10,3 +10,11 @@ pub mod frp;
 pub mod mcmc;
 pub mod nggp;
 pub mod prelude;
+
+use dahl_partition::*;
+use rand::prelude::*;
+
+enum TargetOrRandom<'a> {
+    Target(&'a Partition),
+    Random(ThreadRng),
+}

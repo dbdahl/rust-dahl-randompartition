@@ -39,11 +39,6 @@ impl std::ops::Index<usize> for Weights {
     }
 }
 
-enum TargetOrRandom<'a> {
-    Target(&'a Partition),
-    Random(ThreadRng),
-}
-
 pub fn engine(
     focal: &Partition,
     weights: &Weights,
@@ -69,9 +64,9 @@ pub fn engine(
             assert!(t.is_canonical());
             assert_eq!(t.n_items(), ni);
             t.canonicalize_by_permutation(Some(&permutation));
-            TargetOrRandom::Target(t)
+            super::TargetOrRandom::Target(t)
         }
-        None => TargetOrRandom::Random(thread_rng()),
+        None => super::TargetOrRandom::Random(thread_rng()),
     };
 
     let mut log_probability = 0.0;
@@ -117,11 +112,11 @@ pub fn engine(
             })
             .collect();
         let subset_index = match either {
-            TargetOrRandom::Random(mut rng) => {
+            super::TargetOrRandom::Random(mut rng) => {
                 let dist = WeightedIndex::new(probs.iter().map(|x| x.1)).unwrap();
                 dist.sample(&mut rng)
             }
-            TargetOrRandom::Target(t) => t.label_of(ii).unwrap(),
+            super::TargetOrRandom::Target(t) => t.label_of(ii).unwrap(),
         };
         let numerator = probs[subset_index].1;
         let denominator = probs.iter().fold(0.0, |sum, x| sum + x.1);
@@ -137,6 +132,25 @@ pub fn engine(
     }
     partition.canonicalize();
     (partition, log_probability)
+}
+
+pub fn sample(
+    focal: &Partition,
+    weights: &Weights,
+    permutation: &Permutation,
+    mass: Mass,
+) -> Partition {
+    engine(focal, weights, permutation, mass, None).0
+}
+
+pub fn log_pmf(
+    target: &mut Partition,
+    focal: &Partition,
+    weights: &Weights,
+    permutation: &Permutation,
+    mass: Mass,
+) -> f64 {
+    engine(focal, weights, permutation, mass, Some(target)).1
 }
 
 #[cfg(test)]
@@ -155,7 +169,7 @@ mod tests {
         let mut rng = thread_rng();
         for _ in 0..n_partitions {
             permutation.shuffle(&mut rng);
-            samples.push_partition(&engine(&focal, &weights, &permutation, mass, None).0);
+            samples.push_partition(&sample(&focal, &weights, &permutation, mass));
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -181,14 +195,13 @@ mod tests {
             let weights = Weights::from(&vec[..]).unwrap();
             let sum = Partition::iter(n_items)
                 .map(|p| {
-                    engine(
+                    log_pmf(
+                        &mut Partition::from(&p[..]),
                         &focal,
                         &weights,
                         &permutation,
                         mass,
-                        Some(&mut Partition::from(&p[..])),
                     )
-                    .1
                     .exp()
                 })
                 .sum();

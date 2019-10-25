@@ -35,7 +35,7 @@ pub fn sample(n_items: usize, mass: Mass) -> Partition {
     p
 }
 
-pub fn pmf(x: &Partition, mass: Mass) -> f64 {
+pub fn log_pmf(x: &Partition, mass: Mass) -> f64 {
     let ni = x.n_items() as f64;
     let ns = x.n_subsets() as f64;
     let m = mass.as_f64();
