@@ -75,32 +75,33 @@ pub fn sample(
 }
 
 pub fn log_pmf(
-    target: &mut Partition,
+    partition: &mut Partition,
     u: NonnegativeDouble,
     mass: Mass,
     reinforcement: Reinforcement,
 ) -> f64 {
-    engine(target.n_items(), u, mass, reinforcement, Some(target)).1
+    engine(partition.n_items(), u, mass, reinforcement, Some(partition)).1
 }
 
-/*
 pub fn log_density_of_u(
     u: NonnegativeDouble,
-    n: &Partition,
+    n_items: usize,
     mass: Mass,
     reinforcement: Reinforcement,
 ) -> f64 {
+    let mut partition = Partition::singleton_subsets(n_items);
+    log_joint_density(&partition, u, mass, reinforcement)
+        - log_pmf(&mut partition, u, mass, reinforcement)
 }
-*/
 
 pub fn log_joint_density(
-    x: &Partition,
+    partition: &Partition,
     u: NonnegativeDouble,
     mass: Mass,
     reinforcement: Reinforcement,
 ) -> f64 {
-    let ni = x.n_items() as f64;
-    let ns = x.n_subsets() as f64;
+    let ni = partition.n_items() as f64;
+    let ns = partition.n_subsets() as f64;
     let m = mass.as_f64();
     let lm = mass.log();
     let r = reinforcement.as_f64();
@@ -108,7 +109,7 @@ pub fn log_joint_density(
         - ln_gamma(ni)
         - (ni - r * ns) * (u + 1.0).ln()
         - (m / r) * ((u + 1.0).powf(r) - 1.0);
-    for subset in x.subsets() {
+    for subset in partition.subsets() {
         result += ln_gamma(subset.n_items() as f64 - r);
     }
     result -= ns * ln_gamma(1.0 - r);
@@ -140,10 +141,10 @@ mod tests {
     }
 
     #[test]
-    fn test_joint() {
+    fn test_joint_density() {
         let n_items = 6;
         let mass = Mass::new(3.0);
-        let reinforcement = Reinforcement::new(0.7);
+        let reinforcement = Reinforcement::new(0.9);
         let integrand = |u: f64| {
             let u = NonnegativeDouble::new(u);
             Partition::iter(n_items)
@@ -158,14 +159,28 @@ mod tests {
     }
 
     #[test]
-    fn test_pmf() {
+    fn test_log_pmf() {
         let n_items = 5;
         let u = NonnegativeDouble::new(150.0);
         let mass = Mass::new(2.0);
-        let reinforcement = Reinforcement::new(0.2);
+        let reinforcement = Reinforcement::new(0.7);
         let sum = Partition::iter(n_items)
             .map(|p| log_pmf(&mut Partition::from(&p[..]), u, mass, reinforcement).exp())
             .sum();
+        assert!(0.9999999 <= sum, format!("{}", sum));
+        assert!(sum <= 1.0000001, format!("{}", sum));
+    }
+
+    #[test]
+    fn test_log_density_of_u() {
+        let n_items = 7;
+        let mass = Mass::new(3.0);
+        let reinforcement = Reinforcement::new(0.2);
+        let integrand = |u: f64| {
+            let u = NonnegativeDouble::new(u);
+            log_density_of_u(u, n_items, mass, reinforcement).exp()
+        };
+        let sum = integrate(integrand, 0.0, 100.0, 1e-6).integral;
         assert!(0.9999999 <= sum, format!("{}", sum));
         assert!(sum <= 1.0000001, format!("{}", sum));
     }
