@@ -62,6 +62,7 @@ pub fn engine(
         log_probability += (numerator / denominator).ln();
         partition.add_with_index(i, subset_index);
     }
+    partition.canonicalize();
     (partition, log_probability)
 }
 
@@ -80,10 +81,12 @@ pub fn log_pmf_of_partition_given_u(
     mass: Mass,
     reinforcement: Reinforcement,
 ) -> f64 {
+    partition.canonicalize();
     engine(partition.n_items(), u, mass, reinforcement, Some(partition)).1
 }
 
-pub fn log_density_of_log_of_u_given_partition(
+pub fn log_density_of_log_u_given_partition(
+    // Up to the normalizing constant
     v: f64,
     partition: &Partition,
     mass: Mass,
@@ -103,6 +106,7 @@ pub fn log_density_of_u(
     mass: Mass,
     reinforcement: Reinforcement,
 ) -> f64 {
+    // This should work in theory, but seems to be very unstable in practice.
     let mut partition = Partition::singleton_subsets(n_items);
     log_joint_density(&partition, u, mass, reinforcement)
         - log_pmf_of_partition_given_u(&mut partition, u, mass, reinforcement)
@@ -203,14 +207,14 @@ mod tests {
 
     #[test]
     fn test_log_density_of_u() {
-        let n_items = 7;
-        let mass = Mass::new(3.0);
-        let reinforcement = Reinforcement::new(0.2);
+        let n_items = 5;
+        let mass = Mass::new(1.0);
+        let reinforcement = Reinforcement::new(0.5);
         let integrand = |u: f64| {
             let u = NonnegativeDouble::new(u);
             log_density_of_u(u, n_items, mass, reinforcement).exp()
         };
-        let sum = integrate(integrand, 0.0, 100.0, 1e-6).integral;
+        let sum = integrate(integrand, 0.0, 2000.0, 1e-6).integral;
         assert!(0.9999999 <= sum, format!("{}", sum));
         assert!(sum <= 1.0000001, format!("{}", sum));
     }
