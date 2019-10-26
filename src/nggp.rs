@@ -65,7 +65,7 @@ pub fn engine(
     (partition, log_probability)
 }
 
-pub fn sample(
+pub fn sample_partition_given_u(
     n_items: usize,
     u: NonnegativeDouble,
     mass: Mass,
@@ -74,13 +74,27 @@ pub fn sample(
     engine(n_items, u, mass, reinforcement, None).0
 }
 
-pub fn log_pmf(
+pub fn log_pmf_of_partition_given_u(
     partition: &mut Partition,
     u: NonnegativeDouble,
     mass: Mass,
     reinforcement: Reinforcement,
 ) -> f64 {
     engine(partition.n_items(), u, mass, reinforcement, Some(partition)).1
+}
+
+pub fn log_density_of_log_of_u_given_partition(
+    v: f64,
+    partition: &Partition,
+    mass: Mass,
+    reinforcement: Reinforcement,
+) -> f64 {
+    let u = v.exp();
+    let ni = partition.n_items() as f64;
+    let ns = partition.n_subsets() as f64;
+    let m = mass.as_f64();
+    let r = reinforcement.as_f64();
+    (v * ni) - (ni - m * ns) * (u + 1.0).ln() - (m / r) * ((u + 1.0).powf(r) - 1.0)
 }
 
 pub fn log_density_of_u(
@@ -91,7 +105,7 @@ pub fn log_density_of_u(
 ) -> f64 {
     let mut partition = Partition::singleton_subsets(n_items);
     log_joint_density(&partition, u, mass, reinforcement)
-        - log_pmf(&mut partition, u, mass, reinforcement)
+        - log_pmf_of_partition_given_u(&mut partition, u, mass, reinforcement)
 }
 
 pub fn log_joint_density(
@@ -145,6 +159,7 @@ mod tests {
         let n_items = 6;
         let mass = Mass::new(3.0);
         let reinforcement = Reinforcement::new(0.9);
+        // u in the outer integral
         let integrand = |u: f64| {
             let u = NonnegativeDouble::new(u);
             Partition::iter(n_items)
@@ -156,6 +171,18 @@ mod tests {
         let sum = integrate(integrand, 0.0, 1000.0, 1e-6).integral;
         assert!(0.9999999 <= sum, format!("{}", sum));
         assert!(sum <= 1.0000001, format!("{}", sum));
+        // u in the inner integral
+        let sum = Partition::iter(n_items)
+            .map(|p| {
+                let integrand = |u: f64| {
+                    let u = NonnegativeDouble::new(u);
+                    log_joint_density(&mut Partition::from(&p[..]), u, mass, reinforcement).exp()
+                };
+                integrate(integrand, 0.0, 1000.0, 1e-6).integral
+            })
+            .sum();
+        assert!(0.9999999 <= sum, format!("{}", sum));
+        assert!(sum <= 1.0000001, format!("{}", sum));
     }
 
     #[test]
@@ -165,7 +192,10 @@ mod tests {
         let mass = Mass::new(2.0);
         let reinforcement = Reinforcement::new(0.7);
         let sum = Partition::iter(n_items)
-            .map(|p| log_pmf(&mut Partition::from(&p[..]), u, mass, reinforcement).exp())
+            .map(|p| {
+                log_pmf_of_partition_given_u(&mut Partition::from(&p[..]), u, mass, reinforcement)
+                    .exp()
+            })
             .sum();
         assert!(0.9999999 <= sum, format!("{}", sum));
         assert!(sum <= 1.0000001, format!("{}", sum));

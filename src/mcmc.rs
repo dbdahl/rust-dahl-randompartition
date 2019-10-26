@@ -7,14 +7,16 @@ use rand::Rng;
 use std::ffi::c_void;
 use std::slice;
 
-fn update_neal_algorithm3<T>(
+fn update_neal_algorithm3<T, U>(
     n_updates: u32,
     current: &Partition,
-    mass: Mass,
+    weight_for_new_subset: f64,
+    weight_for_existing_subset: &U,
     log_posterior_predictive: &T,
 ) -> Partition
 where
     T: Fn(usize, &[usize]) -> f64,
+    U: Fn(usize) -> f64,
 {
     let mut rng = thread_rng();
     let ni = current.n_items();
@@ -40,9 +42,9 @@ where
             }
             let weights = state.subsets().iter().map(|subset| {
                 let pp = if subset.is_empty() {
-                    mass.as_f64()
+                    weight_for_new_subset
                 } else {
-                    subset.n_items() as f64
+                    weight_for_existing_subset(subset.n_items())
                 };
                 log_posterior_predictive(i, &subset.items()[..]).exp() * pp
             });
@@ -155,10 +157,17 @@ mod tests_mcmc {
         let mut current = Partition::one_subset(n_items);
         let mass = Mass::new(1.0);
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
+        let weight_for_existing_subset = |size: usize| size as f64;
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            current = update_neal_algorithm3(2, &current, mass, &log_posterior_predictive);
+            current = update_neal_algorithm3(
+                2,
+                &current,
+                mass.as_f64(),
+                &weight_for_existing_subset,
+                &log_posterior_predictive,
+            );
             sum += current.n_subsets();
         }
         let mean_number_of_subsets = (sum as f64) / (n_samples as f64);
@@ -213,11 +222,19 @@ pub enum PartitionPrior {
     },
 }
 
+const PRIOR_PARTITION_CODE_CRP: i32 = 0;
+const PRIOR_PARTITION_CODE_NGGP: i32 = 1;
+const PRIOR_PARTITION_CODE_EPA: i32 = 2;
+const PRIOR_PARTITION_CODE_FOCAL: i32 = 3;
+
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     n_updates: i32,
     n_items: i32,
+    prior_partition_code: i32,
+    u: f64,
     mass: f64,
+    reinforcement: f64,
     partition_ptr: *mut i32,
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
@@ -235,7 +252,22 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
             env_ptr,
         )
     };
-    let results = update_neal_algorithm3(nu, &partition, mass, &log_posterior_predictive);
+    let (weight_for_new_subset, weight_for_existing_subset): (f64, Box<dyn Fn(usize) -> f64>) =
+        match prior_partition_code {
+            PRIOR_PARTITION_CODE_CRP => (mass.as_f64(), Box::new(|size| size as f64)),
+            PRIOR_PARTITION_CODE_NGGP => (
+                mass.as_f64() * (u + 1.0).powf(reinforcement),
+                Box::new(|size| size as f64 - reinforcement),
+            ),
+            _ => panic!("Unsupported prior partition code."),
+        };
+    let results = update_neal_algorithm3(
+        nu,
+        &partition,
+        weight_for_new_subset,
+        &weight_for_existing_subset,
+        &log_posterior_predictive,
+    );
     results.labels_into_slice(partition_slice, |x| x.unwrap() as i32);
 }
 
