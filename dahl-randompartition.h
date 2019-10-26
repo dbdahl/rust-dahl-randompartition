@@ -55,9 +55,9 @@ void dahl_randompartition__neal_algorithm3_update(int32_t n_updates,
 
 void dahl_randompartition__nggp__sample(int32_t n_partitions,
                                         int32_t n_items,
+                                        double u,
                                         double mass,
                                         double reinforcement,
-                                        double u,
                                         int32_t *ptr);
 
 extern RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);

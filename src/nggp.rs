@@ -220,9 +220,9 @@ mod tests {
 pub unsafe extern "C" fn dahl_randompartition__nggp__sample(
     n_partitions: i32,
     n_items: i32,
+    u: f64,
     mass: f64,
     reinforcement: f64,
-    u: f64,
     ptr: *mut i32,
 ) -> () {
     let np = n_partitions as usize;
