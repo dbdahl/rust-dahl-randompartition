@@ -50,6 +50,7 @@ void dahl_randompartition__neal_algorithm3_update(int32_t n_updates,
                                                   double mass,
                                                   double reinforcement,
                                                   int32_t *partition_ptr,
+                                                  int32_t prior_only,
                                                   const void *log_likelihood_function_ptr,
                                                   const void *env_ptr);
 

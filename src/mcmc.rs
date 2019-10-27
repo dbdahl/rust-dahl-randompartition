@@ -236,6 +236,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     mass: f64,
     reinforcement: f64,
     partition_ptr: *mut i32,
+    prior_only: i32,
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
 ) -> () {
@@ -244,13 +245,17 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let partition = Partition::from(partition_slice);
     let mass = Mass::new(mass);
-    let log_posterior_predictive = |i: usize, indices: &[usize]| {
-        callRFunction_logIntegratedLikelihoodOfItem(
-            log_likelihood_function_ptr,
-            (i as i32) + 1,
-            RR_SEXP_vector_INTSXP::from_slice(indices),
-            env_ptr,
-        )
+    let log_posterior_predictive: Box<dyn Fn(usize, &[usize]) -> f64> = if prior_only != 0 {
+        Box::new(|_i: usize, _indices: &[usize]| 0.0)
+    } else {
+        Box::new(|i: usize, indices: &[usize]| {
+            callRFunction_logIntegratedLikelihoodOfItem(
+                log_likelihood_function_ptr,
+                (i as i32) + 1,
+                RR_SEXP_vector_INTSXP::from_slice(indices),
+                env_ptr,
+            )
+        })
     };
     let (weight_for_new_subset, weight_for_existing_subset): (f64, Box<dyn Fn(usize) -> f64>) =
         match prior_partition_code {
