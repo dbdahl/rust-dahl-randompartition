@@ -43,10 +43,11 @@ void dahl_randompartition__mhrw_update(int32_t n_attempts,
                                        const void *env_ptr,
                                        int32_t *n_accepts);
 
-void dahl_randompartition__neal_algorithm3_update(int32_t n_updates,
+void dahl_randompartition__neal_algorithm3_update(int32_t n_updates_for_partition,
+                                                  int32_t n_updates_for_u,
                                                   int32_t n_items,
                                                   int32_t prior_partition_code,
-                                                  double u,
+                                                  double *u,
                                                   double mass,
                                                   double reinforcement,
                                                   int32_t *partition_ptr,

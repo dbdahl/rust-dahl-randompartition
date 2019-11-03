@@ -77,7 +77,10 @@ pub struct Reinforcement(f64);
 
 impl Reinforcement {
     pub fn new(x: f64) -> Self {
-        assert!(0.0 <= x && x < 1.0, "Reinforcement must be in [0,1).");
+        assert!(
+            0.0 <= x && x < 1.0,
+            format!("Reinforcement {} is not in [0,1)", x)
+        );
         Reinforcement(x)
     }
 
@@ -95,7 +98,10 @@ impl Add<f64> for Reinforcement {
 
     fn add(self, other: f64) -> f64 {
         let x = self.0 + other;
-        assert!(0.0 <= x && x < 1.0, "Reinforcement must be in [0,1).");
+        assert!(
+            0.0 <= x && x < 1.0,
+            format!("Reinforcement {} is not in [0,1)", x)
+        );
         x
     }
 }
@@ -105,7 +111,10 @@ impl Add<Reinforcement> for f64 {
 
     fn add(self, other: Reinforcement) -> f64 {
         let x = self + other.0;
-        assert!(0.0 <= x && x < 1.0, "Reinforcement must be in [0,1).");
+        assert!(
+            0.0 <= x && x < 1.0,
+            format!("Reinforcement {} is not in [0,1)", x)
+        );
         x
     }
 }

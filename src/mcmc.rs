@@ -229,10 +229,11 @@ const PRIOR_PARTITION_CODE_FOCAL: i32 = 3;
 
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
-    n_updates: i32,
+    n_updates_for_partition: i32,
+    n_updates_for_u: i32,
     n_items: i32,
     prior_partition_code: i32,
-    u: f64,
+    u: *mut f64,
     mass: f64,
     reinforcement: f64,
     partition_ptr: *mut i32,
@@ -240,11 +241,13 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
 ) -> () {
-    let nu = n_updates as u32;
+    let nup = n_updates_for_partition as u32;
+    let nuu = n_updates_for_u as u32;
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let partition = Partition::from(partition_slice);
     let mass = Mass::new(mass);
+    let reinforcement = Reinforcement::new(reinforcement);
     let log_posterior_predictive: Box<dyn Fn(usize, &[usize]) -> f64> = if prior_only != 0 {
         Box::new(|_i: usize, _indices: &[usize]| 0.0)
     } else {
@@ -261,19 +264,29 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
         match prior_partition_code {
             PRIOR_PARTITION_CODE_CRP => (mass.as_f64(), Box::new(|size| size as f64)),
             PRIOR_PARTITION_CODE_NGGP => (
-                mass.as_f64() * (u + 1.0).powf(reinforcement),
-                Box::new(|size| size as f64 - reinforcement),
+                mass.as_f64() * (*u + 1.0).powf(reinforcement.as_f64()),
+                Box::new(|size| size as f64 - reinforcement.as_f64()),
             ),
             _ => panic!("Unsupported prior partition code."),
         };
-    let results = update_neal_algorithm3(
-        nu,
+    let partition = update_neal_algorithm3(
+        nup,
         &partition,
         weight_for_new_subset,
         &weight_for_existing_subset,
         &log_posterior_predictive,
     );
-    results.labels_into_slice(partition_slice, |x| x.unwrap() as i32);
+    if prior_partition_code == PRIOR_PARTITION_CODE_NGGP {
+        *u = super::nggp::update_u(
+            NonnegativeDouble::new(*u),
+            &partition,
+            mass,
+            reinforcement,
+            nuu,
+        )
+        .as_f64();
+    };
+    partition.labels_into_slice(partition_slice, |x| x.unwrap() as i32);
 }
 
 #[no_mangle]

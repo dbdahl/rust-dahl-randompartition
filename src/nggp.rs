@@ -5,6 +5,7 @@ use crate::prelude::*;
 use dahl_partition::*;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
+use rand_distr::Normal;
 use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
 use std::slice;
@@ -85,7 +86,7 @@ pub fn log_pmf_of_partition_given_u(
     engine(partition.n_items(), u, mass, reinforcement, Some(partition)).1
 }
 
-pub fn log_density_of_log_u_given_partition(
+pub fn log_full_conditional_of_log_u(
     // Up to the normalizing constant
     v: f64,
     partition: &Partition,
@@ -97,7 +98,29 @@ pub fn log_density_of_log_u_given_partition(
     let ns = partition.n_subsets() as f64;
     let m = mass.as_f64();
     let r = reinforcement.as_f64();
-    (v * ni) - (ni - m * ns) * (u + 1.0).ln() - (m / r) * ((u + 1.0).powf(r) - 1.0)
+    (v * ni) - (ni - r * ns) * (u + 1.0).ln() - (m / r) * ((u + 1.0).powf(r) - 1.0)
+}
+
+pub fn update_u(
+    u: NonnegativeDouble,
+    partition: &Partition,
+    mass: Mass,
+    reinforcement: Reinforcement,
+    n_updates: u32,
+) -> NonnegativeDouble {
+    let mut current = u.as_f64().ln();
+    let mut f_current = log_full_conditional_of_log_u(current, partition, mass, reinforcement);
+    let normal = Normal::new(0.0, 0.5_f64.sqrt()).unwrap();
+    let mut rng = rand::thread_rng();
+    for _ in 0..n_updates {
+        let proposal = current + normal.sample(&mut rng);
+        let f_proposal = log_full_conditional_of_log_u(proposal, partition, mass, reinforcement);
+        if rng.gen_range(0.0_f64, 1.0_f64).ln() < f_proposal - f_current {
+            current = proposal;
+            f_current = f_proposal;
+        }
+    }
+    NonnegativeDouble::new(current.exp())
 }
 
 pub fn log_density_of_u(
