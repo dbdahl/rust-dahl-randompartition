@@ -1,8 +1,10 @@
 // Focal random partition distribution
 
 use crate::prelude::*;
+use crate::TargetOrRandom;
 
 use dahl_partition::*;
+use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
 use std::convert::TryFrom;
@@ -40,12 +42,12 @@ impl std::ops::Index<usize> for Weights {
     }
 }
 
-pub fn engine(
+pub fn engine<T: Rng>(
     focal: &Partition,
     weights: &Weights,
     permutation: &Permutation,
     mass: Mass,
-    target: Option<&mut Partition>,
+    mut target_or_rng: TargetOrRandom<T>,
 ) -> (Partition, f64) {
     assert!(
         focal.is_canonical(),
@@ -60,17 +62,11 @@ pub fn engine(
     );
     assert_eq!(permutation.len(), ni);
     let mass = mass.as_f64();
-    let mut rng = thread_rng();
-    let mut either = match target {
-        Some(t) => {
-            assert!(t.is_canonical());
-            assert_eq!(t.n_items(), ni);
-            t.canonicalize_by_permutation(Some(&permutation));
-            super::TargetOrRandom::Target(t)
-        }
-        None => super::TargetOrRandom::Random(&mut rng),
+    if let TargetOrRandom::Target(t) = &mut target_or_rng {
+        assert!(t.is_canonical());
+        assert_eq!(t.n_items(), ni);
+        t.canonicalize_by_permutation(Some(&permutation));
     };
-
     let mut log_probability = 0.0;
     let mut partition = Partition::new(ni);
     let mut total_counter = vec![0.0; nsf];
@@ -113,12 +109,12 @@ pub fn engine(
                 (subset_index, prob)
             })
             .collect();
-        let subset_index = match &mut either {
-            super::TargetOrRandom::Random(rng) => {
+        let subset_index = match &mut target_or_rng {
+            TargetOrRandom::Random(rng) => {
                 let dist = WeightedIndex::new(probs.iter().map(|x| x.1)).unwrap();
                 dist.sample(*rng)
             }
-            super::TargetOrRandom::Target(t) => t.label_of(ii).unwrap(),
+            TargetOrRandom::Target(t) => t.label_of(ii).unwrap(),
         };
         let numerator = probs[subset_index].1;
         let denominator = probs.iter().fold(0.0, |sum, x| sum + x.1);
@@ -136,13 +132,21 @@ pub fn engine(
     (partition, log_probability)
 }
 
-pub fn sample(
+pub fn sample<T: Rng>(
     focal: &Partition,
     weights: &Weights,
     permutation: &Permutation,
     mass: Mass,
+    rng: &mut T,
 ) -> Partition {
-    engine(focal, weights, permutation, mass, None).0
+    engine(
+        focal,
+        weights,
+        permutation,
+        mass,
+        TargetOrRandom::Random(rng),
+    )
+    .0
 }
 
 pub fn log_pmf(
@@ -152,7 +156,14 @@ pub fn log_pmf(
     permutation: &Permutation,
     mass: Mass,
 ) -> f64 {
-    engine(focal, weights, permutation, mass, Some(target)).1
+    engine(
+        focal,
+        weights,
+        permutation,
+        mass,
+        TargetOrRandom::Target::<ThreadRng>(target),
+    )
+    .1
 }
 
 #[cfg(test)]
@@ -168,10 +179,10 @@ mod tests {
         let weights = Weights::zero(1);
         let mut permutation = Permutation::natural(n_items);
         let mass = Mass::new(2.0);
-        let mut rng = thread_rng();
+        let mut rng = &mut thread_rng();
         for _ in 0..n_partitions {
             permutation.shuffle(&mut rng);
-            samples.push_partition(&sample(&focal, &weights, &permutation, mass));
+            samples.push_partition(&sample(&focal, &weights, &permutation, mass, rng));
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -225,6 +236,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     use_random_permutations: i32,
     partition_labels_ptr: *mut i32,
     partition_probs_ptr: *mut f64,
+    seed_ptr: *const i32, // Assumed length is 32
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
@@ -242,12 +254,18 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
     if do_sampling != 0 {
-        let mut rng = thread_rng();
+        let mut rng = &mut mk_rng_isaac(seed_ptr);
         for i in 0..np {
             if use_random_permutations != 0 {
                 permutation.shuffle(&mut rng);
             }
-            let p = engine(&focal, &weights, &permutation, mass, None);
+            let p = engine(
+                &focal,
+                &weights,
+                &permutation,
+                mass,
+                TargetOrRandom::Random(rng),
+            );
             let labels = p.0.labels();
             for j in 0..ni {
                 matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
@@ -261,7 +279,13 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
                 target_labels.push(matrix[np * j + i]);
             }
             let mut target = Partition::from(&target_labels[..]);
-            let p = engine(&focal, &weights, &permutation, mass, Some(&mut target));
+            let p = engine::<ThreadRng>(
+                &focal,
+                &weights,
+                &permutation,
+                mass,
+                TargetOrRandom::Target(&mut target),
+            );
             probs[i] = p.1;
         }
     }

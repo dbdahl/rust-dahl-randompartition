@@ -22,7 +22,6 @@ pub fn engine<T: Rng>(
     if let TargetOrRandom::Target(t) = &mut target_or_rng {
         assert!(t.is_canonical());
         assert_eq!(t.n_items(), n_items);
-        TargetOrRandom::Target::<T>(t);
     };
     let mut log_probability = 0.0;
     let mut partition = Partition::new(n_items);

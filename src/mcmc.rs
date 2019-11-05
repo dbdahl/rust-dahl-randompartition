@@ -88,7 +88,13 @@ where
     for _ in 0..n_attempts {
         state.canonicalize();
         permutation.shuffle(rng);
-        let proposal = frp::engine(&state, &weights_state, &permutation, mass, None);
+        let proposal = frp::engine(
+            &state,
+            &weights_state,
+            &permutation,
+            mass,
+            TargetOrRandom::Random(rng),
+        );
         let weights_proposal = frp::Weights::constant(rate.as_f64(), proposal.0.n_subsets());
         let log_target_proposal = log_target(&proposal.0);
         let log_ratio_target = log_target_proposal - log_target_state;
@@ -97,7 +103,7 @@ where
             &weights_proposal,
             &permutation,
             mass,
-            Some(&mut state),
+            TargetOrRandom::Target::<ThreadRng>(&mut state),
         )
         .1 - proposal.1;
         let log_mh_ratio = log_ratio_target + log_ratio_proposal;
