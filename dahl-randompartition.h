@@ -21,7 +21,8 @@ extern double callRFunction_logIntegratedLikelihoodOfSubset(const void *fn_ptr,
 void dahl_randompartition__crp__sample(int32_t n_partitions,
                                        int32_t n_items,
                                        double mass,
-                                       int32_t *ptr);
+                                       int32_t *ptr,
+                                       const int32_t *seed_ptr);
 
 void dahl_randompartition__focal_partition(int32_t n_partitions,
                                            int32_t n_items,
@@ -32,7 +33,8 @@ void dahl_randompartition__focal_partition(int32_t n_partitions,
                                            int32_t do_sampling,
                                            int32_t use_random_permutations,
                                            int32_t *partition_labels_ptr,
-                                           double *partition_probs_ptr);
+                                           double *partition_probs_ptr,
+                                           const int32_t *seed_ptr);
 
 void dahl_randompartition__mhrw_update(int32_t n_attempts,
                                        int32_t n_items,
@@ -62,6 +64,7 @@ void dahl_randompartition__nggp__sample(int32_t n_partitions,
                                         double u,
                                         double mass,
                                         double reinforcement,
-                                        int32_t *ptr);
+                                        int32_t *ptr,
+                                        const int32_t *seed_ptr);
 
 extern RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);

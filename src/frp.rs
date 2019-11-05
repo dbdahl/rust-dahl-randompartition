@@ -7,6 +7,7 @@ use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
+use rand_isaac::IsaacRng;
 use std::convert::TryFrom;
 use std::slice;
 
@@ -161,7 +162,7 @@ pub fn log_pmf(
         weights,
         permutation,
         mass,
-        TargetOrRandom::Target::<ThreadRng>(target),
+        TargetOrRandom::Target::<IsaacRng>(target),
     )
     .1
 }
@@ -279,7 +280,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
                 target_labels.push(matrix[np * j + i]);
             }
             let mut target = Partition::from(&target_labels[..]);
-            let p = engine::<ThreadRng>(
+            let p = engine::<IsaacRng>(
                 &focal,
                 &weights,
                 &permutation,

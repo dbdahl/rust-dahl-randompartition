@@ -6,6 +6,7 @@ use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
+use rand_isaac::IsaacRng;
 use std::ffi::c_void;
 use std::slice;
 
@@ -103,7 +104,7 @@ where
             &weights_proposal,
             &permutation,
             mass,
-            TargetOrRandom::Target::<ThreadRng>(&mut state),
+            TargetOrRandom::Target::<IsaacRng>(&mut state),
         )
         .1 - proposal.1;
         let log_mh_ratio = log_ratio_target + log_ratio_proposal;

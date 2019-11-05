@@ -8,6 +8,7 @@ use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
 use rand_distr::Normal;
+use rand_isaac::IsaacRng;
 use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
 use std::slice;
@@ -81,7 +82,7 @@ pub fn log_pmf_of_partition_given_u(
     reinforcement: Reinforcement,
 ) -> f64 {
     partition.canonicalize();
-    engine::<ThreadRng>(
+    engine::<IsaacRng>(
         partition.n_items(),
         u,
         mass,
