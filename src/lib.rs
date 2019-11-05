@@ -14,7 +14,16 @@ pub mod prelude;
 use dahl_partition::*;
 use rand::prelude::*;
 
-enum TargetOrRandom<'a> {
+enum TargetOrRandom<'a, T: Rng> {
     Target(&'a Partition),
-    Random(ThreadRng),
+    Random(&'a mut T),
+}
+
+impl<'a, T: Rng> TargetOrRandom<'a, T> {
+    pub fn get_rng(&mut self) -> &mut T {
+        match self {
+            TargetOrRandom::Random(rng) => rng,
+            _ => panic!("Not available."),
+        }
+    }
 }

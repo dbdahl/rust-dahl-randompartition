@@ -17,13 +17,14 @@ pub fn engine(
     reinforcement: Reinforcement,
     target: Option<&mut Partition>,
 ) -> (Partition, f64) {
-    let either = match target {
+    let mut rng = thread_rng();
+    let mut either = match target {
         Some(t) => {
             assert!(t.is_canonical());
             assert_eq!(t.n_items(), n_items);
             super::TargetOrRandom::Target(t)
         }
-        None => super::TargetOrRandom::Random(thread_rng()),
+        None => super::TargetOrRandom::Random(&mut rng),
     };
 
     let mut log_probability = 0.0;
@@ -51,10 +52,10 @@ pub fn engine(
             })
             .enumerate()
             .collect();
-        let subset_index = match either {
-            super::TargetOrRandom::Random(mut rng) => {
+        let subset_index = match &mut either {
+            super::TargetOrRandom::Random(rng) => {
                 let dist = WeightedIndex::new(probs.iter().map(|x| x.1)).unwrap();
-                dist.sample(&mut rng)
+                dist.sample(*rng)
             }
             super::TargetOrRandom::Target(t) => t.label_of(i).unwrap(),
         };
