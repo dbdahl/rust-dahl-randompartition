@@ -291,6 +291,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
             mass,
             reinforcement,
             nuu,
+            &mut rng,
         )
         .as_f64();
     };

@@ -102,19 +102,19 @@ pub fn log_full_conditional_of_log_u(
     (v * ni) - (ni - r * ns) * (u + 1.0).ln() - (m / r) * ((u + 1.0).powf(r) - 1.0)
 }
 
-pub fn update_u(
+pub fn update_u<T: Rng>(
     u: NonnegativeDouble,
     partition: &Partition,
     mass: Mass,
     reinforcement: Reinforcement,
     n_updates: u32,
+    rng: &mut T,
 ) -> NonnegativeDouble {
     let mut current = u.as_f64().ln();
     let mut f_current = log_full_conditional_of_log_u(current, partition, mass, reinforcement);
     let normal = Normal::new(0.0, 0.5_f64.sqrt()).unwrap();
-    let mut rng = rand::thread_rng();
     for _ in 0..n_updates {
-        let proposal = current + normal.sample(&mut rng);
+        let proposal = current + normal.sample(rng);
         let f_proposal = log_full_conditional_of_log_u(proposal, partition, mass, reinforcement);
         if rng.gen_range(0.0_f64, 1.0_f64).ln() < f_proposal - f_current {
             current = proposal;
