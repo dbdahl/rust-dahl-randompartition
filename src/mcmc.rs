@@ -1,24 +1,25 @@
 use crate::frp::{engine, Weights};
 use crate::prelude::*;
 use dahl_partition::*;
+use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
-use rand::thread_rng;
 use rand::Rng;
 use std::ffi::c_void;
 use std::slice;
 
-fn update_neal_algorithm3<T, U>(
+fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     current: &Partition,
     weight_for_new_subset: f64,
     weight_for_existing_subset: &U,
     log_posterior_predictive: &T,
+    rng: &mut V,
 ) -> Partition
 where
     T: Fn(usize, &[usize]) -> f64,
     U: Fn(usize) -> f64,
+    V: Rng,
 {
-    let mut rng = thread_rng();
     let ni = current.n_items();
     let mut state = current.clone();
     state.canonicalize();
@@ -49,7 +50,7 @@ where
                 log_posterior_predictive(i, &subset.items()[..]).exp() * pp
             });
             let dist = WeightedIndex::new(weights).unwrap();
-            let subset_index = dist.sample(&mut rng);
+            let subset_index = dist.sample(rng);
             state.add_with_index(i, subset_index);
             if state.subsets()[subset_index].n_items() == 1 {
                 state.new_subset();
@@ -65,25 +66,26 @@ where
     state
 }
 
-fn update_rwmh<T>(
+fn update_rwmh<T, U>(
     n_attempts: u32,
     current: &Partition,
     rate: NonnegativeDouble,
     mass: Mass,
     log_target: &T,
+    rng: &mut U,
 ) -> (Partition, u32)
 where
     T: Fn(&Partition) -> f64,
+    U: Rng,
 {
     let mut accepts: u32 = 0;
     let mut state = current.clone();
-    let mut rng = thread_rng();
     let mut permutation = Permutation::natural(state.n_items());
     let mut log_target_state = log_target(&state);
     let mut weights_state = Weights::constant(rate.as_f64(), state.n_subsets());
     for _ in 0..n_attempts {
         state.canonicalize();
-        permutation.shuffle(&mut rng);
+        permutation.shuffle(rng);
         let proposal = engine(&state, &weights_state, &permutation, mass, None);
         let weights_proposal = Weights::constant(rate.as_f64(), proposal.0.n_subsets());
         let log_target_proposal = log_target(&proposal.0);
@@ -129,6 +131,7 @@ where
 #[cfg(test)]
 mod tests_mcmc {
     use super::*;
+    use rand::thread_rng;
 
     #[test]
     fn test_crp_rwmh() {
@@ -142,7 +145,7 @@ mod tests_mcmc {
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            let result = update_rwmh(2, &current, rate, mass, &log_target);
+            let result = update_rwmh(2, &current, rate, mass, &log_target, &mut thread_rng());
             current = result.0;
             sum += current.n_subsets();
         }
@@ -167,6 +170,7 @@ mod tests_mcmc {
                 mass.as_f64(),
                 &weight_for_existing_subset,
                 &log_posterior_predictive,
+                &mut thread_rng(),
             );
             sum += current.n_subsets();
         }
@@ -240,6 +244,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     prior_only: i32,
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
 ) -> () {
     let nup = n_updates_for_partition as u32;
     let nuu = n_updates_for_u as u32;
@@ -269,12 +274,14 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
             ),
             _ => panic!("Unsupported prior partition code."),
         };
+    let mut rng = mk_rng_isaac(seed_ptr);
     let partition = update_neal_algorithm3(
         nup,
         &partition,
         weight_for_new_subset,
         &weight_for_existing_subset,
         &log_posterior_predictive,
+        &mut rng,
     );
     if prior_partition_code == PRIOR_PARTITION_CODE_NGGP {
         *u = super::nggp::update_u(
@@ -299,6 +306,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
     n_accepts: *mut i32,
+    seed_ptr: *const i32, // Assumed length is 32
 ) -> () {
     let na = n_attempts as u32;
     let ni = n_items as usize;
@@ -315,7 +323,8 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
         )
     };
     let log_target = make_posterior(log_prior, log_likelihood);
-    let results = update_rwmh(na, &partition, rate, mass, &log_target);
+    let mut rng = mk_rng_isaac(seed_ptr);
+    let results = update_rwmh(na, &partition, rate, mass, &log_target, &mut rng);
     results
         .0
         .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
