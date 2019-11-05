@@ -41,7 +41,8 @@ void dahl_randompartition__mhrw_update(int32_t n_attempts,
                                        int32_t *partition_ptr,
                                        const void *log_likelihood_function_ptr,
                                        const void *env_ptr,
-                                       int32_t *n_accepts);
+                                       int32_t *n_accepts,
+                                       const int32_t *seed_ptr);
 
 void dahl_randompartition__neal_algorithm3_update(int32_t n_updates_for_partition,
                                                   int32_t n_updates_for_u,
@@ -53,7 +54,8 @@ void dahl_randompartition__neal_algorithm3_update(int32_t n_updates_for_partitio
                                                   int32_t *partition_ptr,
                                                   int32_t prior_only,
                                                   const void *log_likelihood_function_ptr,
-                                                  const void *env_ptr);
+                                                  const void *env_ptr,
+                                                  const int32_t *seed_ptr);
 
 void dahl_randompartition__nggp__sample(int32_t n_partitions,
                                         int32_t n_items,
