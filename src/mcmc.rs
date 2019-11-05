@@ -1,5 +1,6 @@
 use crate::frp;
 use crate::prelude::*;
+use crate::*;
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
@@ -66,7 +67,6 @@ where
     state
 }
 
-/*
 fn update_rwmh<T, U>(
     n_attempts: u32,
     current: &Partition,
@@ -84,20 +84,19 @@ where
     let mut permutation = Permutation::natural(state.n_items());
     let mut log_target_state = log_target(&state);
     let mut weights_state = frp::Weights::constant(rate.as_f64(), state.n_subsets());
-    let rng_wrapper = TargetOrRandom::Random(rng);
     for _ in 0..n_attempts {
         state.canonicalize();
-        permutation.shuffle(rng_wrapper.get_rng());
-        let proposal = frp::engine(&state, &weights_state, &permutation, mass, rng_wrapper);
+        permutation.shuffle(rng);
+        let proposal = frp::engine(&state, &weights_state, &permutation, mass, None);
         let weights_proposal = frp::Weights::constant(rate.as_f64(), proposal.0.n_subsets());
         let log_target_proposal = log_target(&proposal.0);
         let log_ratio_target = log_target_proposal - log_target_state;
-        let log_ratio_proposal = frp::engine::<U>(
+        let log_ratio_proposal = frp::engine(
             &proposal.0,
             &weights_proposal,
             &permutation,
             mass,
-            TargetOrRandom::Target(&mut state),
+            Some(&mut state),
         )
         .1 - proposal.1;
         let log_mh_ratio = log_ratio_target + log_ratio_proposal;
@@ -110,7 +109,6 @@ where
     }
     (state, accepts)
 }
-*/
 
 fn make_posterior<'a, T: 'a, U: 'a>(
     log_prior: T,
@@ -136,7 +134,6 @@ mod tests_mcmc {
     use super::*;
     use rand::thread_rng;
 
-    /*
     #[test]
     fn test_crp_rwmh() {
         let n_items = 5;
@@ -157,7 +154,6 @@ mod tests_mcmc {
         let z_stat = (mean_number_of_subsets - 2.283333) / (0.8197222 / n_samples as f64).sqrt();
         assert!(z_stat.abs() < 3.290527);
     }
-    */
 
     #[test]
     fn test_crp_neal_algorithm3() {
@@ -301,7 +297,6 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     partition.labels_into_slice(partition_slice, |x| x.unwrap() as i32);
 }
 
-/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     n_attempts: i32,
@@ -336,4 +331,3 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
         .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
     *n_accepts = results.1 as i32;
 }
-*/
