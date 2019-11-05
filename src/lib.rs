@@ -14,8 +14,8 @@ pub mod prelude;
 use dahl_partition::*;
 use rand::prelude::*;
 
-enum TargetOrRandom<'a, T: Rng> {
-    Target(&'a Partition),
+pub enum TargetOrRandom<'a, T: Rng> {
+    Target(&'a mut Partition),
     Random(&'a mut T),
 }
 

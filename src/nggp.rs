@@ -1,6 +1,7 @@
 // Normalized generalized gamma process
 
 use crate::prelude::*;
+use crate::TargetOrRandom;
 
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
@@ -16,18 +17,13 @@ pub fn engine<T: Rng>(
     u: NonnegativeDouble,
     mass: Mass,
     reinforcement: Reinforcement,
-    target: Option<&mut Partition>,
-    rng: &mut T,
+    mut target_or_rng: TargetOrRandom<T>,
 ) -> (Partition, f64) {
-    let mut either = match target {
-        Some(t) => {
-            assert!(t.is_canonical());
-            assert_eq!(t.n_items(), n_items);
-            super::TargetOrRandom::Target(t)
-        }
-        None => super::TargetOrRandom::Random(rng),
+    if let TargetOrRandom::Target(t) = &mut target_or_rng {
+        assert!(t.is_canonical());
+        assert_eq!(t.n_items(), n_items);
+        TargetOrRandom::Target::<T>(t);
     };
-
     let mut log_probability = 0.0;
     let mut partition = Partition::new(n_items);
     let weight_of_new = mass.as_f64() * (u + 1.0).powf(reinforcement.as_f64());
@@ -53,12 +49,12 @@ pub fn engine<T: Rng>(
             })
             .enumerate()
             .collect();
-        let subset_index = match &mut either {
-            super::TargetOrRandom::Random(rng) => {
+        let subset_index = match &mut target_or_rng {
+            TargetOrRandom::Random(rng) => {
                 let dist = WeightedIndex::new(probs.iter().map(|x| x.1)).unwrap();
                 dist.sample(*rng)
             }
-            super::TargetOrRandom::Target(t) => t.label_of(i).unwrap(),
+            TargetOrRandom::Target(t) => t.label_of(i).unwrap(),
         };
         let numerator = probs[subset_index].1;
         let denominator = probs.iter().fold(0.0, |sum, x| sum + x.1);
@@ -76,7 +72,7 @@ pub fn sample_partition_given_u<T: Rng>(
     reinforcement: Reinforcement,
     rng: &mut T,
 ) -> Partition {
-    engine(n_items, u, mass, reinforcement, None, rng).0
+    engine(n_items, u, mass, reinforcement, TargetOrRandom::Random(rng)).0
 }
 
 pub fn log_pmf_of_partition_given_u(
@@ -86,14 +82,12 @@ pub fn log_pmf_of_partition_given_u(
     reinforcement: Reinforcement,
 ) -> f64 {
     partition.canonicalize();
-    let dummy_rng = &mut thread_rng();
-    engine(
+    engine::<ThreadRng>(
         partition.n_items(),
         u,
         mass,
         reinforcement,
-        Some(partition),
-        dummy_rng,
+        TargetOrRandom::Target(partition),
     )
     .1
 }
@@ -184,7 +178,9 @@ mod tests {
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         let rng = &mut thread_rng();
         for _ in 0..n_partitions {
-            samples.push_partition(&engine(n_items, u, mass, reinforcement, None, rng).0);
+            samples.push_partition(
+                &engine(n_items, u, mass, reinforcement, TargetOrRandom::Random(rng)).0,
+            );
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -274,7 +270,7 @@ pub unsafe extern "C" fn dahl_randompartition__nggp__sample(
     let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
     let mut rng = mk_rng_isaac(seed_ptr);
     for i in 0..np {
-        let p = engine(ni, u, mass, reinforcement, None, &mut rng);
+        let p = engine(ni, u, mass, reinforcement, TargetOrRandom::Random(&mut rng));
         let labels = p.0.labels();
         for j in 0..ni {
             array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
