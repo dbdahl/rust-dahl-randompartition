@@ -18,12 +18,3 @@ pub enum TargetOrRandom<'a, T: Rng> {
     Target(&'a mut Partition),
     Random(&'a mut T),
 }
-
-impl<'a, T: Rng> TargetOrRandom<'a, T> {
-    pub fn get_rng(&mut self) -> &mut T {
-        match self {
-            TargetOrRandom::Random(rng) => rng,
-            _ => panic!("Not available."),
-        }
-    }
-}

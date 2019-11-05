@@ -51,7 +51,7 @@ pub fn log_pmf(x: &Partition, mass: Mass) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::thread_rng;
+    use rand::prelude::*;
 
     #[test]
     fn test_sample() {
