@@ -1,10 +1,11 @@
 use crate::frp;
 use crate::prelude::*;
 use crate::*;
+
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
-use rand::Rng;
+use rand::prelude::*;
 use std::ffi::c_void;
 use std::slice;
 
@@ -132,7 +133,6 @@ where
 #[cfg(test)]
 mod tests_mcmc {
     use super::*;
-    use rand::thread_rng;
 
     #[test]
     fn test_crp_rwmh() {

@@ -1,6 +1,7 @@
 // Focal random partition distribution
 
 use crate::prelude::*;
+
 use dahl_partition::*;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
