@@ -3,6 +3,7 @@
 use crate::prelude::*;
 
 use dahl_partition::*;
+use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
 use rand_distr::Normal;
@@ -10,21 +11,21 @@ use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
 use std::slice;
 
-pub fn engine(
+pub fn engine<T: Rng>(
     n_items: usize,
     u: NonnegativeDouble,
     mass: Mass,
     reinforcement: Reinforcement,
     target: Option<&mut Partition>,
+    rng: &mut T,
 ) -> (Partition, f64) {
-    let mut rng = thread_rng();
     let mut either = match target {
         Some(t) => {
             assert!(t.is_canonical());
             assert_eq!(t.n_items(), n_items);
             super::TargetOrRandom::Target(t)
         }
-        None => super::TargetOrRandom::Random(&mut rng),
+        None => super::TargetOrRandom::Random(rng),
     };
 
     let mut log_probability = 0.0;
@@ -68,13 +69,14 @@ pub fn engine(
     (partition, log_probability)
 }
 
-pub fn sample_partition_given_u(
+pub fn sample_partition_given_u<T: Rng>(
     n_items: usize,
     u: NonnegativeDouble,
     mass: Mass,
     reinforcement: Reinforcement,
+    rng: &mut T,
 ) -> Partition {
-    engine(n_items, u, mass, reinforcement, None).0
+    engine(n_items, u, mass, reinforcement, None, rng).0
 }
 
 pub fn log_pmf_of_partition_given_u(
@@ -84,7 +86,16 @@ pub fn log_pmf_of_partition_given_u(
     reinforcement: Reinforcement,
 ) -> f64 {
     partition.canonicalize();
-    engine(partition.n_items(), u, mass, reinforcement, Some(partition)).1
+    let dummy_rng = &mut thread_rng();
+    engine(
+        partition.n_items(),
+        u,
+        mass,
+        reinforcement,
+        Some(partition),
+        dummy_rng,
+    )
+    .1
 }
 
 pub fn log_full_conditional_of_log_u(
@@ -171,8 +182,9 @@ mod tests {
         let reinforcement = Reinforcement::new(0.0); // Reduces to the DP...
         let u = NonnegativeDouble::new(0.2); // ... where the partition and u are independent.
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
+        let rng = &mut thread_rng();
         for _ in 0..n_partitions {
-            samples.push_partition(&engine(n_items, u, mass, reinforcement, None).0);
+            samples.push_partition(&engine(n_items, u, mass, reinforcement, None, rng).0);
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -252,6 +264,7 @@ pub unsafe extern "C" fn dahl_randompartition__nggp__sample(
     mass: f64,
     reinforcement: f64,
     ptr: *mut i32,
+    seed_ptr: *const i32, // Assumed length is 32
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
@@ -259,8 +272,9 @@ pub unsafe extern "C" fn dahl_randompartition__nggp__sample(
     let reinforcement = Reinforcement::new(reinforcement);
     let u = NonnegativeDouble::new(u);
     let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
+    let mut rng = mk_rng_isaac(seed_ptr);
     for i in 0..np {
-        let p = engine(ni, u, mass, reinforcement, None);
+        let p = engine(ni, u, mass, reinforcement, None, &mut rng);
         let labels = p.0.labels();
         for j in 0..ni {
             array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
