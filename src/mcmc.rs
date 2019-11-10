@@ -14,13 +14,13 @@ fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     current: &Partition,
     weight_for_new_subset: f64,
-    weight_for_existing_subset: &U,
-    log_posterior_predictive: &T,
+    weight_for_existing_subset: &T,
+    log_posterior_predictive: &U,
     rng: &mut V,
 ) -> Partition
 where
     T: Fn(usize, &[usize]) -> f64,
-    U: Fn(usize) -> f64,
+    U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
     let ni = current.n_items();
@@ -45,12 +45,13 @@ where
                 }
             }
             let weights = state.subsets().iter().map(|subset| {
+                let slice = &subset.items()[..];
                 let pp = if subset.is_empty() {
                     weight_for_new_subset
                 } else {
-                    weight_for_existing_subset(subset.n_items())
+                    weight_for_existing_subset(i, slice)
                 };
-                log_posterior_predictive(i, &subset.items()[..]).exp() * pp
+                log_posterior_predictive(i, slice).exp() * pp
             });
             let dist = WeightedIndex::new(weights).unwrap();
             let subset_index = dist.sample(rng);
@@ -168,7 +169,7 @@ mod tests_mcmc {
         let mut current = Partition::one_subset(n_items);
         let mass = Mass::new(1.0);
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
-        let weight_for_existing_subset = |size: usize| size as f64;
+        let weight_for_existing_subset = |_i: usize, indices: &[usize]| indices.len() as f64;
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
@@ -189,7 +190,7 @@ mod tests_mcmc {
 }
 
 extern "C" {
-    fn callRFunction_logIntegratedLikelihoodOfItem(
+    fn callRFunction_logPosteriorPredictiveOfItem(
         fn_ptr: *const c_void,
         i: i32,
         indices: RR_SEXP_vector_INTSXP,
@@ -239,6 +240,13 @@ const PRIOR_PARTITION_CODE_NGGP: i32 = 1;
 const PRIOR_PARTITION_CODE_EPA: i32 = 2;
 const PRIOR_PARTITION_CODE_FOCAL: i32 = 3;
 
+type NealNecessities = (f64, Box<dyn Fn(usize, &[usize]) -> f64>);
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__setup_crp(mass: f64) -> NealNecessities {
+    (mass, Box::new(|_i, indices| indices.len() as f64))
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     n_updates_for_partition: i32,
@@ -250,7 +258,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     reinforcement: f64,
     partition_ptr: *mut i32,
     prior_only: i32,
-    log_likelihood_function_ptr: *const c_void,
+    log_posterior_predictive_function_ptr: *const c_void,
     env_ptr: *const c_void,
     seed_ptr: *const i32, // Assumed length is 32
 ) -> () {
@@ -265,23 +273,25 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
         Box::new(|_i: usize, _indices: &[usize]| 0.0)
     } else {
         Box::new(|i: usize, indices: &[usize]| {
-            callRFunction_logIntegratedLikelihoodOfItem(
-                log_likelihood_function_ptr,
+            callRFunction_logPosteriorPredictiveOfItem(
+                log_posterior_predictive_function_ptr,
                 (i as i32) + 1,
                 RR_SEXP_vector_INTSXP::from_slice(indices),
                 env_ptr,
             )
         })
     };
-    let (weight_for_new_subset, weight_for_existing_subset): (f64, Box<dyn Fn(usize) -> f64>) =
-        match prior_partition_code {
-            PRIOR_PARTITION_CODE_CRP => (mass.as_f64(), Box::new(|size| size as f64)),
-            PRIOR_PARTITION_CODE_NGGP => (
-                mass.as_f64() * (*u + 1.0).powf(reinforcement.as_f64()),
-                Box::new(|size| size as f64 - reinforcement.as_f64()),
-            ),
-            _ => panic!("Unsupported prior partition code."),
-        };
+    let (weight_for_new_subset, weight_for_existing_subset): (
+        f64,
+        Box<dyn Fn(usize, &[usize]) -> f64>,
+    ) = match prior_partition_code {
+        PRIOR_PARTITION_CODE_CRP => dahl_randompartition__setup_crp(mass.as_f64()),
+        PRIOR_PARTITION_CODE_NGGP => (
+            mass.as_f64() * (*u + 1.0).powf(reinforcement.as_f64()),
+            Box::new(|_i, indices| indices.len() as f64 - reinforcement.as_f64()),
+        ),
+        _ => panic!("Unsupported prior partition code."),
+    };
     let mut rng = mk_rng_isaac(seed_ptr);
     let partition = update_neal_algorithm3(
         nup,
