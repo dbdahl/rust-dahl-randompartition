@@ -3,20 +3,22 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct NealNecessities NealNecessities;
+
 typedef struct {
   const void *sexp_ptr;
   int32_t *data_ptr;
   int32_t len;
 } RR_SEXP_vector_INTSXP;
 
-extern double callRFunction_logIntegratedLikelihoodOfItem(const void *fn_ptr,
-                                                          int32_t i,
-                                                          RR_SEXP_vector_INTSXP indices,
-                                                          const void *env_ptr);
-
 extern double callRFunction_logIntegratedLikelihoodOfSubset(const void *fn_ptr,
                                                             RR_SEXP_vector_INTSXP indices,
                                                             const void *env_ptr);
+
+extern double callRFunction_logPosteriorPredictiveOfItem(const void *fn_ptr,
+                                                         int32_t i,
+                                                         RR_SEXP_vector_INTSXP indices,
+                                                         const void *env_ptr);
 
 void dahl_randompartition__crp__sample(int32_t n_partitions,
                                        int32_t n_items,
@@ -55,7 +57,7 @@ void dahl_randompartition__neal_algorithm3_update(int32_t n_updates_for_partitio
                                                   double reinforcement,
                                                   int32_t *partition_ptr,
                                                   int32_t prior_only,
-                                                  const void *log_likelihood_function_ptr,
+                                                  const void *log_posterior_predictive_function_ptr,
                                                   const void *env_ptr,
                                                   const int32_t *seed_ptr);
 
@@ -66,5 +68,7 @@ void dahl_randompartition__nggp__sample(int32_t n_partitions,
                                         double reinforcement,
                                         int32_t *ptr,
                                         const int32_t *seed_ptr);
+
+NealNecessities dahl_randompartition__setup_crp(double mass);
 
 extern RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);
