@@ -15,7 +15,7 @@ use std::slice;
 
 pub fn engine<T: Rng>(
     n_items: usize,
-    u: NonnegativeDouble,
+    u: UinNGGP,
     mass: Mass,
     reinforcement: Reinforcement,
     mut target_or_rng: TargetOrRandom<T>,
@@ -26,7 +26,7 @@ pub fn engine<T: Rng>(
     };
     let mut log_probability = 0.0;
     let mut partition = Partition::new(n_items);
-    let weight_of_new = mass.as_f64() * (u + 1.0).powf(reinforcement.as_f64());
+    let weight_of_new = mass * (u + 1.0).powf(reinforcement.unwrap());
     for i in 0..partition.n_items() {
         // Ensure there is an empty subset
         match partition.subsets().last() {
@@ -44,7 +44,7 @@ pub fn engine<T: Rng>(
                 if subset.is_empty() {
                     weight_of_new
                 } else {
-                    subset.n_items() as f64 - reinforcement.as_f64()
+                    subset.n_items() as f64 - reinforcement
                 }
             })
             .enumerate()
@@ -67,7 +67,7 @@ pub fn engine<T: Rng>(
 
 pub fn sample_partition_given_u<T: Rng>(
     n_items: usize,
-    u: NonnegativeDouble,
+    u: UinNGGP,
     mass: Mass,
     reinforcement: Reinforcement,
     rng: &mut T,
@@ -77,7 +77,7 @@ pub fn sample_partition_given_u<T: Rng>(
 
 pub fn log_pmf_of_partition_given_u(
     partition: &mut Partition,
-    u: NonnegativeDouble,
+    u: UinNGGP,
     mass: Mass,
     reinforcement: Reinforcement,
 ) -> f64 {
@@ -102,20 +102,20 @@ pub fn log_full_conditional_of_log_u(
     let u = v.exp();
     let ni = partition.n_items() as f64;
     let ns = partition.n_subsets() as f64;
-    let m = mass.as_f64();
-    let r = reinforcement.as_f64();
+    let m = mass.unwrap();
+    let r = reinforcement.unwrap();
     (v * ni) - (ni - r * ns) * (u + 1.0).ln() - (m / r) * ((u + 1.0).powf(r) - 1.0)
 }
 
 pub fn update_u<T: Rng>(
-    u: NonnegativeDouble,
+    u: UinNGGP,
     partition: &Partition,
     mass: Mass,
     reinforcement: Reinforcement,
     n_updates: u32,
     rng: &mut T,
-) -> NonnegativeDouble {
-    let mut current = u.as_f64().ln();
+) -> UinNGGP {
+    let mut current = u.unwrap().ln();
     let mut f_current = log_full_conditional_of_log_u(current, partition, mass, reinforcement);
     let normal = Normal::new(0.0, 0.5_f64.sqrt()).unwrap();
     for _ in 0..n_updates {
@@ -126,11 +126,11 @@ pub fn update_u<T: Rng>(
             f_current = f_proposal;
         }
     }
-    NonnegativeDouble::new(current.exp())
+    UinNGGP::new(current.exp())
 }
 
 pub fn log_density_of_u(
-    u: NonnegativeDouble,
+    u: UinNGGP,
     n_items: usize,
     mass: Mass,
     reinforcement: Reinforcement,
@@ -143,16 +143,17 @@ pub fn log_density_of_u(
 
 pub fn log_joint_density(
     partition: &Partition,
-    u: NonnegativeDouble,
+    u: UinNGGP,
     mass: Mass,
     reinforcement: Reinforcement,
 ) -> f64 {
     let ni = partition.n_items() as f64;
     let ns = partition.n_subsets() as f64;
-    let m = mass.as_f64();
-    let lm = mass.log();
-    let r = reinforcement.as_f64();
-    let mut result = ns * lm + (ni - 1.0) * u.as_f64().ln()
+    let u = u.unwrap();
+    let m = mass.unwrap();
+    let lm = m.ln();
+    let r = reinforcement.unwrap();
+    let mut result = ns * lm + (ni - 1.0) * u.ln()
         - ln_gamma(ni)
         - (ni - r * ns) * (u + 1.0).ln()
         - (m / r) * ((u + 1.0).powf(r) - 1.0);
@@ -174,7 +175,7 @@ mod tests {
         let n_items = 4;
         let mass = Mass::new(2.0);
         let reinforcement = Reinforcement::new(0.0); // Reduces to the DP...
-        let u = NonnegativeDouble::new(0.2); // ... where the partition and u are independent.
+        let u = UinNGGP::new(0.2); // ... where the partition and u are independent.
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         let rng = &mut thread_rng();
         for _ in 0..n_partitions {
@@ -197,7 +198,7 @@ mod tests {
         let reinforcement = Reinforcement::new(0.9);
         // u in the outer integral
         let integrand = |u: f64| {
-            let u = NonnegativeDouble::new(u);
+            let u = UinNGGP::new(u);
             Partition::iter(n_items)
                 .map(|p| {
                     log_joint_density(&mut Partition::from(&p[..]), u, mass, reinforcement).exp()
@@ -211,7 +212,7 @@ mod tests {
         let sum = Partition::iter(n_items)
             .map(|p| {
                 let integrand = |u: f64| {
-                    let u = NonnegativeDouble::new(u);
+                    let u = UinNGGP::new(u);
                     log_joint_density(&mut Partition::from(&p[..]), u, mass, reinforcement).exp()
                 };
                 integrate(integrand, 0.0, 1000.0, 1e-6).integral
@@ -224,7 +225,7 @@ mod tests {
     #[test]
     fn test_log_pmf() {
         let n_items = 5;
-        let u = NonnegativeDouble::new(150.0);
+        let u = UinNGGP::new(150.0);
         let mass = Mass::new(2.0);
         let reinforcement = Reinforcement::new(0.7);
         let sum = Partition::iter(n_items)
@@ -243,7 +244,7 @@ mod tests {
         let mass = Mass::new(1.0);
         let reinforcement = Reinforcement::new(0.5);
         let integrand = |u: f64| {
-            let u = NonnegativeDouble::new(u);
+            let u = UinNGGP::new(u);
             log_density_of_u(u, n_items, mass, reinforcement).exp()
         };
         let sum = integrate(integrand, 0.0, 2000.0, 1e-6).integral;
@@ -266,7 +267,7 @@ pub unsafe extern "C" fn dahl_randompartition__nggp__sample(
     let ni = n_items as usize;
     let mass = Mass::new(mass);
     let reinforcement = Reinforcement::new(reinforcement);
-    let u = NonnegativeDouble::new(u);
+    let u = UinNGGP::new(u);
     let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
     let mut rng = mk_rng_isaac(seed_ptr);
     for i in 0..np {

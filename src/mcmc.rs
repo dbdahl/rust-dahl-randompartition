@@ -73,7 +73,7 @@ where
 fn update_rwmh<T, U>(
     n_attempts: u32,
     current: &Partition,
-    rate: NonnegativeDouble,
+    rate: Rate,
     mass: Mass,
     log_target: &T,
     rng: &mut U,
@@ -86,7 +86,7 @@ where
     let mut state = current.clone();
     let mut permutation = Permutation::natural(state.n_items());
     let mut log_target_state = log_target(&state);
-    let mut weights_state = frp::Weights::constant(rate.as_f64(), state.n_subsets());
+    let mut weights_state = frp::Weights::constant(rate.unwrap(), state.n_subsets());
     for _ in 0..n_attempts {
         state.canonicalize();
         permutation.shuffle(rng);
@@ -97,7 +97,7 @@ where
             mass,
             TargetOrRandom::Random(rng),
         );
-        let weights_proposal = frp::Weights::constant(rate.as_f64(), proposal.0.n_subsets());
+        let weights_proposal = frp::Weights::constant(rate.unwrap(), proposal.0.n_subsets());
         let log_target_proposal = log_target(&proposal.0);
         let log_ratio_target = log_target_proposal - log_target_state;
         let log_ratio_proposal = frp::engine(
@@ -146,7 +146,7 @@ mod tests_mcmc {
     fn test_crp_rwmh() {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
-        let rate = NonnegativeDouble::new(5.0);
+        let rate = Rate::new(5.0);
         let mass = Mass::new(1.0);
         let log_prior = |p: &Partition| crate::crp::log_pmf(&p, mass);
         let log_likelihood = |_indices: &[usize]| 0.0;
@@ -176,7 +176,7 @@ mod tests_mcmc {
             current = update_neal_algorithm3(
                 2,
                 &current,
-                mass.as_f64(),
+                mass.unwrap(),
                 &weight_for_existing_subset,
                 &log_posterior_predictive,
                 &mut thread_rng(),
@@ -223,7 +223,7 @@ impl RR_SEXP_vector_INTSXP {
     }
 }
 
-pub enum PartitionPrior {
+pub enum PartitionPrior<'a> {
     CRP {
         mass: Mass,
     },
@@ -231,6 +231,13 @@ pub enum PartitionPrior {
         focal: Partition,
         permutation: Permutation,
         weights: frp::Weights,
+        mass: Mass,
+    },
+    EPA {
+        distances: SquareMatrixBorrower<'a>,
+        temperature: Temperature,
+        permutation: Permutation,
+        discount: Discount,
         mass: Mass,
     },
 }
@@ -285,10 +292,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
         f64,
         Box<dyn Fn(usize, &[usize]) -> f64>,
     ) = match prior_partition_code {
-        PRIOR_PARTITION_CODE_CRP => dahl_randompartition__setup_crp(mass.as_f64()),
+        PRIOR_PARTITION_CODE_CRP => dahl_randompartition__setup_crp(mass.unwrap()),
         PRIOR_PARTITION_CODE_NGGP => (
-            mass.as_f64() * (*u + 1.0).powf(reinforcement.as_f64()),
-            Box::new(|_i, indices| indices.len() as f64 - reinforcement.as_f64()),
+            mass * (*u + 1.0).powf(reinforcement.unwrap()),
+            Box::new(|_i, indices| indices.len() as f64 - reinforcement),
         ),
         _ => panic!("Unsupported prior partition code."),
     };
@@ -303,14 +310,14 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
     );
     if prior_partition_code == PRIOR_PARTITION_CODE_NGGP {
         *u = super::nggp::update_u(
-            NonnegativeDouble::new(*u),
+            UinNGGP::new(*u),
             &partition,
             mass,
             reinforcement,
             nuu,
             &mut rng,
         )
-        .as_f64();
+        .unwrap();
     };
     partition.labels_into_slice(partition_slice, |x| x.unwrap() as i32);
 }
@@ -331,7 +338,7 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let partition = Partition::from(partition_slice);
-    let rate = NonnegativeDouble::new(rate);
+    let rate = Rate::new(rate);
     let mass = Mass::new(mass);
     let log_prior = |p: &Partition| crate::crp::log_pmf(&p, mass);
     let log_likelihood = |indices: &[usize]| {

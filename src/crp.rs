@@ -12,7 +12,7 @@ use std::slice;
 
 pub fn sample<T: Rng>(n_items: usize, mass: Mass, rng: &mut T) -> Partition {
     let mut p = Partition::new(n_items);
-    let mass = mass.as_f64();
+    let mass = mass.unwrap();
     for i in 0..p.n_items() {
         match p.subsets().last() {
             None => p.new_subset(),
@@ -39,8 +39,8 @@ pub fn sample<T: Rng>(n_items: usize, mass: Mass, rng: &mut T) -> Partition {
 pub fn log_pmf(x: &Partition, mass: Mass) -> f64 {
     let ni = x.n_items() as f64;
     let ns = x.n_subsets() as f64;
-    let m = mass.as_f64();
-    let lm = mass.log();
+    let m = mass.unwrap();
+    let lm = m.ln();
     let mut result = ns * lm + ln_gamma(m) - ln_gamma(m + ni);
     for subset in x.subsets() {
         result += ln_gamma(subset.n_items() as f64);

@@ -62,7 +62,7 @@ pub fn engine<T: Rng>(
         "Length of weights must equal the number of subsets of the focal partition."
     );
     assert_eq!(permutation.len(), ni);
-    let mass = mass.as_f64();
+    let mass = mass.unwrap();
     if let TargetOrRandom::Target(t) = &mut target_or_rng {
         assert!(t.is_canonical());
         assert_eq!(t.n_items(), ni);
