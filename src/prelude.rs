@@ -1,4 +1,4 @@
-use core::ops::{Add, Mul, Sub};
+use core::ops::{Add, Div, Mul, Sub};
 
 macro_rules! constrained_f64 {
     ( $name:ident, $closure:tt, $msg:expr ) => {
@@ -13,6 +13,10 @@ macro_rules! constrained_f64 {
 
             pub fn unwrap(self) -> f64 {
                 self.0
+            }
+
+            pub fn ln(self) -> f64 {
+                self.0.ln()
             }
         }
 
@@ -61,6 +65,22 @@ macro_rules! constrained_f64 {
 
             fn mul(self, other: $name) -> f64 {
                 self * other.0
+            }
+        }
+
+        impl Div<f64> for $name {
+            type Output = f64;
+
+            fn div(self, other: f64) -> f64 {
+                self.0 / other
+            }
+        }
+
+        impl Div<$name> for f64 {
+            type Output = f64;
+
+            fn div(self, other: $name) -> f64 {
+                self / other.0
             }
         }
     };

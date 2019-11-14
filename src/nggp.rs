@@ -115,7 +115,7 @@ pub fn update_u<T: Rng>(
     n_updates: u32,
     rng: &mut T,
 ) -> UinNGGP {
-    let mut current = u.unwrap().ln();
+    let mut current = u.ln();
     let mut f_current = log_full_conditional_of_log_u(current, partition, mass, reinforcement);
     let normal = Normal::new(0.0, 0.5_f64.sqrt()).unwrap();
     for _ in 0..n_updates {
@@ -151,7 +151,7 @@ pub fn log_joint_density(
     let ns = partition.n_subsets() as f64;
     let u = u.unwrap();
     let m = mass.unwrap();
-    let lm = m.ln();
+    let lm = mass.ln();
     let r = reinforcement.unwrap();
     let mut result = ns * lm + (ni - 1.0) * u.ln()
         - ln_gamma(ni)
