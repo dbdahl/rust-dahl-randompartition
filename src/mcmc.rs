@@ -221,30 +221,6 @@ impl RR_SEXP_vector_INTSXP {
     }
 }
 
-pub enum PartitionPrior<'a> {
-    CRP {
-        mass: Mass,
-    },
-    Focal {
-        focal: Partition,
-        permutation: Permutation,
-        weights: frp::Weights,
-        mass: Mass,
-    },
-    EPA {
-        distances: SquareMatrixBorrower<'a>,
-        temperature: Temperature,
-        permutation: Permutation,
-        discount: Discount,
-        mass: Mass,
-    },
-}
-
-const PRIOR_PARTITION_CODE_CRP: i32 = 0;
-const PRIOR_PARTITION_CODE_NGGP: i32 = 1;
-const PRIOR_PARTITION_CODE_EPA: i32 = 2;
-const PRIOR_PARTITION_CODE_FOCAL: i32 = 3;
-
 type NealNecessities = (f64, Box<dyn Fn(usize, &[usize]) -> f64>);
 
 pub trait NealFunctions {
