@@ -1,11 +1,11 @@
 // Chinese restaurant process
 
+use crate::mcmc::NealFunctions;
 use crate::prelude::*;
 use dahl_partition::*;
-use rand::Rng;
-
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
+use rand::Rng;
 use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
 use std::slice;
@@ -46,6 +46,26 @@ pub fn log_pmf(x: &Partition, mass: Mass) -> f64 {
         result += ln_gamma(subset.n_items() as f64);
     }
     result
+}
+
+pub struct NealFunctionsCRP {
+    pub mass: Mass,
+}
+
+impl NealFunctionsCRP {
+    pub fn new(mass: Mass) -> Self {
+        Self { mass }
+    }
+}
+
+impl NealFunctions for NealFunctionsCRP {
+    fn new_weight(&self, _i: usize, _ii: usize, _n_subsets: usize) -> f64 {
+        self.mass.unwrap()
+    }
+
+    fn existing_weight(&self, _i: usize, _ii: usize, _n_subsets: usize, items: &[usize]) -> f64 {
+        items.len() as f64
+    }
 }
 
 #[cfg(test)]

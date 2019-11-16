@@ -13,13 +13,12 @@ use std::slice;
 fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     current: &Partition,
-    weight_for_new_subset: f64,
-    weight_for_existing_subset: &T,
+    neal_functions: &T,
     log_posterior_predictive: &U,
     rng: &mut V,
 ) -> Partition
 where
-    T: Fn(usize, &[usize]) -> f64,
+    T: NealFunctions,
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
@@ -44,14 +43,15 @@ where
                     empty_subset_at_end = true;
                 }
             }
+            let n_subsets = state.n_subsets() - 1; // Because there is an empty subset
             let weights = state.subsets().iter().map(|subset| {
-                let slice = &subset.items()[..];
+                let items = &subset.items()[..];
                 let pp = if subset.is_empty() {
-                    weight_for_new_subset
+                    neal_functions.new_weight(i, i, n_subsets)
                 } else {
-                    weight_for_existing_subset(i, slice)
+                    neal_functions.existing_weight(i, i, n_subsets, items)
                 };
-                log_posterior_predictive(i, slice).exp() * pp
+                log_posterior_predictive(i, items).exp() * pp
             });
             let dist = WeightedIndex::new(weights).unwrap();
             let subset_index = dist.sample(rng);
@@ -167,17 +167,15 @@ mod tests_mcmc {
     fn test_crp_neal_algorithm3() {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
-        let mass = Mass::new(1.0);
+        let neal_functions = crp::NealFunctionsCRP::new(Mass::new(1.0));
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
-        let weight_for_existing_subset = |_i: usize, indices: &[usize]| indices.len() as f64;
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
             current = update_neal_algorithm3(
                 2,
                 &current,
-                mass.unwrap(),
-                &weight_for_existing_subset,
+                &neal_functions,
                 &log_posterior_predictive,
                 &mut thread_rng(),
             );
@@ -249,37 +247,39 @@ const PRIOR_PARTITION_CODE_FOCAL: i32 = 3;
 
 type NealNecessities = (f64, Box<dyn Fn(usize, &[usize]) -> f64>);
 
+pub trait NealFunctions {
+    fn new_weight(&self, i: usize, ii: usize, n_subsets: usize) -> f64;
+    fn existing_weight(&self, i: usize, ii: usize, n_subsets: usize, items: &[usize]) -> f64;
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__setup_crp(mass: f64) -> NealNecessities {
     (mass, Box::new(|_i, indices| indices.len() as f64))
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
+unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
     n_updates_for_partition: i32,
-    n_updates_for_u: i32,
     n_items: i32,
-    prior_partition_code: i32,
-    u: *mut f64,
-    mass: f64,
-    reinforcement: f64,
     partition_ptr: *mut i32,
     prior_only: i32,
     log_posterior_predictive_function_ptr: *const c_void,
     env_ptr: *const c_void,
-    seed_ptr: *const i32, // Assumed length is 32
-) -> () {
+    seed_ptr: *const i32, // Assumed length is 32)
+) -> (
+    u32,
+    &'a mut [i32],
+    Partition,
+    Box<dyn Fn(usize, &[usize]) -> f64>,
+    IsaacRng,
+) {
     let nup = n_updates_for_partition as u32;
-    let nuu = n_updates_for_u as u32;
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let partition = Partition::from(partition_slice);
-    let mass = Mass::new(mass);
-    let reinforcement = Reinforcement::new(reinforcement);
     let log_posterior_predictive: Box<dyn Fn(usize, &[usize]) -> f64> = if prior_only != 0 {
         Box::new(|_i: usize, _indices: &[usize]| 0.0)
     } else {
-        Box::new(|i: usize, indices: &[usize]| {
+        Box::new(move |i: usize, indices: &[usize]| {
             callRFunction_logPosteriorPredictiveOfItem(
                 log_posterior_predictive_function_ptr,
                 (i as i32) + 1,
@@ -288,38 +288,90 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_update(
             )
         })
     };
-    let (weight_for_new_subset, weight_for_existing_subset): (
-        f64,
-        Box<dyn Fn(usize, &[usize]) -> f64>,
-    ) = match prior_partition_code {
-        PRIOR_PARTITION_CODE_CRP => dahl_randompartition__setup_crp(mass.unwrap()),
-        PRIOR_PARTITION_CODE_NGGP => (
-            mass * (*u + 1.0).powf(reinforcement.unwrap()),
-            Box::new(|_i, indices| indices.len() as f64 - reinforcement),
-        ),
-        _ => panic!("Unsupported prior partition code."),
-    };
-    let mut rng = mk_rng_isaac(seed_ptr);
+    let rng = mk_rng_isaac(seed_ptr);
+    (
+        nup,
+        partition_slice,
+        partition,
+        log_posterior_predictive,
+        rng,
+    )
+}
+
+unsafe fn neal_algorithm3_push_into_slice(partition: &Partition, slice: &mut [i32]) {
+    partition.labels_into_slice(slice, |x| x.unwrap() as i32);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
+    n_updates_for_partition: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    prior_only: i32,
+    log_posterior_predictive_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
+    mass: f64,
+) -> () {
+    let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
+        neal_algorithm3_process_arguments(
+            n_updates_for_partition,
+            n_items,
+            partition_ptr,
+            prior_only,
+            log_posterior_predictive_function_ptr,
+            env_ptr,
+            seed_ptr,
+        );
+    let neal_functions = crp::NealFunctionsCRP::new(Mass::new(mass));
     let partition = update_neal_algorithm3(
         nup,
         &partition,
-        weight_for_new_subset,
-        &weight_for_existing_subset,
+        &neal_functions,
         &log_posterior_predictive,
         &mut rng,
     );
-    if prior_partition_code == PRIOR_PARTITION_CODE_NGGP {
-        *u = super::nggp::update_u(
-            UinNGGP::new(*u),
-            &partition,
-            mass,
-            reinforcement,
-            nuu,
-            &mut rng,
-        )
-        .unwrap();
-    };
-    partition.labels_into_slice(partition_slice, |x| x.unwrap() as i32);
+    neal_algorithm3_push_into_slice(&partition, partition_slice);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
+    n_updates_for_partition: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    prior_only: i32,
+    log_posterior_predictive_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
+    n_updates_for_u: i32,
+    u_ptr: *mut f64,
+    mass: f64,
+    reinforcement: f64,
+) -> () {
+    let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
+        neal_algorithm3_process_arguments(
+            n_updates_for_partition,
+            n_items,
+            partition_ptr,
+            prior_only,
+            log_posterior_predictive_function_ptr,
+            env_ptr,
+            seed_ptr,
+        );
+    let nuu = n_updates_for_u as u32;
+    let u = UinNGGP::new(*u_ptr);
+    let mass = Mass::new(mass);
+    let reinforcement = Reinforcement::new(reinforcement);
+    let neal_functions = nggp::NealParametersNGGP::new(u, mass, reinforcement);
+    let partition = update_neal_algorithm3(
+        nup,
+        &partition,
+        &neal_functions,
+        &log_posterior_predictive,
+        &mut rng,
+    );
+    *u_ptr = super::nggp::update_u(u, &partition, mass, reinforcement, nuu, &mut rng).unwrap();
+    neal_algorithm3_push_into_slice(&partition, partition_slice);
 }
 
 #[no_mangle]

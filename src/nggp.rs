@@ -1,5 +1,6 @@
 // Normalized generalized gamma process
 
+use crate::mcmc::NealFunctions;
 use crate::prelude::*;
 use crate::TargetOrRandom;
 
@@ -162,6 +163,32 @@ pub fn log_joint_density(
     }
     result -= ns * ln_gamma(1.0 - r);
     result
+}
+
+pub struct NealParametersNGGP {
+    pub u: UinNGGP,
+    pub mass: Mass,
+    pub reinforcement: Reinforcement,
+}
+
+impl NealParametersNGGP {
+    pub fn new(u: UinNGGP, mass: Mass, reinforcement: Reinforcement) -> Self {
+        Self {
+            u,
+            mass,
+            reinforcement,
+        }
+    }
+}
+
+impl NealFunctions for NealParametersNGGP {
+    fn new_weight(&self, _i: usize, _ii: usize, _n_subsets: usize) -> f64 {
+        self.mass * (self.u + 1.0).powf(self.reinforcement.unwrap())
+    }
+
+    fn existing_weight(&self, _i: usize, _ii: usize, _n_subsets: usize, items: &[usize]) -> f64 {
+        (items.len() as f64) - self.reinforcement
+    }
 }
 
 #[cfg(test)]

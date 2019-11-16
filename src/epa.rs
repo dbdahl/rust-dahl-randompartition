@@ -170,15 +170,14 @@ mod tests {
     }
 }
 
-/*
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__focal_partition(
+pub unsafe extern "C" fn dahl_randompartition__epa_partition(
     n_partitions: i32,
     n_items: i32,
-    focal_ptr: *const i32,
-    weights_ptr: *const f64,
+    similarity_ptr: *mut f64,
     permutation_ptr: *const i32,
     mass: f64,
+    discount: f64,
     do_sampling: i32,
     use_random_permutations: i32,
     partition_labels_ptr: *mut i32,
@@ -187,8 +186,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
-    let focal = Partition::from(slice::from_raw_parts(focal_ptr, ni));
-    let weights = Weights::from(slice::from_raw_parts(weights_ptr, focal.n_subsets())).unwrap();
+    let similarity = SimilarityBorrower(SquareMatrixBorrower::from_ptr(similarity_ptr, ni));
     let mut permutation = if use_random_permutations != 0 {
         Permutation::natural(ni)
     } else {
@@ -198,6 +196,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
         Permutation::from_vector(permutation_vector).unwrap()
     };
     let mass = Mass::new(mass);
+    let discount = Discount::new(discount);
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
     if do_sampling != 0 {
@@ -207,10 +206,10 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
                 permutation.shuffle(&mut rng);
             }
             let p = engine(
-                &focal,
-                &weights,
+                &similarity,
                 &permutation,
                 mass,
+                discount,
                 TargetOrRandom::Random(rng),
             );
             let labels = p.0.labels();
@@ -227,14 +226,13 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
             }
             let mut target = Partition::from(&target_labels[..]);
             let p = engine::<IsaacRng>(
-                &focal,
-                &weights,
+                &similarity,
                 &permutation,
                 mass,
+                discount,
                 TargetOrRandom::Target(&mut target),
             );
             probs[i] = p.1;
         }
     }
 }
-*/
