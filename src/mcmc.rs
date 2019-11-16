@@ -171,7 +171,7 @@ mod tests_mcmc {
     fn test_crp_neal_algorithm3() {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
-        let neal_functions = crp::NealFunctionsCRP::new(Mass::new(1.0));
+        let neal_functions = crp::CRPParameters::new(Mass::new(1.0));
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
         let n_samples = 10000;
@@ -291,7 +291,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
             env_ptr,
             seed_ptr,
         );
-    let neal_functions = crp::NealFunctionsCRP::new(Mass::new(mass));
+    let neal_functions = crp::CRPParameters::new(Mass::new(mass));
     let partition = update_neal_algorithm3(
         nup,
         &partition,
@@ -330,7 +330,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
     let u = UinNGGP::new(*u_ptr);
     let mass = Mass::new(mass);
     let reinforcement = Reinforcement::new(reinforcement);
-    let neal_functions = nggp::NealParametersNGGP::new(u, mass, reinforcement);
+    let neal_functions = nggp::NGGPParameters::new(u, mass, reinforcement);
     let partition = update_neal_algorithm3(
         nup,
         &partition,
