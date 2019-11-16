@@ -10,6 +10,11 @@ use rand_isaac::IsaacRng;
 use std::ffi::c_void;
 use std::slice;
 
+pub trait NealFunctions {
+    fn new_weight(&self, n_subsets: usize) -> f64;
+    fn existing_weight(&self, n_subsets: usize, n_items: usize) -> f64;
+}
+
 fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     current: &Partition,
@@ -45,13 +50,12 @@ where
             }
             let n_subsets = state.n_subsets() - 1; // Because there is an empty subset
             let weights = state.subsets().iter().map(|subset| {
-                let items = &subset.items()[..];
                 let pp = if subset.is_empty() {
-                    neal_functions.new_weight(i, i, n_subsets)
+                    neal_functions.new_weight(n_subsets)
                 } else {
-                    neal_functions.existing_weight(i, i, n_subsets, items)
+                    neal_functions.existing_weight(n_subsets, subset.n_items())
                 };
-                log_posterior_predictive(i, items).exp() * pp
+                log_posterior_predictive(i, &subset.items()[..]).exp() * pp
             });
             let dist = WeightedIndex::new(weights).unwrap();
             let subset_index = dist.sample(rng);
@@ -219,18 +223,6 @@ impl RR_SEXP_vector_INTSXP {
         }
         result
     }
-}
-
-type NealNecessities = (f64, Box<dyn Fn(usize, &[usize]) -> f64>);
-
-pub trait NealFunctions {
-    fn new_weight(&self, i: usize, ii: usize, n_subsets: usize) -> f64;
-    fn existing_weight(&self, i: usize, ii: usize, n_subsets: usize, items: &[usize]) -> f64;
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__setup_crp(mass: f64) -> NealNecessities {
-    (mass, Box::new(|_i, indices| indices.len() as f64))
 }
 
 unsafe fn neal_algorithm3_process_arguments<'a, 'b>(

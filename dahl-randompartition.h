@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef struct NealNecessities NealNecessities;
-
 typedef struct {
   const void *sexp_ptr;
   int32_t *data_ptr;
@@ -88,7 +86,5 @@ void dahl_randompartition__nggp__sample(int32_t n_partitions,
                                         double reinforcement,
                                         int32_t *ptr,
                                         const int32_t *seed_ptr);
-
-NealNecessities dahl_randompartition__setup_crp(double mass);
 
 extern RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);

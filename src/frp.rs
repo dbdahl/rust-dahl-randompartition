@@ -167,6 +167,35 @@ pub fn log_pmf(
     .1
 }
 
+pub struct NealParametersFocal {
+    focal: Partition,
+    weights: Weights,
+    permutation: Permutation,
+    mass: Mass,
+}
+
+impl NealParametersFocal {
+    pub fn new(
+        focal: Partition,
+        weights: Weights,
+        permutation: Permutation,
+        mass: Mass,
+    ) -> Option<Self> {
+        if focal.n_subsets() != weights.len() {
+            None
+        } else if focal.n_items() != permutation.len() {
+            None
+        } else {
+            Some(Self {
+                focal,
+                weights,
+                permutation,
+                mass,
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

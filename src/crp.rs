@@ -49,7 +49,7 @@ pub fn log_pmf(x: &Partition, mass: Mass) -> f64 {
 }
 
 pub struct NealFunctionsCRP {
-    pub mass: Mass,
+    mass: Mass,
 }
 
 impl NealFunctionsCRP {
@@ -59,12 +59,12 @@ impl NealFunctionsCRP {
 }
 
 impl NealFunctions for NealFunctionsCRP {
-    fn new_weight(&self, _i: usize, _ii: usize, _n_subsets: usize) -> f64 {
+    fn new_weight(&self, _n_subsets: usize) -> f64 {
         self.mass.unwrap()
     }
 
-    fn existing_weight(&self, _i: usize, _ii: usize, _n_subsets: usize, items: &[usize]) -> f64 {
-        items.len() as f64
+    fn existing_weight(&self, _n_subsets: usize, n_items: usize) -> f64 {
+        n_items as f64
     }
 }
 

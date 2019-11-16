@@ -166,9 +166,9 @@ pub fn log_joint_density(
 }
 
 pub struct NealParametersNGGP {
-    pub u: UinNGGP,
-    pub mass: Mass,
-    pub reinforcement: Reinforcement,
+    u: UinNGGP,
+    mass: Mass,
+    reinforcement: Reinforcement,
 }
 
 impl NealParametersNGGP {
@@ -182,12 +182,12 @@ impl NealParametersNGGP {
 }
 
 impl NealFunctions for NealParametersNGGP {
-    fn new_weight(&self, _i: usize, _ii: usize, _n_subsets: usize) -> f64 {
+    fn new_weight(&self, _n_subsets: usize) -> f64 {
         self.mass * (self.u + 1.0).powf(self.reinforcement.unwrap())
     }
 
-    fn existing_weight(&self, _i: usize, _ii: usize, _n_subsets: usize, items: &[usize]) -> f64 {
-        (items.len() as f64) - self.reinforcement
+    fn existing_weight(&self, _n_subsets: usize, n_items: usize) -> f64 {
+        (n_items as f64) - self.reinforcement
     }
 }
 
