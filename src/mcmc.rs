@@ -2,6 +2,7 @@ use crate::frp;
 use crate::prelude::*;
 use crate::*;
 
+use crate::frp::FRPParameters;
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
@@ -94,21 +95,16 @@ where
     for _ in 0..n_attempts {
         state.canonicalize();
         permutation.shuffle(rng);
-        let proposal = frp::engine(
-            &state,
-            &weights_state,
-            &permutation,
-            mass,
-            TargetOrRandom::Random(rng),
-        );
+        let current_parameters =
+            FRPParameters::new(&state, &weights_state, &permutation, mass).unwrap();
+        let proposal = frp::engine(&current_parameters, TargetOrRandom::Random(rng));
         let weights_proposal = frp::Weights::constant(rate.unwrap(), proposal.0.n_subsets());
         let log_target_proposal = log_target(&proposal.0);
         let log_ratio_target = log_target_proposal - log_target_state;
+        let proposed_parameters =
+            FRPParameters::new(&proposal.0, &weights_proposal, &permutation, mass).unwrap();
         let log_ratio_proposal = frp::engine(
-            &proposal.0,
-            &weights_proposal,
-            &permutation,
-            mass,
+            &proposed_parameters,
             TargetOrRandom::Target::<IsaacRng>(&mut state),
         )
         .1 - proposal.1;

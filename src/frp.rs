@@ -11,6 +11,35 @@ use rand_isaac::IsaacRng;
 use std::convert::TryFrom;
 use std::slice;
 
+pub struct FRPParameters<'a, 'b, 'c> {
+    focal: &'a Partition,
+    weights: &'b Weights,
+    permutation: &'c Permutation,
+    mass: Mass,
+}
+
+impl<'a, 'b, 'c> FRPParameters<'a, 'b, 'c> {
+    pub fn new(
+        focal: &'a Partition,
+        weights: &'b Weights,
+        permutation: &'c Permutation,
+        mass: Mass,
+    ) -> Option<Self> {
+        if focal.n_subsets() != weights.len() {
+            None
+        } else if focal.n_items() != permutation.len() {
+            None
+        } else {
+            Some(Self {
+                focal,
+                weights,
+                permutation,
+                mass,
+            })
+        }
+    }
+}
+
 pub struct Weights(Vec<f64>);
 
 impl Weights {
@@ -44,29 +73,20 @@ impl std::ops::Index<usize> for Weights {
 }
 
 pub fn engine<T: Rng>(
-    focal: &Partition,
-    weights: &Weights,
-    permutation: &Permutation,
-    mass: Mass,
+    parameters: &FRPParameters,
     mut target_or_rng: TargetOrRandom<T>,
 ) -> (Partition, f64) {
     assert!(
-        focal.is_canonical(),
+        parameters.focal.is_canonical(),
         "Focal partition must be in canonical form."
     );
-    let nsf = focal.n_subsets();
-    let ni = focal.n_items();
-    assert_eq!(
-        nsf,
-        weights.len(),
-        "Length of weights must equal the number of subsets of the focal partition."
-    );
-    assert_eq!(permutation.len(), ni);
-    let mass = mass.unwrap();
+    let nsf = parameters.focal.n_subsets();
+    let ni = parameters.focal.n_items();
+    let mass = parameters.mass.unwrap();
     if let TargetOrRandom::Target(t) = &mut target_or_rng {
         assert!(t.is_canonical());
         assert_eq!(t.n_items(), ni);
-        t.canonicalize_by_permutation(Some(&permutation));
+        t.canonicalize_by_permutation(Some(&parameters.permutation));
     };
     let mut log_probability = 0.0;
     let mut partition = Partition::new(ni);
@@ -76,7 +96,7 @@ pub fn engine<T: Rng>(
         intersection_counter.push(Vec::new())
     }
     for i in 0..ni {
-        let ii = permutation[i];
+        let ii = parameters.permutation[i];
         // Ensure there is an empty subset
         match partition.subsets().last() {
             None => partition.new_subset(),
@@ -86,11 +106,11 @@ pub fn engine<T: Rng>(
                 }
             }
         }
-        let focal_subset_index = focal.label_of(ii).unwrap();
+        let focal_subset_index = parameters.focal.label_of(ii).unwrap();
         let scaled_weight = if total_counter[focal_subset_index] == 0.0 {
             0.0
         } else {
-            weights[focal_subset_index] / total_counter[focal_subset_index]
+            parameters.weights[focal_subset_index] / total_counter[focal_subset_index]
         };
         let probs: Vec<(usize, f64)> = partition
             .subsets()
@@ -99,7 +119,7 @@ pub fn engine<T: Rng>(
             .map(|(subset_index, subset)| {
                 let prob = if subset.is_empty() {
                     if total_counter[focal_subset_index] == 0.0 {
-                        mass + weights[focal_subset_index]
+                        mass + parameters.weights[focal_subset_index]
                     } else {
                         mass
                     }
@@ -133,67 +153,12 @@ pub fn engine<T: Rng>(
     (partition, log_probability)
 }
 
-pub fn sample<T: Rng>(
-    focal: &Partition,
-    weights: &Weights,
-    permutation: &Permutation,
-    mass: Mass,
-    rng: &mut T,
-) -> Partition {
-    engine(
-        focal,
-        weights,
-        permutation,
-        mass,
-        TargetOrRandom::Random(rng),
-    )
-    .0
+pub fn sample<T: Rng>(parameters: &FRPParameters, rng: &mut T) -> Partition {
+    engine(parameters, TargetOrRandom::Random(rng)).0
 }
 
-pub fn log_pmf(
-    target: &mut Partition,
-    focal: &Partition,
-    weights: &Weights,
-    permutation: &Permutation,
-    mass: Mass,
-) -> f64 {
-    engine(
-        focal,
-        weights,
-        permutation,
-        mass,
-        TargetOrRandom::Target::<IsaacRng>(target),
-    )
-    .1
-}
-
-pub struct NealParametersFocal {
-    focal: Partition,
-    weights: Weights,
-    permutation: Permutation,
-    mass: Mass,
-}
-
-impl NealParametersFocal {
-    pub fn new(
-        focal: Partition,
-        weights: Weights,
-        permutation: Permutation,
-        mass: Mass,
-    ) -> Option<Self> {
-        if focal.n_subsets() != weights.len() {
-            None
-        } else if focal.n_items() != permutation.len() {
-            None
-        } else {
-            Some(Self {
-                focal,
-                weights,
-                permutation,
-                mass,
-            })
-        }
-    }
+pub fn log_pmf(target: &mut Partition, parameters: &FRPParameters) -> f64 {
+    engine(parameters, TargetOrRandom::Target::<IsaacRng>(target)).1
 }
 
 #[cfg(test)]
@@ -212,7 +177,8 @@ mod tests {
         let mut rng = &mut thread_rng();
         for _ in 0..n_partitions {
             permutation.shuffle(&mut rng);
-            samples.push_partition(&sample(&focal, &weights, &permutation, mass, rng));
+            let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+            samples.push_partition(&sample(&parameters, rng));
         }
         let mut psm = dahl_salso::psm::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
@@ -238,14 +204,9 @@ mod tests {
             let weights = Weights::from(&vec[..]).unwrap();
             let sum = Partition::iter(n_items)
                 .map(|p| {
-                    log_pmf(
-                        &mut Partition::from(&p[..]),
-                        &focal,
-                        &weights,
-                        &permutation,
-                        mass,
-                    )
-                    .exp()
+                    let parameters =
+                        FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+                    log_pmf(&mut Partition::from(&p[..]), &parameters).exp()
                 })
                 .sum();
             assert!(0.9999999 <= sum, format!("{}", sum));
@@ -289,13 +250,8 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
             if use_random_permutations != 0 {
                 permutation.shuffle(&mut rng);
             }
-            let p = engine(
-                &focal,
-                &weights,
-                &permutation,
-                mass,
-                TargetOrRandom::Random(rng),
-            );
+            let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+            let p = engine(&parameters, TargetOrRandom::Random(rng));
             let labels = p.0.labels();
             for j in 0..ni {
                 matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
@@ -303,19 +259,14 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
             probs[i] = p.1;
         }
     } else {
+        let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
         for i in 0..np {
             let mut target_labels = Vec::with_capacity(ni);
             for j in 0..ni {
                 target_labels.push(matrix[np * j + i]);
             }
             let mut target = Partition::from(&target_labels[..]);
-            let p = engine::<IsaacRng>(
-                &focal,
-                &weights,
-                &permutation,
-                mass,
-                TargetOrRandom::Target(&mut target),
-            );
+            let p = engine::<IsaacRng>(&parameters, TargetOrRandom::Target(&mut target));
             probs[i] = p.1;
         }
     }
