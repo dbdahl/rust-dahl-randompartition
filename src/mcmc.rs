@@ -2,6 +2,7 @@ use crate::frp;
 use crate::prelude::*;
 use crate::*;
 
+use crate::crp::CRPParameters;
 use crate::frp::FRPParameters;
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
@@ -148,7 +149,8 @@ mod tests_mcmc {
         let mut current = Partition::one_subset(n_items);
         let rate = Rate::new(5.0);
         let mass = Mass::new(1.0);
-        let log_prior = |p: &Partition| crate::crp::log_pmf(&p, mass);
+        let parameters = CRPParameters::new(mass);
+        let log_prior = |p: &Partition| crate::crp::log_pmf(&p, &parameters);
         let log_likelihood = |_indices: &[usize]| 0.0;
         let log_target = make_posterior(log_prior, log_likelihood);
         let mut sum = 0;
@@ -356,7 +358,8 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let partition = Partition::from(partition_slice);
     let rate = Rate::new(rate);
     let mass = Mass::new(mass);
-    let log_prior = |p: &Partition| crate::crp::log_pmf(&p, mass);
+    let parameters = CRPParameters::new(mass);
+    let log_prior = |p: &Partition| crate::crp::log_pmf(&p, &parameters);
     let log_likelihood = |indices: &[usize]| {
         callRFunction_logIntegratedLikelihoodOfSubset(
             log_likelihood_function_ptr,

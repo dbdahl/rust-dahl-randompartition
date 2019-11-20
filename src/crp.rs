@@ -2,6 +2,7 @@
 
 use crate::mcmc::NealFunctions;
 use crate::prelude::*;
+
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
@@ -10,6 +11,7 @@ use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
 use std::slice;
 
+#[derive(Debug)]
 pub struct CRPParameters {
     mass: Mass,
 }
@@ -53,13 +55,14 @@ pub fn sample<T: Rng>(n_items: usize, parameters: &CRPParameters, rng: &mut T) -
         let subset_index = dist.sample(rng);
         p.add_with_index(i, subset_index);
     }
+    p.canonicalize();
     p
 }
 
-pub fn log_pmf(x: &Partition, mass: Mass) -> f64 {
+pub fn log_pmf(x: &Partition, parameters: &CRPParameters) -> f64 {
     let ni = x.n_items() as f64;
     let ns = x.n_subsets() as f64;
-    let m = mass.unwrap();
+    let m = parameters.mass.unwrap();
     let lm = m.ln();
     let mut result = ns * lm + ln_gamma(m) - ln_gamma(m + ni);
     for subset in x.subsets() {
@@ -92,23 +95,38 @@ mod tests {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__crp__sample(
+pub unsafe extern "C" fn dahl_randompartition__crp_partition(
+    do_sampling: i32,
     n_partitions: i32,
     n_items: i32,
-    mass: f64,
-    ptr: *mut i32,
+    partition_labels_ptr: *mut i32,
+    partition_probs_ptr: *mut f64,
     seed_ptr: *const i32, // Assumed length is 32
+    mass: f64,
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
     let parameters = CRPParameters::new(Mass::new(mass));
-    let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
-    let mut rng = mk_rng_isaac(seed_ptr);
-    for i in 0..np {
-        let p = sample(ni, &parameters, &mut rng);
-        let labels = p.labels();
-        for j in 0..ni {
-            array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+    let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
+    let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
+    if do_sampling != 0 {
+        let rng = &mut mk_rng_isaac(seed_ptr);
+        for i in 0..np {
+            let p = sample(ni, &parameters, rng);
+            let labels = p.labels();
+            for j in 0..ni {
+                matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+            }
+            probs[i] = log_pmf(&p, &parameters);
+        }
+    } else {
+        for i in 0..np {
+            let mut target_labels = Vec::with_capacity(ni);
+            for j in 0..ni {
+                target_labels.push(matrix[np * j + i]);
+            }
+            let target = Partition::from(&target_labels[..]);
+            probs[i] = log_pmf(&target, &parameters);
         }
     }
 }

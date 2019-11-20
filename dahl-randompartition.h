@@ -18,11 +18,13 @@ extern double callRFunction_logPosteriorPredictiveOfItem(const void *fn_ptr,
                                                          RR_SEXP_vector_INTSXP indices,
                                                          const void *env_ptr);
 
-void dahl_randompartition__crp__sample(int32_t n_partitions,
-                                       int32_t n_items,
-                                       double mass,
-                                       int32_t *ptr,
-                                       const int32_t *seed_ptr);
+void dahl_randompartition__crp_partition(int32_t do_sampling,
+                                         int32_t n_partitions,
+                                         int32_t n_items,
+                                         int32_t *partition_labels_ptr,
+                                         double *partition_probs_ptr,
+                                         const int32_t *seed_ptr,
+                                         double mass);
 
 void dahl_randompartition__epa_partition(int32_t n_partitions,
                                          int32_t n_items,
