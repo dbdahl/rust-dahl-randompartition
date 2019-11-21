@@ -174,12 +174,12 @@ pub unsafe extern "C" fn dahl_randompartition__epa_partition(
     permutation_ptr: *const i32,
     mass: f64,
     discount: f64,
-    use_random_permutations: i32,
+    use_random_permutation: i32,
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
     let similarity = SimilarityBorrower(SquareMatrixBorrower::from_ptr(similarity_ptr, ni));
-    let mut permutation = if use_random_permutations != 0 {
+    let mut permutation = if use_random_permutation != 0 {
         Permutation::natural(ni)
     } else {
         let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
@@ -194,7 +194,7 @@ pub unsafe extern "C" fn dahl_randompartition__epa_partition(
     if do_sampling != 0 {
         let mut rng = &mut mk_rng_isaac(seed_ptr);
         for i in 0..np {
-            if use_random_permutations != 0 {
+            if use_random_permutation != 0 {
                 permutation.shuffle(&mut rng);
             }
             let parameters = EPAParameters::new(&similarity, &permutation, mass, discount);

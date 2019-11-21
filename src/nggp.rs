@@ -259,28 +259,54 @@ mod tests {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__nggp__sample(
+pub unsafe extern "C" fn dahl_randompartition__nggp_partition(
+    do_sampling: i32,
     n_partitions: i32,
     n_items: i32,
+    partition_labels_ptr: *mut i32,
+    partition_probs_ptr: *mut f64,
+    seed_ptr: *const i32, // Assumed length is 32
     u: f64,
     mass: f64,
     reinforcement: f64,
-    ptr: *mut i32,
-    seed_ptr: *const i32, // Assumed length is 32
+    n_updates_for_u: i32,
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
-    let u = UinNGGP::new(u);
+    let mut u = UinNGGP::new(u);
     let mass = Mass::new(mass);
     let reinforcement = Reinforcement::new(reinforcement);
-    let parameters = NGGPParameters::new(u, mass, reinforcement);
-    let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
-    let mut rng = mk_rng_isaac(seed_ptr);
-    for i in 0..np {
-        let p = engine(ni, &parameters, TargetOrRandom::Random(&mut rng));
-        let labels = p.0.labels();
-        for j in 0..ni {
-            array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+    let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
+    let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
+    if do_sampling != 0 {
+        let mut rng = mk_rng_isaac(seed_ptr);
+        for i in 0..np {
+            let parameters = NGGPParameters::new(u, mass, reinforcement);
+            let p = engine(ni, &parameters, TargetOrRandom::Random(&mut rng));
+            let labels = p.0.labels();
+            for j in 0..ni {
+                matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+            }
+            probs[i] = p.1;
+            u = super::nggp::update_u(
+                u,
+                &p.0,
+                mass,
+                reinforcement,
+                n_updates_for_u as u32,
+                &mut rng,
+            );
+        }
+    } else {
+        for i in 0..np {
+            let mut target_labels = Vec::with_capacity(ni);
+            for j in 0..ni {
+                target_labels.push(matrix[np * j + i]);
+            }
+            let mut target = Partition::from(&target_labels[..]);
+            let parameters = NGGPParameters::new(u, mass, reinforcement);
+            let p = engine::<IsaacRng>(ni, &parameters, TargetOrRandom::Target(&mut target));
+            probs[i] = p.1;
         }
     }
 }

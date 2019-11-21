@@ -36,7 +36,7 @@ void dahl_randompartition__epa_partition(int32_t do_sampling,
                                          const int32_t *permutation_ptr,
                                          double mass,
                                          double discount,
-                                         int32_t use_random_permutations);
+                                         int32_t use_random_permutation);
 
 void dahl_randompartition__focal_partition(int32_t n_partitions,
                                            int32_t n_items,
@@ -81,12 +81,15 @@ void dahl_randompartition__neal_algorithm3_nggp(int32_t n_updates_for_partition,
                                                 double mass,
                                                 double reinforcement);
 
-void dahl_randompartition__nggp__sample(int32_t n_partitions,
-                                        int32_t n_items,
-                                        double u,
-                                        double mass,
-                                        double reinforcement,
-                                        int32_t *ptr,
-                                        const int32_t *seed_ptr);
+void dahl_randompartition__nggp_partition(int32_t do_sampling,
+                                          int32_t n_partitions,
+                                          int32_t n_items,
+                                          int32_t *partition_labels_ptr,
+                                          double *partition_probs_ptr,
+                                          const int32_t *seed_ptr,
+                                          double u,
+                                          double mass,
+                                          double reinforcement,
+                                          int32_t n_updates_for_u);
 
 extern RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);
