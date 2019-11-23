@@ -307,7 +307,7 @@ pub unsafe extern "C" fn dahl_randompartition__nggp_partition(
         // let l = |_i: usize, _indices: &[usize]| 0.0;
         for i in 0..np {
             let parameters = NGGPParameters::new(u, mass, reinforcement);
-            let p = sample_partition_given_u(ni, &parameters, &mut rng);
+            let p = engine(ni, &parameters, TargetOrRandom::Random(&mut rng));
             // p = crate::mcmc::update_neal_algorithm3(1, &p, &parameters, &l, &mut rng);
             let labels = p.0.labels();
             // let labels = p.labels();
