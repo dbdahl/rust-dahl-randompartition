@@ -74,13 +74,34 @@ pub fn log_pmf(x: &Partition, parameters: &CRPParameters) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mcmc::update_neal_algorithm3;
     use rand::prelude::*;
 
     #[test]
-    fn test_goodness_of_fit() {
+    fn test_goodness_of_fit_constructive() {
         let n_items = 5;
         let parameters = CRPParameters::new(Mass::new(2.0));
         let sample_closure = || sample(n_items, &parameters, &mut thread_rng());
+        let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
+        crate::testing::assert_goodness_of_fit(
+            100000,
+            n_items,
+            sample_closure,
+            log_prob_closure,
+            0.001,
+        );
+    }
+
+    #[test]
+    fn test_goodness_of_fit_neal_algorithm3() {
+        let n_items = 5;
+        let parameters = CRPParameters::new(Mass::new(2.0));
+        let l = Box::new(|_i: usize, _indices: &[usize]| 0.0);
+        let mut p = Partition::one_subset(n_items);
+        let sample_closure = || {
+            p = update_neal_algorithm3(1, &p, &parameters, &l, &mut thread_rng());
+            p.clone()
+        };
         let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
         crate::testing::assert_goodness_of_fit(
             100000,

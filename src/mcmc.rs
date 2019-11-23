@@ -17,7 +17,7 @@ pub trait NealFunctions {
     fn existing_weight(&self, n_subsets: usize, n_items: usize) -> f64;
 }
 
-fn update_neal_algorithm3<T, U, V>(
+pub fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     current: &Partition,
     neal_functions: &T,
@@ -68,15 +68,11 @@ where
             }
         }
     }
-    if empty_subset_at_end {
-        state.pop_subset();
-    } else {
-        state.canonicalize();
-    }
+    state.canonicalize();
     state
 }
 
-fn update_rwmh<T, U>(
+pub fn update_rwmh<T, U>(
     n_attempts: u32,
     current: &Partition,
     rate: Rate,

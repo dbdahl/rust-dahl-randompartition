@@ -5,7 +5,7 @@ use std::collections::HashMap;
 pub fn assert_goodness_of_fit(
     n_samples: usize,
     n_items: usize,
-    sample: impl Fn() -> Partition,
+    mut sample: impl FnMut() -> Partition,
     log_pmf: impl Fn(&mut Partition) -> f64,
     alpha: f64,
 ) -> () {
