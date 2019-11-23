@@ -178,10 +178,11 @@ pub fn log_joint_density(partition: &Partition, parameters: &NGGPParameters) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mcmc::{update_neal_algorithm3, update_rwmh};
     use quadrature::integrate;
 
     #[test]
-    fn test_goodness_of_fit() {
+    fn test_goodness_of_fit_constructive() {
         let n_items = 5;
         let parameters =
             NGGPParameters::new(UinNGGP::new(300.0), Mass::new(2.0), Reinforcement::new(0.2));
@@ -189,10 +190,34 @@ mod tests {
         let log_prob_closure =
             |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
         crate::testing::assert_goodness_of_fit(
-            100000,
+            10000,
             n_items,
             sample_closure,
             log_prob_closure,
+            1,
+            0.001,
+        );
+    }
+
+    #[test]
+    fn test_goodness_of_fit_neal_algorithm3() {
+        let n_items = 5;
+        let parameters =
+            NGGPParameters::new(UinNGGP::new(300.0), Mass::new(2.0), Reinforcement::new(0.2));
+        let l = |_i: usize, _indices: &[usize]| 0.0;
+        let mut p = Partition::one_subset(n_items);
+        let sample_closure = || {
+            p = update_neal_algorithm3(1, &p, &parameters, &l, &mut thread_rng());
+            p.clone()
+        };
+        let log_prob_closure =
+            |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
+        crate::testing::assert_goodness_of_fit(
+            10000,
+            n_items,
+            sample_closure,
+            log_prob_closure,
+            1,
             0.001,
         );
     }
@@ -278,17 +303,23 @@ pub unsafe extern "C" fn dahl_randompartition__nggp_partition(
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
     if do_sampling != 0 {
         let mut rng = mk_rng_isaac(seed_ptr);
+        // let mut p = Partition::one_subset(ni);
+        // let l = |_i: usize, _indices: &[usize]| 0.0;
         for i in 0..np {
             let parameters = NGGPParameters::new(u, mass, reinforcement);
-            let p = engine(ni, &parameters, TargetOrRandom::Random(&mut rng));
+            let p = sample_partition_given_u(ni, &parameters, &mut rng);
+            // p = crate::mcmc::update_neal_algorithm3(1, &p, &parameters, &l, &mut rng);
             let labels = p.0.labels();
+            // let labels = p.labels();
             for j in 0..ni {
                 matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
             }
             probs[i] = p.1;
+            // probs[i] = 0.0;
             u = super::nggp::update_u(
                 u,
                 &p.0,
+                // &p,
                 mass,
                 reinforcement,
                 n_updates_for_u as u32,

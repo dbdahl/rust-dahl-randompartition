@@ -97,7 +97,7 @@ mod tests {
     fn test_goodness_of_fit_neal_algorithm3() {
         let n_items = 5;
         let parameters = CRPParameters::new(Mass::new(2.0));
-        let l = Box::new(|_i: usize, _indices: &[usize]| 0.0);
+        let l = |_i: usize, _indices: &[usize]| 0.0;
         let mut p = Partition::one_subset(n_items);
         let sample_closure = || {
             p = update_neal_algorithm3(1, &p, &parameters, &l, &mut thread_rng());
