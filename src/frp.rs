@@ -166,7 +166,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_goodness_of_fit() {
+    fn test_goodness_of_fit_constructive() {
         let n_items = 4;
         let mut permutation = Permutation::natural(n_items);
         let mass = Mass::new(2.0);
