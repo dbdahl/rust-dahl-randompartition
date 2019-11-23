@@ -166,26 +166,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sample() {
-        let n_partitions = 10000;
+    fn test_goodness_of_fit() {
         let n_items = 4;
-        let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
-        let focal = Partition::one_subset(n_items);
-        let weights = Weights::zero(1);
         let mut permutation = Permutation::natural(n_items);
         let mass = Mass::new(2.0);
-        let mut rng = &mut thread_rng();
-        for _ in 0..n_partitions {
+        let mut rng = thread_rng();
+        for focal in Partition::iter(n_items) {
             permutation.shuffle(&mut rng);
+            let focal = Partition::from(&focal[..]);
+            let mut vec = Vec::with_capacity(focal.n_subsets());
+            for _ in 0..focal.n_subsets() {
+                vec.push(rng.gen_range(0.0, 10.0));
+            }
+            let weights = Weights::from(&vec[..]).unwrap();
             let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
-            samples.push_partition(&sample(&parameters, rng));
+            let sample_closure = || sample(&parameters, &mut thread_rng());
+            let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
+            crate::testing::assert_goodness_of_fit(
+                10000,
+                n_items,
+                sample_closure,
+                log_prob_closure,
+                0.001,
+            );
         }
-        let mut psm = dahl_salso::psm::psm(&samples.view(), true);
-        let truth = 1.0 / (1.0 + mass);
-        let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_partitions as f64).sqrt();
-        assert!(psm.view().data().iter().all(|prob| {
-            *prob == 1.0 || (truth - margin_of_error < *prob && *prob < truth + margin_of_error)
-        }));
     }
 
     #[test]
@@ -202,15 +206,9 @@ mod tests {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
-            let sum = Partition::iter(n_items)
-                .map(|p| {
-                    let parameters =
-                        FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
-                    log_pmf(&mut Partition::from(&p[..]), &parameters).exp()
-                })
-                .sum();
-            assert!(0.9999999 <= sum, format!("{}", sum));
-            assert!(sum <= 1.0000001, format!("{}", sum));
+            let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+            let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
+            crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
     }
 }

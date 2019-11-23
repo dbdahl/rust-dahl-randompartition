@@ -11,6 +11,7 @@ pub mod frp;
 pub mod mcmc;
 pub mod nggp;
 pub mod prelude;
+pub mod testing;
 
 use dahl_partition::*;
 use rand::prelude::*;

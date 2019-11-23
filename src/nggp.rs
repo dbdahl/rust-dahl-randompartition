@@ -149,8 +149,12 @@ pub fn update_u<T: Rng>(
 pub fn log_density_of_u(n_items: usize, parameters: &NGGPParameters) -> f64 {
     // This should work in theory, but seems to be very unstable in practice.
     let mut partition = Partition::singleton_subsets(n_items);
-    log_joint_density(&partition, parameters)
-        - log_pmf_of_partition_given_u(&mut partition, parameters)
+    let lower = log_joint_density(&partition, parameters)
+        - log_pmf_of_partition_given_u(&mut partition, parameters);
+    let mut partition = Partition::one_subset(n_items);
+    let upper = log_joint_density(&partition, parameters)
+        - log_pmf_of_partition_given_u(&mut partition, parameters);
+    (lower + upper) / 2.0
 }
 
 pub fn log_joint_density(partition: &Partition, parameters: &NGGPParameters) -> f64 {
@@ -177,24 +181,29 @@ mod tests {
     use quadrature::integrate;
 
     #[test]
-    fn test_sample() {
-        let n_partitions = 10000;
-        let n_items = 4;
-        let u = UinNGGP::new(0.2);
-        let mass = Mass::new(2.0);
-        let reinforcement = Reinforcement::new(0.0); // Reduces to the DP...
-        let parameters = NGGPParameters::new(u, mass, reinforcement);
-        let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
-        let rng = &mut thread_rng();
-        for _ in 0..n_partitions {
-            samples.push_partition(&engine(n_items, &parameters, TargetOrRandom::Random(rng)).0);
-        }
-        let mut psm = dahl_salso::psm::psm(&samples.view(), true);
-        let truth = 1.0 / (1.0 + mass);
-        let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_partitions as f64).sqrt();
-        assert!(psm.view().data().iter().all(|prob| {
-            *prob == 1.0 || (truth - margin_of_error < *prob && *prob < truth + margin_of_error)
-        }));
+    fn test_goodness_of_fit() {
+        let n_items = 5;
+        let parameters =
+            NGGPParameters::new(UinNGGP::new(300.0), Mass::new(2.0), Reinforcement::new(0.2));
+        let sample_closure = || sample_partition_given_u(n_items, &parameters, &mut thread_rng());
+        let log_prob_closure =
+            |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
+        crate::testing::assert_goodness_of_fit(
+            100000,
+            n_items,
+            sample_closure,
+            log_prob_closure,
+            0.001,
+        );
+    }
+
+    #[test]
+    fn test_pmf() {
+        let parameters =
+            NGGPParameters::new(UinNGGP::new(400.0), Mass::new(2.0), Reinforcement::new(0.1));
+        let log_prob_closure =
+            |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
+        crate::testing::assert_pmf_sums_to_one(5, log_prob_closure, 0.0000001);
     }
 
     #[test]
@@ -229,32 +238,21 @@ mod tests {
     }
 
     #[test]
-    fn test_log_pmf() {
-        let n_items = 5;
-        let u = UinNGGP::new(150.0);
-        let mass = Mass::new(2.0);
-        let reinforcement = Reinforcement::new(0.7);
-        let parameters = NGGPParameters::new(u, mass, reinforcement);
-        let sum = Partition::iter(n_items)
-            .map(|p| log_pmf_of_partition_given_u(&mut Partition::from(&p[..]), &parameters).exp())
-            .sum();
-        assert!(0.9999999 <= sum, format!("{}", sum));
-        assert!(sum <= 1.0000001, format!("{}", sum));
-    }
-
-    #[test]
     fn test_log_density_of_u() {
-        let n_items = 5;
-        let mass = Mass::new(1.0);
-        let reinforcement = Reinforcement::new(0.5);
+        let n_items = 4;
+        let mass = Mass::new(2.0);
+        let reinforcement = Reinforcement::new(0.1);
         let integrand = |u: f64| {
             let u = UinNGGP::new(u);
             let parameters = NGGPParameters::new(u, mass, reinforcement);
             log_density_of_u(n_items, &parameters).exp()
         };
         let sum = integrate(integrand, 0.0, 2000.0, 1e-6).integral;
-        assert!(0.9999999 <= sum, format!("{}", sum));
-        assert!(sum <= 1.0000001, format!("{}", sum));
+        let epsilon = 0.011;
+        assert!(
+            1.0 - epsilon <= sum && sum <= 1.0 + epsilon,
+            format!("Total probability should be one, but is {}.", sum)
+        );
     }
 }
 

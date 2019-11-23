@@ -77,20 +77,25 @@ mod tests {
     use rand::prelude::*;
 
     #[test]
-    fn test_sample() {
-        let n_partitions = 10000;
-        let n_items = 4;
+    fn test_goodness_of_fit() {
+        let n_items = 5;
         let parameters = CRPParameters::new(Mass::new(2.0));
-        let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
-        for _ in 0..n_partitions {
-            samples.push_partition(&sample(n_items, &parameters, &mut thread_rng()));
-        }
-        let mut psm = dahl_salso::psm::psm(&samples.view(), true);
-        let truth = 1.0 / (1.0 + parameters.mass);
-        let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_partitions as f64).sqrt();
-        assert!(psm.view().data().iter().all(|prob| {
-            *prob == 1.0 || (truth - margin_of_error < *prob && *prob < truth + margin_of_error)
-        }));
+        let sample_closure = || sample(n_items, &parameters, &mut thread_rng());
+        let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
+        crate::testing::assert_goodness_of_fit(
+            100000,
+            n_items,
+            sample_closure,
+            log_prob_closure,
+            0.001,
+        );
+    }
+
+    #[test]
+    fn test_pmf() {
+        let parameters = CRPParameters::new(Mass::new(1.5));
+        let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
+        crate::testing::assert_pmf_sums_to_one(5, log_prob_closure, 0.0000001);
     }
 }
 

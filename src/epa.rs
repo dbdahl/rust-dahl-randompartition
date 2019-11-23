@@ -27,12 +27,16 @@ impl<'a, 'b> EPAParameters<'a, 'b> {
         permutation: &'b Permutation,
         mass: Mass,
         discount: Discount,
-    ) -> Self {
-        Self {
-            similarity,
-            permutation,
-            mass,
-            discount,
+    ) -> Option<Self> {
+        if similarity.0.n_items() != permutation.len() {
+            None
+        } else {
+            Some(Self {
+                similarity,
+                permutation,
+                mass,
+                discount,
+            })
         }
     }
 }
@@ -121,44 +125,80 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sample() {
-        let n_partitions = 10000;
+    fn test_goodness_of_fit() {
         let n_items = 4;
-        let mass = Mass::new(2.0);
-        let discount = Discount::new(0.0);
-        let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
-        let mut ones = SquareMatrix::ones(n_items);
-        let similarity = SimilarityBorrower(ones.view());
-        let rng = &mut thread_rng();
-        let permutation = Permutation::random(n_items, rng);
-        let parameters = EPAParameters::new(&similarity, &permutation, mass, discount);
-        for _ in 0..n_partitions {
-            samples.push_partition(&sample(&parameters, rng));
+        let mut permutation = Permutation::natural(n_items);
+        let mass = Mass::new(1.5);
+        let discount = Discount::new(0.3);
+        let mut rng = thread_rng();
+        let mut similarity = SquareMatrix::zeros(n_items);
+        {
+            let data = similarity.data_mut();
+            data[0] = 0.0;
+            data[4] = 0.9;
+            data[8] = 0.6;
+            data[12] = 0.3;
+            data[1] = 0.9;
+            data[5] = 0.0;
+            data[9] = 0.1;
+            data[13] = 0.2;
+            data[2] = 0.6;
+            data[6] = 0.1;
+            data[10] = 0.0;
+            data[14] = 0.6;
+            data[3] = 0.3;
+            data[7] = 0.2;
+            data[11] = 0.6;
+            data[15] = 0.0;
         }
-        let mut psm = dahl_salso::psm::psm(&samples.view(), true);
-        let truth = 1.0 / (1.0 + mass);
-        let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_partitions as f64).sqrt();
-        assert!(psm.view().data().iter().all(|prob| {
-            *prob == 1.0 || (truth - margin_of_error < *prob && *prob < truth + margin_of_error)
-        }));
+        permutation.shuffle(&mut rng);
+        let similarity_borrower = SimilarityBorrower(similarity.view());
+        let parameters =
+            EPAParameters::new(&similarity_borrower, &permutation, mass, discount).unwrap();
+        let sample_closure = || sample(&parameters, &mut thread_rng());
+        let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
+        crate::testing::assert_goodness_of_fit(
+            10000,
+            n_items,
+            sample_closure,
+            log_prob_closure,
+            0.001,
+        );
     }
 
     #[test]
     fn test_pmf() {
-        let n_items = 5;
+        let n_items = 4;
         let mut permutation = Permutation::natural(n_items);
-        let mut rng = thread_rng();
-        permutation.shuffle(&mut rng);
         let mass = Mass::new(1.5);
         let discount = Discount::new(0.3);
-        let mut ones = SquareMatrix::ones(n_items);
-        let similarity = SimilarityBorrower(ones.view());
-        let parameters = EPAParameters::new(&similarity, &permutation, mass, discount);
-        let sum = Partition::iter(n_items)
-            .map(|p| log_pmf(&mut Partition::from(&p[..]), &parameters).exp())
-            .sum();
-        assert!(0.9999999 <= sum, format!("{}", sum));
-        assert!(sum <= 1.0000001, format!("{}", sum));
+        let mut rng = thread_rng();
+        let mut similarity = SquareMatrix::zeros(n_items);
+        {
+            let data = similarity.data_mut();
+            data[0] = 0.0;
+            data[4] = 0.9;
+            data[8] = 0.6;
+            data[12] = 0.3;
+            data[1] = 0.9;
+            data[5] = 0.0;
+            data[9] = 0.1;
+            data[13] = 0.2;
+            data[2] = 0.6;
+            data[6] = 0.1;
+            data[10] = 0.0;
+            data[14] = 0.6;
+            data[3] = 0.3;
+            data[7] = 0.2;
+            data[11] = 0.6;
+            data[15] = 0.0;
+        }
+        permutation.shuffle(&mut rng);
+        let similarity_borrower = SimilarityBorrower(similarity.view());
+        let parameters =
+            EPAParameters::new(&similarity_borrower, &permutation, mass, discount).unwrap();
+        let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
+        crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
     }
 }
 
@@ -197,7 +237,7 @@ pub unsafe extern "C" fn dahl_randompartition__epa_partition(
             if use_random_permutation != 0 {
                 permutation.shuffle(&mut rng);
             }
-            let parameters = EPAParameters::new(&similarity, &permutation, mass, discount);
+            let parameters = EPAParameters::new(&similarity, &permutation, mass, discount).unwrap();
             let p = engine(&parameters, TargetOrRandom::Random(rng));
             let labels = p.0.labels();
             for j in 0..ni {
@@ -212,7 +252,7 @@ pub unsafe extern "C" fn dahl_randompartition__epa_partition(
                 target_labels.push(matrix[np * j + i]);
             }
             let mut target = Partition::from(&target_labels[..]);
-            let parameters = EPAParameters::new(&similarity, &permutation, mass, discount);
+            let parameters = EPAParameters::new(&similarity, &permutation, mass, discount).unwrap();
             let p = engine::<IsaacRng>(&parameters, TargetOrRandom::Target(&mut target));
             probs[i] = p.1;
         }
