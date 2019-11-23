@@ -74,7 +74,7 @@ pub fn log_pmf(x: &Partition, parameters: &CRPParameters) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mcmc::update_neal_algorithm3;
+    use crate::mcmc::{update_neal_algorithm3, update_rwmh};
     use rand::prelude::*;
 
     #[test]
@@ -88,6 +88,7 @@ mod tests {
             n_items,
             sample_closure,
             log_prob_closure,
+            1,
             0.001,
         );
     }
@@ -108,6 +109,30 @@ mod tests {
             n_items,
             sample_closure,
             log_prob_closure,
+            5,
+            0.001,
+        );
+    }
+
+    #[test]
+    fn test_goodness_of_fit_rwmh() {
+        let n_items = 5;
+        let parameters = CRPParameters::new(Mass::new(2.0));
+        let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
+        let log_prob_closure2 = |partition: &Partition| log_pmf(partition, &parameters);
+        let rate = Rate::new(1.0);
+        let mass = Mass::new(2.5); // Notice that the mass for the proposal doesn't need to match the prior
+        let mut p = Partition::one_subset(n_items);
+        let sample_closure = || {
+            p = update_rwmh(1, &p, rate, mass, &log_prob_closure2, &mut thread_rng()).0;
+            p.clone()
+        };
+        crate::testing::assert_goodness_of_fit(
+            10000,
+            n_items,
+            sample_closure,
+            log_prob_closure,
+            5,
             0.001,
         );
     }

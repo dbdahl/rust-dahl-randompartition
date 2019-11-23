@@ -7,14 +7,17 @@ pub fn assert_goodness_of_fit(
     n_items: usize,
     mut sample: impl FnMut() -> Partition,
     log_pmf: impl Fn(&mut Partition) -> f64,
+    nCallsPerSample: usize,
     alpha: f64,
 ) -> () {
     let ns = n_samples as f64;
     let mut map = HashMap::new();
-    for _ in 0..n_samples {
+    for i in 0..(nCallsPerSample * n_samples) {
         let s = sample();
-        let key = s.labels_via_copying();
-        *map.entry(key).or_insert(0) += 1;
+        if (i + 1) % nCallsPerSample == 0 {
+            let key = s.labels_via_copying();
+            *map.entry(key).or_insert(0) += 1;
+        }
     }
     let threshold = 5.0;
     let mut chisq = 0.0;

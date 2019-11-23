@@ -187,6 +187,7 @@ mod tests {
                 n_items,
                 sample_closure,
                 log_prob_closure,
+                1,
                 0.001,
             );
         }
