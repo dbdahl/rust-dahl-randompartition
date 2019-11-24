@@ -223,6 +223,35 @@ mod tests {
     }
 
     #[test]
+    fn test_goodness_of_fit_rwmh() {
+        let n_items = 5;
+        let parameters =
+            NGGPParameters::new(UinNGGP::new(1.0), Mass::new(1.0), Reinforcement::new(0.1));
+        let log_prob_closure =
+            |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
+        let log_prob_closure2 = |partition: &Partition| {
+            let mut p = partition.clone();
+            p.canonicalize();
+            log_pmf_of_partition_given_u(&mut p, &parameters)
+        };
+        let rate = Rate::new(1.0);
+        let mass = Mass::new(1.5); // Notice that the mass for the proposal doesn't need to match the prior
+        let mut p = Partition::one_subset(n_items);
+        let sample_closure = || {
+            p = update_rwmh(1, &p, rate, mass, &log_prob_closure2, &mut thread_rng()).0;
+            p.clone()
+        };
+        crate::testing::assert_goodness_of_fit(
+            10000,
+            n_items,
+            sample_closure,
+            log_prob_closure,
+            10,
+            0.001,
+        );
+    }
+
+    #[test]
     fn test_pmf() {
         let parameters =
             NGGPParameters::new(UinNGGP::new(400.0), Mass::new(2.0), Reinforcement::new(0.1));
