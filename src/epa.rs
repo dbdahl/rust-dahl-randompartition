@@ -157,14 +157,16 @@ mod tests {
             EPAParameters::new(&similarity_borrower, &permutation, mass, discount).unwrap();
         let sample_closure = || sample(&parameters, &mut thread_rng());
         let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
-        crate::testing::assert_goodness_of_fit(
+        if let Some(string) = crate::testing::assert_goodness_of_fit(
             10000,
             n_items,
             sample_closure,
             log_prob_closure,
             1,
             0.001,
-        );
+        ) {
+            panic!("{}", string);
+        }
     }
 
     #[test]

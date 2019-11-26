@@ -189,14 +189,16 @@ mod tests {
         let sample_closure = || sample_partition_given_u(n_items, &parameters, &mut thread_rng());
         let log_prob_closure =
             |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
-        crate::testing::assert_goodness_of_fit(
+        if let Some(string) = crate::testing::assert_goodness_of_fit(
             10000,
             n_items,
             sample_closure,
             log_prob_closure,
             1,
             0.001,
-        );
+        ) {
+            panic!("{}", string);
+        }
     }
 
     #[test]
@@ -212,14 +214,16 @@ mod tests {
         };
         let log_prob_closure =
             |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
-        crate::testing::assert_goodness_of_fit(
+        if let Some(string) = crate::testing::assert_goodness_of_fit(
             10000,
             n_items,
             sample_closure,
             log_prob_closure,
             1,
             0.001,
-        );
+        ) {
+            panic!("{}", string);
+        }
     }
 
     #[test]
@@ -241,14 +245,16 @@ mod tests {
             p = update_rwmh(1, &p, rate, mass, &log_prob_closure2, &mut thread_rng()).0;
             p.clone()
         };
-        crate::testing::assert_goodness_of_fit(
+        if let Some(string) = crate::testing::assert_goodness_of_fit(
             10000,
             n_items,
             sample_closure,
             log_prob_closure,
             10,
             0.001,
-        );
+        ) {
+            panic!("{}", string);
+        }
     }
 
     #[test]
