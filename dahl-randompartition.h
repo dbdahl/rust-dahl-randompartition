@@ -52,13 +52,14 @@ void dahl_randompartition__focal_partition(int32_t n_partitions,
 
 void dahl_randompartition__mhrw_update(int32_t n_attempts,
                                        int32_t n_items,
-                                       double rate,
-                                       double mass,
                                        int32_t *partition_ptr,
+                                       int32_t prior_only,
                                        const void *log_likelihood_function_ptr,
                                        const void *env_ptr,
+                                       const int32_t *seed_ptr,
                                        int32_t *n_accepts,
-                                       const int32_t *seed_ptr);
+                                       double rate,
+                                       double mass);
 
 void dahl_randompartition__neal_algorithm3_crp(int32_t n_updates_for_partition,
                                                int32_t n_items,

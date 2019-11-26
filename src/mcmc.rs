@@ -340,13 +340,14 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
 pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     n_attempts: i32,
     n_items: i32,
-    rate: f64,
-    mass: f64,
     partition_ptr: *mut i32,
+    prior_only: i32,
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
-    n_accepts: *mut i32,
     seed_ptr: *const i32, // Assumed length is 32
+    n_accepts: *mut i32,
+    rate: f64,
+    mass: f64,
 ) -> () {
     let na = n_attempts as u32;
     let ni = n_items as usize;
@@ -356,12 +357,16 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
     let mass = Mass::new(mass);
     let parameters = CRPParameters::new(mass);
     let log_prior = |p: &Partition| crate::crp::log_pmf(&p, &parameters);
-    let log_likelihood = |indices: &[usize]| {
-        callRFunction_logIntegratedLikelihoodOfSubset(
-            log_likelihood_function_ptr,
-            RR_SEXP_vector_INTSXP::from_slice(indices),
-            env_ptr,
-        )
+    let log_likelihood: Box<dyn Fn(&[usize]) -> f64> = if prior_only != 0 {
+        Box::new(|_indices: &[usize]| 0.0)
+    } else {
+        Box::new(move |indices: &[usize]| {
+            callRFunction_logIntegratedLikelihoodOfSubset(
+                log_likelihood_function_ptr,
+                RR_SEXP_vector_INTSXP::from_slice(indices),
+                env_ptr,
+            )
+        })
     };
     let log_target = make_posterior(log_prior, log_likelihood);
     let mut rng = mk_rng_isaac(seed_ptr);
