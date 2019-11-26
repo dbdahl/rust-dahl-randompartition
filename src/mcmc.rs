@@ -116,23 +116,19 @@ where
     (state, accepts)
 }
 
-fn make_posterior<'a, T: 'a, U: 'a>(
-    log_prior: T,
-    log_likelihood: U,
-) -> Box<dyn Fn(&Partition) -> f64 + 'a>
+fn make_posterior<'a, T: 'a, U: 'a>(log_prior: T, log_likelihood: U) -> impl Fn(&Partition) -> f64
 where
     T: Fn(&Partition) -> f64,
     U: Fn(&[usize]) -> f64,
 {
-    let log_target = move |partition: &Partition| {
+    move |partition: &Partition| {
         partition
             .subsets()
             .iter()
             .fold(log_prior(partition), |sum, subset| {
                 sum + log_likelihood(&subset.items()[..])
             })
-    };
-    Box::new(log_target)
+    }
 }
 
 #[cfg(test)]
@@ -231,7 +227,7 @@ unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
     u32,
     &'a mut [i32],
     Partition,
-    Box<dyn Fn(usize, &[usize]) -> f64>,
+    impl Fn(usize, &[usize]) -> f64,
     IsaacRng,
 ) {
     let nup = n_updates_for_partition as u32;
