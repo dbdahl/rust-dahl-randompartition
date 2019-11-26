@@ -86,12 +86,11 @@ where
 {
     let mut accepts: u32 = 0;
     let mut state = current.clone();
-    state.canonicalize();
     let mut permutation = Permutation::natural(state.n_items());
     let mut log_target_state = log_target(&state);
     let mut weights_state = frp::Weights::constant(rate.unwrap(), state.n_subsets());
     for _ in 0..n_attempts {
-        // permutation.shuffle(rng);
+        permutation.shuffle(rng);
         let current_parameters =
             FRPParameters::new(&state, &weights_state, &permutation, mass).unwrap();
         let proposal = frp::engine(&current_parameters, TargetOrRandom::Random(rng));
@@ -109,11 +108,11 @@ where
         if log_mh_ratio >= 1.0 || rng.gen_range(0.0, 1.0) < log_mh_ratio.exp() {
             accepts += 1;
             state = proposal.0;
-            state.canonicalize();
             log_target_state = log_target_proposal;
             weights_state = weights_proposal;
         };
     }
+    state.canonicalize();
     (state, accepts)
 }
 

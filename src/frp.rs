@@ -76,15 +76,10 @@ pub fn engine<T: Rng>(
     parameters: &FRPParameters,
     mut target_or_rng: TargetOrRandom<T>,
 ) -> (Partition, f64) {
-    assert!(
-        parameters.focal.is_canonical(),
-        "Focal partition must be in canonical form."
-    );
     let nsf = parameters.focal.n_subsets();
     let ni = parameters.focal.n_items();
     let mass = parameters.mass.unwrap();
     if let TargetOrRandom::Target(t) = &mut target_or_rng {
-        assert!(t.is_canonical());
         assert_eq!(t.n_items(), ni);
         t.canonicalize_by_permutation(Some(&parameters.permutation));
     };

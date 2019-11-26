@@ -90,7 +90,7 @@ dependencies = [
 [[package]]
 name = "dahl-partition"
 version = "0.3.2"
-source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-partition.git#b01d8543ee6b601900a09bb2b3a64bed404e7da1"
+source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-partition.git#6194554710d8a9f81a2ae26da5fe98c70f88d535"
 dependencies = [
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -121,7 +121,7 @@ dependencies = [
 [[package]]
 name = "dahl-salso"
 version = "0.1.0"
-source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-salso.git#a8c26ad60e86d1ba5ed66b72714e6441a313956f"
+source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-salso.git#4a237fe23a43d73f36c20844f233a3c8d766e50e"
 dependencies = [
  "approx 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
