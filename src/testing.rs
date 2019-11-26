@@ -36,7 +36,8 @@ pub fn assert_goodness_of_fit(
             expected = 0.0;
         }
     }
-    let distr = ChiSquared::new((df - 1) as f64).unwrap();
+    df -= 1;
+    let distr = ChiSquared::new(df as f64).unwrap();
     let p_value = 1.0 - distr.cdf(chisq);
     if p_value <= alpha {
         Some(format!(

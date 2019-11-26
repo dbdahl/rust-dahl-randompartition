@@ -131,7 +131,7 @@ mod tests {
             p.clone()
         };
         let n_samples = 10000;
-        let n_calls_per_sample = 100;
+        let n_calls_per_sample = 5;
         if let Some(mut string) = crate::testing::assert_goodness_of_fit(
             n_samples,
             n_items,

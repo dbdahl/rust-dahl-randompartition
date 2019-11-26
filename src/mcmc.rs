@@ -91,7 +91,7 @@ where
     let mut log_target_state = log_target(&state);
     let mut weights_state = frp::Weights::constant(rate.unwrap(), state.n_subsets());
     for _ in 0..n_attempts {
-        permutation.shuffle(rng);
+        // permutation.shuffle(rng);
         let current_parameters =
             FRPParameters::new(&state, &weights_state, &permutation, mass).unwrap();
         let proposal = frp::engine(&current_parameters, TargetOrRandom::Random(rng));
