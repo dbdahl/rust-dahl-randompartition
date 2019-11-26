@@ -105,7 +105,7 @@ mod tests {
         };
         let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
         crate::testing::assert_goodness_of_fit(
-            100000,
+            10000,
             n_items,
             sample_closure,
             log_prob_closure,
@@ -120,21 +120,33 @@ mod tests {
         let parameters = CRPParameters::new(Mass::new(2.0));
         let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
         let log_prob_closure2 = |partition: &Partition| log_pmf(partition, &parameters);
-        let rate = Rate::new(1.0);
-        let mass = Mass::new(2.5); // Notice that the mass for the proposal doesn't need to match the prior
+        let rate = Rate::new(0.0);
+        let mass = Mass::new(3.0); // Notice that the mass for the proposal doesn't need to match the prior
         let mut p = Partition::one_subset(n_items);
+        let mut n_accepts = 0;
         let sample_closure = || {
-            p = update_rwmh(1, &p, rate, mass, &log_prob_closure2, &mut thread_rng()).0;
+            let temp = update_rwmh(1, &p, rate, mass, &log_prob_closure2, &mut thread_rng());
+            p = temp.0;
+            n_accepts += temp.1 as usize;
             p.clone()
         };
-        crate::testing::assert_goodness_of_fit(
-            10000,
+        let n_samples = 10000;
+        let n_calls_per_sample = 100;
+        if let Some(mut string) = crate::testing::assert_goodness_of_fit(
+            n_samples,
             n_items,
             sample_closure,
             log_prob_closure,
-            5,
+            n_calls_per_sample,
             0.001,
-        );
+        ) {
+            let x = format!(
+                ", acceptance_rate = {:.2}",
+                (n_accepts as f64) / (n_calls_per_sample * n_samples) as f64
+            );
+            string.push_str(&x[..]);
+            panic!(string);
+        }
     }
 
     #[test]
