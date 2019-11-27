@@ -36,7 +36,7 @@ impl NealFunctions for NGGPParameters {
     }
 
     fn existing_weight(&self, _n_subsets: usize, n_items: usize) -> f64 {
-        (n_items as f64) - self.reinforcement
+        n_items as f64 - self.reinforcement
     }
 }
 
@@ -219,7 +219,7 @@ mod tests {
             n_items,
             sample_closure,
             log_prob_closure,
-            1,
+            3,
             0.001,
         ) {
             panic!("{}", string);
@@ -250,7 +250,7 @@ mod tests {
             n_items,
             sample_closure,
             log_prob_closure,
-            10,
+            5,
             0.001,
         ) {
             panic!("{}", string);
