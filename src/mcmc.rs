@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::*;
 
 use crate::crp::CRPParameters;
-use crate::frp::FRPParameters;
+use crate::frp::{FRPParameters, Weights};
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
@@ -333,25 +333,24 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
+pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     n_attempts: i32,
     n_items: i32,
     partition_ptr: *mut i32,
+    rate: f64,
+    mass: f64,
     prior_only: i32,
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
     seed_ptr: *const i32, // Assumed length is 32
     n_accepts: *mut i32,
-    rate: f64,
-    mass: f64,
+    crp_mass: f64,
 ) -> () {
     let na = n_attempts as u32;
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let partition = Partition::from(partition_slice);
-    let rate = Rate::new(rate);
-    let mass = Mass::new(mass);
-    let parameters = CRPParameters::new(mass);
+    let parameters = CRPParameters::new(Mass::new(crp_mass));
     let log_prior = |p: &Partition| crate::crp::log_pmf(&p, &parameters);
     let log_likelihood: Box<dyn Fn(&[usize]) -> f64> = if prior_only != 0 {
         Box::new(|_indices: &[usize]| 0.0)
@@ -365,6 +364,69 @@ pub unsafe extern "C" fn dahl_randompartition__mhrw_update(
         })
     };
     let log_target = make_posterior(log_prior, log_likelihood);
+    let rate = Rate::new(rate);
+    let mass = Mass::new(mass);
+    let mut rng = mk_rng_isaac(seed_ptr);
+    let results = update_rwmh(na, &partition, rate, mass, &log_target, &mut rng);
+    results
+        .0
+        .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
+    *n_accepts = results.1 as i32;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
+    n_attempts: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    rate: f64,
+    mass: f64,
+    prior_only: i32,
+    log_likelihood_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
+    n_accepts: *mut i32,
+    frp_partition_ptr: *const i32,
+    frp_weights_ptr: *const f64,
+    frp_permutation_ptr: *const i32,
+    frp_mass: f64,
+) -> () {
+    let na = n_attempts as u32;
+    let ni = n_items as usize;
+    let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
+    let partition = Partition::from(partition_slice);
+    let frp_partition_slice = slice::from_raw_parts(frp_partition_ptr, ni);
+    let frp_partition = Partition::from(frp_partition_slice);
+    let frp_weights_slice = slice::from_raw_parts(frp_weights_ptr, frp_partition.n_subsets());
+    let frp_weights = Weights::from(frp_weights_slice).unwrap();
+    let frp_permutation_slice = slice::from_raw_parts(frp_permutation_ptr, ni);
+    let mut frp_permutation_slice2 = Vec::with_capacity(ni);
+    for i in 0..ni {
+        frp_permutation_slice2.push(frp_permutation_slice[i] as usize);
+    }
+    let frp_permutation = Permutation::from_vector(frp_permutation_slice2).unwrap();
+    let parameters = FRPParameters::new(
+        &frp_partition,
+        &frp_weights,
+        &frp_permutation,
+        Mass::new(frp_mass),
+    )
+    .unwrap();
+    let log_prior = |p: &Partition| crate::frp::log_pmf(&p, &parameters);
+    let log_likelihood: Box<dyn Fn(&[usize]) -> f64> = if prior_only != 0 {
+        Box::new(|_indices: &[usize]| 0.0)
+    } else {
+        Box::new(move |indices: &[usize]| {
+            callRFunction_logIntegratedLikelihoodOfSubset(
+                log_likelihood_function_ptr,
+                RR_SEXP_vector_INTSXP::from_slice(indices),
+                env_ptr,
+            )
+        })
+    };
+    let log_target = make_posterior(log_prior, log_likelihood);
+    let rate = Rate::new(rate);
+    let mass = Mass::new(mass);
     let mut rng = mk_rng_isaac(seed_ptr);
     let results = update_rwmh(na, &partition, rate, mass, &log_target, &mut rng);
     results

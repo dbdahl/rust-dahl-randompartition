@@ -152,8 +152,9 @@ pub fn sample<T: Rng>(parameters: &FRPParameters, rng: &mut T) -> Partition {
     engine(parameters, TargetOrRandom::Random(rng)).0
 }
 
-pub fn log_pmf(target: &mut Partition, parameters: &FRPParameters) -> f64 {
-    engine(parameters, TargetOrRandom::Target::<IsaacRng>(target)).1
+pub fn log_pmf(target: &Partition, parameters: &FRPParameters) -> f64 {
+    let mut target2 = target.clone();
+    engine(parameters, TargetOrRandom::Target::<IsaacRng>(&mut target2)).1
 }
 
 #[cfg(test)]

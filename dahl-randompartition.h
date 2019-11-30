@@ -50,16 +50,32 @@ void dahl_randompartition__focal_partition(int32_t n_partitions,
                                            double *partition_probs_ptr,
                                            const int32_t *seed_ptr);
 
-void dahl_randompartition__mhrw_update(int32_t n_attempts,
+void dahl_randompartition__focalrw_crp(int32_t n_attempts,
                                        int32_t n_items,
                                        int32_t *partition_ptr,
+                                       double rate,
+                                       double mass,
                                        int32_t prior_only,
                                        const void *log_likelihood_function_ptr,
                                        const void *env_ptr,
                                        const int32_t *seed_ptr,
                                        int32_t *n_accepts,
+                                       double crp_mass);
+
+void dahl_randompartition__focalrw_frp(int32_t n_attempts,
+                                       int32_t n_items,
+                                       int32_t *partition_ptr,
                                        double rate,
-                                       double mass);
+                                       double mass,
+                                       int32_t prior_only,
+                                       const void *log_likelihood_function_ptr,
+                                       const void *env_ptr,
+                                       const int32_t *seed_ptr,
+                                       int32_t *n_accepts,
+                                       const int32_t *frp_partition_ptr,
+                                       const double *frp_weights_ptr,
+                                       const int32_t *frp_permutation_ptr,
+                                       double frp_mass);
 
 void dahl_randompartition__neal_algorithm3_crp(int32_t n_updates_for_partition,
                                                int32_t n_items,
