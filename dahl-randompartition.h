@@ -38,17 +38,17 @@ void dahl_randompartition__epa_partition(int32_t do_sampling,
                                          double discount,
                                          int32_t use_random_permutation);
 
-void dahl_randompartition__focal_partition(int32_t n_partitions,
+void dahl_randompartition__focal_partition(int32_t do_sampling,
+                                           int32_t n_partitions,
                                            int32_t n_items,
+                                           int32_t *partition_labels_ptr,
+                                           double *partition_probs_ptr,
+                                           const int32_t *seed_ptr,
                                            const int32_t *focal_ptr,
                                            const double *weights_ptr,
                                            const int32_t *permutation_ptr,
                                            double mass,
-                                           int32_t do_sampling,
-                                           int32_t use_random_permutations,
-                                           int32_t *partition_labels_ptr,
-                                           double *partition_probs_ptr,
-                                           const int32_t *seed_ptr);
+                                           int32_t use_random_permutations);
 
 void dahl_randompartition__focalrw_crp(int32_t n_attempts,
                                        int32_t n_items,

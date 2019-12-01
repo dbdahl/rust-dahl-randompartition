@@ -214,17 +214,17 @@ mod tests {
 
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__focal_partition(
+    do_sampling: i32,
     n_partitions: i32,
     n_items: i32,
+    partition_labels_ptr: *mut i32,
+    partition_probs_ptr: *mut f64,
+    seed_ptr: *const i32, // Assumed length is 32
     focal_ptr: *const i32,
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     mass: f64,
-    do_sampling: i32,
     use_random_permutations: i32,
-    partition_labels_ptr: *mut i32,
-    partition_probs_ptr: *mut f64,
-    seed_ptr: *const i32, // Assumed length is 32
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
