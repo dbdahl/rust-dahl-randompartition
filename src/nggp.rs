@@ -181,6 +181,21 @@ mod tests {
     use crate::mcmc::{update_neal_algorithm3, update_rwmh};
     use quadrature::integrate;
 
+/*
+    #[test]
+    fn find_best_u() {
+        let n_items = 5;
+        let u = UinNGGP::new(1.4);
+        let parameters = NGGPParameters::new(u, Mass::new(2.0), Reinforcement::new(0.2));
+        for p in Partition::iter(n_items) {
+            let mut partition = Partition::from(&p[..]);
+            let d = log_joint_density(&partition, &parameters)
+                - log_pmf_of_partition_given_u(&mut partition, &parameters).exp();
+            println!("{} {}", partition, d);
+        }
+    }
+*/
+
     #[test]
     fn test_goodness_of_fit_constructive() {
         let n_items = 5;
@@ -308,7 +323,7 @@ mod tests {
             log_density_of_u(n_items, &parameters).exp()
         };
         let sum = integrate(integrand, 0.0, 2000.0, 1e-6).integral;
-        let epsilon = 0.011;
+        let epsilon = 0.0001;
         assert!(
             1.0 - epsilon <= sum && sum <= 1.0 + epsilon,
             format!("Total probability should be one, but is {}.", sum)

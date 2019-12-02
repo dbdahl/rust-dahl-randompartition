@@ -1,5 +1,6 @@
 // Focal random partition distribution
 
+// use crate::mcmc::NealFunctions;
 use crate::prelude::*;
 use crate::TargetOrRandom;
 
@@ -71,6 +72,18 @@ impl std::ops::Index<usize> for Weights {
         &self.0[i]
     }
 }
+
+/*
+impl<'a, 'b, 'c> NealFunctions for FRPParameters<'a, 'b, 'c> {
+    fn new_weight(&self, _n_subsets: usize) -> f64 {
+        self.mass * (self.u + 1.0).powf(self.reinforcement.unwrap())
+    }
+
+    fn existing_weight(&self, _n_subsets: usize, n_items: usize) -> f64 {
+        n_items as f64 - self.reinforcement
+    }
+}
+*/
 
 pub fn engine<T: Rng>(
     parameters: &FRPParameters,

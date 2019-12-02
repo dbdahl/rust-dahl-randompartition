@@ -333,6 +333,51 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
+    n_updates_for_partition: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    prior_only: i32,
+    log_posterior_predictive_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
+    focal_ptr: *const i32,
+    weights_ptr: *const f64,
+    permutation_ptr: *const i32,
+    mass: f64,
+) -> () {
+    let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
+        neal_algorithm3_process_arguments(
+            n_updates_for_partition,
+            n_items,
+            partition_ptr,
+            prior_only,
+            log_posterior_predictive_function_ptr,
+            env_ptr,
+            seed_ptr,
+        );
+    let focal_slice = slice::from_raw_parts(focal_ptr, partition.n_items());
+    let focal = Partition::from(focal_slice);
+    let weights_slice = slice::from_raw_parts(weights_ptr, focal.n_subsets());
+    let weights = Weights::from(weights_slice).unwrap();
+    let permutation_slice = slice::from_raw_parts(permutation_ptr, focal.n_items());
+    let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
+    let permutation = Permutation::from_vector(permutation_vector).unwrap();
+    let mass = Mass::new(mass);
+    let neal_functions = frp::FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+    /*
+    let partition = update_neal_algorithm3(
+        nup,
+        &partition,
+        &neal_functions,
+        &log_posterior_predictive,
+        &mut rng,
+    );
+    */
+    neal_algorithm3_push_into_slice(&partition, partition_slice);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     n_attempts: i32,
     n_items: i32,
