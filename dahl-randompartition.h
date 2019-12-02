@@ -86,6 +86,18 @@ void dahl_randompartition__neal_algorithm3_crp(int32_t n_updates_for_partition,
                                                const int32_t *seed_ptr,
                                                double mass);
 
+void dahl_randompartition__neal_algorithm3_frp(int32_t n_updates_for_partition,
+                                               int32_t n_items,
+                                               int32_t *partition_ptr,
+                                               int32_t prior_only,
+                                               const void *log_posterior_predictive_function_ptr,
+                                               const void *env_ptr,
+                                               const int32_t *seed_ptr,
+                                               const int32_t *focal_ptr,
+                                               const double *weights_ptr,
+                                               const int32_t *permutation_ptr,
+                                               double mass);
+
 void dahl_randompartition__neal_algorithm3_nggp(int32_t n_updates_for_partition,
                                                 int32_t n_items,
                                                 int32_t *partition_ptr,
