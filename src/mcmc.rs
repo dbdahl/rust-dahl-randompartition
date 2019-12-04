@@ -72,6 +72,68 @@ where
     state
 }
 
+pub trait NealFunctionsGeneral {
+    fn new_weight(&self, n_subsets: usize) -> f64;
+    fn existing_weight(&self, index_index: usize, subset: &Subset, partition: &Partition) -> f64;
+}
+
+pub fn update_neal_algorithm3_generalized<T, U, V>(
+    n_updates: u32,
+    current: &Partition,
+    permutation: &Permutation,
+    neal_functions_generalized: &T,
+    log_posterior_predictive: &U,
+    rng: &mut V,
+) -> Partition
+where
+    T: NealFunctionsGeneral,
+    U: Fn(usize, &[usize]) -> f64,
+    V: Rng,
+{
+    let ni = current.n_items();
+    let mut state = current.clone();
+    state.canonicalize();
+    state.new_subset();
+    let mut empty_subset_at_end = true;
+    for _ in 0..n_updates {
+        for i in 0..ni {
+            let ii = permutation[i];
+            // Remove 'i', ensure there is one and only one empty subset, and be efficient.
+            let k = state.label_of(ii).unwrap();
+            state.remove(ii);
+            state.clean_subset(k);
+            if state.subsets()[k].is_empty() {
+                if empty_subset_at_end {
+                    state.pop_subset();
+                    empty_subset_at_end = k == state.n_subsets() - 1;
+                } else {
+                    state.canonicalize();
+                    state.new_subset();
+                    empty_subset_at_end = true;
+                }
+            }
+            let n_subsets = state.n_subsets() - 1; // Because there is an empty subset
+            let weights = state.subsets().iter().map(|subset| {
+                let pp = if subset.is_empty() {
+                    neal_functions_generalized.new_weight(n_subsets)
+                } else {
+                    neal_functions_generalized.existing_weight(i, &subset, &state)
+                };
+                log_posterior_predictive(ii, &subset.items()[..]).exp() * pp
+            });
+            let dist = WeightedIndex::new(weights).unwrap();
+            let subset_index = dist.sample(rng);
+            state.add_with_index(ii, subset_index);
+            if state.subsets()[subset_index].n_items() == 1 {
+                state.new_subset();
+                empty_subset_at_end = true;
+            }
+        }
+    }
+    state.canonicalize();
+    state
+}
+
 pub fn update_rwmh<T, U>(
     n_attempts: u32,
     current: &Partition,
@@ -365,15 +427,14 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
     let permutation = Permutation::from_vector(permutation_vector).unwrap();
     let mass = Mass::new(mass);
     let neal_functions = frp::FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
-    /*
-    let partition = update_neal_algorithm3(
+    let partition = update_neal_algorithm3_generalized(
         nup,
         &partition,
+        &permutation,
         &neal_functions,
         &log_posterior_predictive,
         &mut rng,
     );
-    */
     neal_algorithm3_push_into_slice(&partition, partition_slice);
 }
 
