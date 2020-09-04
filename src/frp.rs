@@ -41,6 +41,7 @@ impl<'a, 'b, 'c> FRPParameters<'a, 'b, 'c> {
     }
 }
 
+#[derive(Debug)]
 pub struct Weights(Vec<f64>);
 
 impl Weights {
@@ -75,11 +76,11 @@ impl std::ops::Index<usize> for Weights {
 
 impl<'a, 'b, 'c> NealFunctionsGeneral for FRPParameters<'a, 'b, 'c> {
     fn new_weight(&self, _n_subsets: usize) -> f64 {
-        0.0
+        self.mass.unwrap()
     }
 
-    fn existing_weight(&self, _item_index: usize, _subset: &Subset, _partition: &Partition) -> f64 {
-        0.0
+    fn existing_weight(&self, _item_index: usize, subset: &Subset, _partition: &Partition) -> f64 {
+        subset.n_items() as f64
     }
 }
 
