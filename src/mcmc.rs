@@ -75,6 +75,7 @@ where
 pub trait NealFunctionsGeneral {
     fn new_weight(&self, n_subsets: usize) -> f64;
     fn existing_weight(&self, index_index: usize, subset: &Subset, partition: &Partition) -> f64;
+    fn weight(&self, index_index: usize, subset_index: usize, partition: &Partition) -> f64;
 }
 
 pub fn update_neal_algorithm3_generalized<T, U, V>(
@@ -112,14 +113,10 @@ where
                     empty_subset_at_end = true;
                 }
             }
-            let n_subsets = state.n_subsets() - 1; // Because there is an empty subset
-            let weights = state.subsets().iter().map(|subset| {
-                let pp = if subset.is_empty() {
-                    neal_functions_generalized.new_weight(n_subsets)
-                } else {
-                    neal_functions_generalized.existing_weight(i, &subset, &state)
-                };
-                log_posterior_predictive(ii, &subset.items()[..]).exp() * pp
+            let weights = (0..state.n_subsets()).map(|subset_index| {
+                let pp = neal_functions_generalized.weight(i, subset_index, &state);
+                let indices = &state.subsets()[subset_index].items()[..];
+                log_posterior_predictive(ii, indices).exp() * pp
             });
             let dist = WeightedIndex::new(weights).unwrap();
             let subset_index = dist.sample(rng);

@@ -79,8 +79,14 @@ impl<'a, 'b, 'c> NealFunctionsGeneral for FRPParameters<'a, 'b, 'c> {
         self.mass.unwrap()
     }
 
-    fn existing_weight(&self, _item_index: usize, subset: &Subset, _partition: &Partition) -> f64 {
-        subset.n_items() as f64
+    fn existing_weight(&self, _item_index: usize, _subset: &Subset, _partition: &Partition) -> f64 {
+        panic!("No implemented!");
+    }
+
+    fn weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
+        let mut p = partition.clone();
+        p.add_with_index(item_index, subset_index);
+        log_pmf(&p, self).exp()
     }
 }
 
