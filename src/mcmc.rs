@@ -315,8 +315,8 @@ unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
     )
 }
 
-unsafe fn neal_algorithm3_push_into_slice(partition: &Partition, slice: &mut [i32]) {
-    partition.labels_into_slice(slice, |x| x.unwrap() as i32);
+unsafe fn push_into_slice_for_r(partition: &Partition, slice: &mut [i32]) {
+    partition.labels_into_slice(slice, |x| (x.unwrap() as i32) + 1);
 }
 
 #[no_mangle]
@@ -348,7 +348,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
         &log_posterior_predictive,
         &mut rng,
     );
-    neal_algorithm3_push_into_slice(&partition, partition_slice);
+    push_into_slice_for_r(&partition, partition_slice);
 }
 
 #[no_mangle]
@@ -388,7 +388,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
         &mut rng,
     );
     *u_ptr = super::nggp::update_u(u, &partition, mass, reinforcement, nuu, &mut rng).unwrap();
-    neal_algorithm3_push_into_slice(&partition, partition_slice);
+    push_into_slice_for_r(&partition, partition_slice);
 }
 
 #[no_mangle]
@@ -432,7 +432,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
         &log_posterior_predictive,
         &mut rng,
     );
-    neal_algorithm3_push_into_slice(&partition, partition_slice);
+    push_into_slice_for_r(&partition, partition_slice);
 }
 
 #[no_mangle]
@@ -471,9 +471,7 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     let mass = Mass::new(mass);
     let mut rng = mk_rng_isaac(seed_ptr);
     let results = update_rwmh(na, &partition, rate, mass, &log_target, &mut rng);
-    results
-        .0
-        .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
+    push_into_slice_for_r(&results.0, partition_slice);
     *n_accepts = results.1 as i32;
 }
 
@@ -532,8 +530,6 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
     let mass = Mass::new(mass);
     let mut rng = mk_rng_isaac(seed_ptr);
     let results = update_rwmh(na, &partition, rate, mass, &log_target, &mut rng);
-    results
-        .0
-        .labels_into_slice(partition_slice, |x| x.unwrap() as i32);
+    push_into_slice_for_r(&results.0, partition_slice);
     *n_accepts = results.1 as i32;
 }
