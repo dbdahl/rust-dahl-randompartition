@@ -147,17 +147,17 @@ where
     let mut state = current.clone();
     let mut permutation = Permutation::natural(state.n_items());
     let mut log_target_state = log_target(&state);
-    let mut weights_state = frp::Weights::constant(rate.unwrap(), state.n_subsets());
+    let weights_state = frp::Weights::from_rate(rate, state.n_items());
     for _ in 0..n_attempts {
         permutation.shuffle(rng);
         let current_parameters =
             FRPParameters::new(&state, &weights_state, &permutation, mass).unwrap();
         let proposal = frp::engine(&current_parameters, TargetOrRandom::Random(rng));
-        let weights_proposal = frp::Weights::constant(rate.unwrap(), proposal.0.n_subsets());
+        let weights_proposal = &weights_state;
         let log_target_proposal = log_target(&proposal.0);
         let log_ratio_target = log_target_proposal - log_target_state;
         let proposed_parameters =
-            FRPParameters::new(&proposal.0, &weights_proposal, &permutation, mass).unwrap();
+            FRPParameters::new(&proposal.0, weights_proposal, &permutation, mass).unwrap();
         let log_ratio_proposal = frp::engine(
             &proposed_parameters,
             TargetOrRandom::Target::<IsaacRng>(&mut state),
@@ -168,7 +168,6 @@ where
             accepts += 1;
             state = proposal.0;
             log_target_state = log_target_proposal;
-            weights_state = weights_proposal;
         };
     }
     state.canonicalize();
@@ -417,7 +416,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
         );
     let focal_slice = slice::from_raw_parts(focal_ptr, partition.n_items());
     let focal = Partition::from(focal_slice);
-    let weights_slice = slice::from_raw_parts(weights_ptr, focal.n_subsets());
+    let weights_slice = slice::from_raw_parts(weights_ptr, focal.n_items());
     let weights = Weights::from(weights_slice).unwrap();
     let permutation_slice = slice::from_raw_parts(permutation_ptr, focal.n_items());
     let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
@@ -498,7 +497,7 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
     let partition = Partition::from(partition_slice);
     let frp_partition_slice = slice::from_raw_parts(frp_partition_ptr, ni);
     let frp_partition = Partition::from(frp_partition_slice);
-    let frp_weights_slice = slice::from_raw_parts(frp_weights_ptr, frp_partition.n_subsets());
+    let frp_weights_slice = slice::from_raw_parts(frp_weights_ptr, frp_partition.n_items());
     let frp_weights = Weights::from(frp_weights_slice).unwrap();
     let frp_permutation_slice = slice::from_raw_parts(frp_permutation_ptr, ni);
     let mut frp_permutation_slice2 = Vec::with_capacity(ni);

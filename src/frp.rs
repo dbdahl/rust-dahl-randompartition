@@ -26,7 +26,7 @@ impl<'a, 'b, 'c> FRPParameters<'a, 'b, 'c> {
         permutation: &'c Permutation,
         mass: Mass,
     ) -> Option<Self> {
-        if focal.n_subsets() != weights.len() {
+        if weights.len() != focal.n_items() {
             None
         } else if focal.n_items() != permutation.len() {
             None
@@ -45,12 +45,19 @@ impl<'a, 'b, 'c> FRPParameters<'a, 'b, 'c> {
 pub struct Weights(Vec<f64>);
 
 impl Weights {
-    pub fn zero(n_subsets: usize) -> Weights {
-        Weights::constant(0.0, n_subsets)
+    pub fn zero(n_items: usize) -> Weights {
+        Weights(vec![0.0; n_items])
     }
 
-    pub fn constant(value: f64, n_subsets: usize) -> Weights {
-        Weights(vec![value; n_subsets])
+    pub fn from_rate(rate: Rate, n_items: usize) -> Weights {
+        Weights(vec![rate.unwrap(); n_items])
+    }
+
+    pub fn constant(value: f64, n_items: usize) -> Option<Weights> {
+        if value.is_nan() || value.is_infinite() || value < 0.0 {
+            return None;
+        }
+        Some(Weights(vec![value; n_items]))
     }
 
     pub fn from(w: &[f64]) -> Option<Weights> {
@@ -123,7 +130,7 @@ pub fn engine<T: Rng>(
         let scaled_weight = if total_counter[focal_subset_index] == 0.0 {
             0.0
         } else {
-            parameters.weights[focal_subset_index] / total_counter[focal_subset_index]
+            (i as f64) * parameters.weights[ii] / total_counter[focal_subset_index]
         };
         let probs: Vec<(usize, f64)> = partition
             .subsets()
@@ -132,7 +139,7 @@ pub fn engine<T: Rng>(
             .map(|(subset_index, subset)| {
                 let prob = if subset.is_empty() {
                     if total_counter[focal_subset_index] == 0.0 {
-                        mass + parameters.weights[focal_subset_index]
+                        mass + (i as f64) * parameters.weights[ii]
                     } else {
                         mass
                     }
@@ -189,7 +196,7 @@ mod tests {
             permutation.shuffle(&mut rng);
             let focal = Partition::from(&focal[..]);
             let mut vec = Vec::with_capacity(focal.n_subsets());
-            for _ in 0..focal.n_subsets() {
+            for _ in 0..focal.n_items() {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
@@ -219,7 +226,7 @@ mod tests {
             permutation.shuffle(&mut rng);
             let focal = Partition::from(&focal[..]);
             let mut vec = Vec::with_capacity(focal.n_subsets());
-            for _ in 0..focal.n_subsets() {
+            for _ in 0..focal.n_items() {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
@@ -247,7 +254,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     let np = n_partitions as usize;
     let ni = n_items as usize;
     let focal = Partition::from(slice::from_raw_parts(focal_ptr, ni));
-    let weights = Weights::from(slice::from_raw_parts(weights_ptr, focal.n_subsets())).unwrap();
+    let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
     let mut permutation = if use_random_permutations != 0 {
         Permutation::natural(ni)
     } else {
