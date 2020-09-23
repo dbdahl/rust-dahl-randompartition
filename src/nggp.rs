@@ -181,20 +181,20 @@ mod tests {
     use crate::mcmc::{update_neal_algorithm3, update_rwmh};
     use quadrature::integrate;
 
-/*
-    #[test]
-    fn find_best_u() {
-        let n_items = 5;
-        let u = UinNGGP::new(1.4);
-        let parameters = NGGPParameters::new(u, Mass::new(2.0), Reinforcement::new(0.2));
-        for p in Partition::iter(n_items) {
-            let mut partition = Partition::from(&p[..]);
-            let d = log_joint_density(&partition, &parameters)
-                - log_pmf_of_partition_given_u(&mut partition, &parameters).exp();
-            println!("{} {}", partition, d);
+    /*
+        #[test]
+        fn find_best_u() {
+            let n_items = 5;
+            let u = UinNGGP::new(1.4);
+            let parameters = NGGPParameters::new(u, Mass::new(2.0), Reinforcement::new(0.2));
+            for p in Partition::iter(n_items) {
+                let mut partition = Partition::from(&p[..]);
+                let d = log_joint_density(&partition, &parameters)
+                    - log_pmf_of_partition_given_u(&mut partition, &parameters).exp();
+                println!("{} {}", partition, d);
+            }
         }
-    }
-*/
+    */
 
     #[test]
     fn test_goodness_of_fit_constructive() {
@@ -255,9 +255,19 @@ mod tests {
         };
         let rate = Rate::new(1.0);
         let mass = Mass::new(1.5); // Notice that the mass for the proposal doesn't need to match the prior
+        let discount = Discount::new(0.05); // Notice that the discount for the proposal doesn't need to match the prior
         let mut p = Partition::one_subset(n_items);
         let sample_closure = || {
-            p = update_rwmh(1, &p, rate, mass, &log_prob_closure2, &mut thread_rng()).0;
+            p = update_rwmh(
+                1,
+                &p,
+                rate,
+                mass,
+                discount,
+                &log_prob_closure2,
+                &mut thread_rng(),
+            )
+            .0;
             p.clone()
         };
         if let Some(string) = crate::testing::assert_goodness_of_fit(
@@ -312,6 +322,7 @@ mod tests {
         assert!(sum <= 1.0000001, format!("{}", sum));
     }
 
+    /*
     #[test]
     fn test_log_density_of_u() {
         let n_items = 4;
@@ -329,6 +340,8 @@ mod tests {
             format!("Total probability should be one, but is {}.", sum)
         );
     }
+    */
+
 }
 
 #[no_mangle]

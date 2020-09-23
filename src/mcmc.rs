@@ -136,6 +136,7 @@ pub fn update_rwmh<T, U>(
     current: &Partition,
     rate: Rate,
     mass: Mass,
+    discount: Discount,
     log_target: &T,
     rng: &mut U,
 ) -> (Partition, u32)
@@ -151,13 +152,14 @@ where
     for _ in 0..n_attempts {
         permutation.shuffle(rng);
         let current_parameters =
-            FRPParameters::new(&state, &weights_state, &permutation, mass).unwrap();
+            FRPParameters::new(&state, &weights_state, &permutation, mass, discount).unwrap();
         let proposal = frp::engine(&current_parameters, TargetOrRandom::Random(rng));
         let weights_proposal = &weights_state;
         let log_target_proposal = log_target(&proposal.0);
         let log_ratio_target = log_target_proposal - log_target_state;
         let proposed_parameters =
-            FRPParameters::new(&proposal.0, weights_proposal, &permutation, mass).unwrap();
+            FRPParameters::new(&proposal.0, weights_proposal, &permutation, mass, discount)
+                .unwrap();
         let log_ratio_proposal = frp::engine(
             &proposed_parameters,
             TargetOrRandom::Target::<IsaacRng>(&mut state),
@@ -199,14 +201,23 @@ mod tests_mcmc {
         let mut current = Partition::one_subset(n_items);
         let rate = Rate::new(5.0);
         let mass = Mass::new(1.0);
-        let parameters = CRPParameters::new(mass);
+        let discount = Discount::new(0.1);
+        let parameters = CRPParameters::new_with_mass_and_discount(mass, discount);
         let log_prior = |p: &Partition| crate::crp::log_pmf(&p, &parameters);
         let log_likelihood = |_indices: &[usize]| 0.0;
         let log_target = make_posterior(log_prior, log_likelihood);
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            let result = update_rwmh(2, &current, rate, mass, &log_target, &mut thread_rng());
+            let result = update_rwmh(
+                2,
+                &current,
+                rate,
+                mass,
+                discount,
+                &log_target,
+                &mut thread_rng(),
+            );
             current = result.0;
             sum += current.n_subsets();
         }
@@ -219,7 +230,7 @@ mod tests_mcmc {
     fn test_crp_neal_algorithm3() {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
-        let neal_functions = crp::CRPParameters::new(Mass::new(1.0));
+        let neal_functions = crp::CRPParameters::new_with_mass(Mass::new(1.0));
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
         let n_samples = 10000;
@@ -328,6 +339,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
     env_ptr: *const c_void,
     seed_ptr: *const i32, // Assumed length is 32
     mass: f64,
+    discount: f64,
 ) -> () {
     let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
         neal_algorithm3_process_arguments(
@@ -339,7 +351,8 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
             env_ptr,
             seed_ptr,
         );
-    let neal_functions = crp::CRPParameters::new(Mass::new(mass));
+    let neal_functions =
+        crp::CRPParameters::new_with_mass_and_discount(Mass::new(mass), Discount::new(discount));
     let partition = update_neal_algorithm3(
         nup,
         &partition,
@@ -403,6 +416,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     mass: f64,
+    discount: f64,
 ) -> () {
     let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
         neal_algorithm3_process_arguments(
@@ -422,7 +436,9 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
     let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
     let permutation = Permutation::from_vector(permutation_vector).unwrap();
     let mass = Mass::new(mass);
-    let neal_functions = frp::FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+    let discount = Discount::new(discount);
+    let neal_functions =
+        frp::FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
     let partition = update_neal_algorithm3_generalized(
         nup,
         &partition,
@@ -441,18 +457,21 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     partition_ptr: *mut i32,
     rate: f64,
     mass: f64,
+    discount: f64,
     prior_only: i32,
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
     seed_ptr: *const i32, // Assumed length is 32
     n_accepts: *mut i32,
     crp_mass: f64,
+    crp_discount: f64,
 ) -> () {
     let na = n_attempts as u32;
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let partition = Partition::from(partition_slice);
-    let parameters = CRPParameters::new(Mass::new(crp_mass));
+    let parameters =
+        CRPParameters::new_with_mass_and_discount(Mass::new(crp_mass), Discount::new(crp_discount));
     let log_prior = |p: &Partition| crate::crp::log_pmf(&p, &parameters);
     let log_likelihood: Box<dyn Fn(&[usize]) -> f64> = if prior_only != 0 {
         Box::new(|_indices: &[usize]| 0.0)
@@ -468,8 +487,9 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     let log_target = make_posterior(log_prior, log_likelihood);
     let rate = Rate::new(rate);
     let mass = Mass::new(mass);
+    let discount = Discount::new(discount);
     let mut rng = mk_rng_isaac(seed_ptr);
-    let results = update_rwmh(na, &partition, rate, mass, &log_target, &mut rng);
+    let results = update_rwmh(na, &partition, rate, mass, discount, &log_target, &mut rng);
     push_into_slice_for_r(&results.0, partition_slice);
     *n_accepts = results.1 as i32;
 }
@@ -481,6 +501,7 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
     partition_ptr: *mut i32,
     rate: f64,
     mass: f64,
+    discount: f64,
     prior_only: i32,
     log_likelihood_function_ptr: *const c_void,
     env_ptr: *const c_void,
@@ -490,6 +511,7 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
     frp_weights_ptr: *const f64,
     frp_permutation_ptr: *const i32,
     frp_mass: f64,
+    frp_discount: f64,
 ) -> () {
     let na = n_attempts as u32;
     let ni = n_items as usize;
@@ -510,6 +532,7 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
         &frp_weights,
         &frp_permutation,
         Mass::new(frp_mass),
+        Discount::new(frp_discount),
     )
     .unwrap();
     let log_prior = |p: &Partition| crate::frp::log_pmf(&p, &parameters);
@@ -527,8 +550,9 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
     let log_target = make_posterior(log_prior, log_likelihood);
     let rate = Rate::new(rate);
     let mass = Mass::new(mass);
+    let discount = Discount::new(discount);
     let mut rng = mk_rng_isaac(seed_ptr);
-    let results = update_rwmh(na, &partition, rate, mass, &log_target, &mut rng);
+    let results = update_rwmh(na, &partition, rate, mass, discount, &log_target, &mut rng);
     push_into_slice_for_r(&results.0, partition_slice);
     *n_accepts = results.1 as i32;
 }

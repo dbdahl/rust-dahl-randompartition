@@ -17,6 +17,7 @@ pub struct FRPParameters<'a, 'b, 'c> {
     weights: &'b Weights,
     permutation: &'c Permutation,
     mass: Mass,
+    discount: Discount,
 }
 
 impl<'a, 'b, 'c> FRPParameters<'a, 'b, 'c> {
@@ -25,6 +26,7 @@ impl<'a, 'b, 'c> FRPParameters<'a, 'b, 'c> {
         weights: &'b Weights,
         permutation: &'c Permutation,
         mass: Mass,
+        discount: Discount,
     ) -> Option<Self> {
         if weights.len() != focal.n_items() {
             None
@@ -36,6 +38,7 @@ impl<'a, 'b, 'c> FRPParameters<'a, 'b, 'c> {
                 weights,
                 permutation,
                 mass,
+                discount,
             })
         }
     }
@@ -104,6 +107,7 @@ pub fn engine<T: Rng>(
     let nsf = parameters.focal.n_subsets();
     let ni = parameters.focal.n_items();
     let mass = parameters.mass.unwrap();
+    let discount = parameters.discount.unwrap();
     if let TargetOrRandom::Target(t) = &mut target_or_rng {
         assert_eq!(t.n_items(), ni);
         t.canonicalize_by_permutation(Some(&parameters.permutation));
@@ -126,11 +130,29 @@ pub fn engine<T: Rng>(
                 }
             }
         }
+        let n_occupied_subsets = (partition.n_subsets() - 1) as f64;
         let focal_subset_index = parameters.focal.label_of(ii).unwrap();
-        let scaled_weight = if total_counter[focal_subset_index] == 0.0 {
+        let scaled_weight = (i as f64) * parameters.weights[ii];
+
+        // This code chunk should be deleted in production.
+        let key = "DBD_PUMPKIN_SCALING";
+        let scaled_weight = match std::env::var(key) {
+            Ok(val) => {
+                if val.to_lowercase() == "old" {
+                    println!("Using old weighting method.");
+                    parameters.weights[ii]
+                } else {
+                    println!("Using new weighting method.");
+                    scaled_weight
+                }
+            }
+            Err(_e) => scaled_weight,
+        };
+
+        let normalized_scaled_weight = if total_counter[focal_subset_index] == 0.0 {
             0.0
         } else {
-            (i as f64) * parameters.weights[ii] / total_counter[focal_subset_index]
+            scaled_weight / total_counter[focal_subset_index]
         };
         let probs: Vec<(usize, f64)> = partition
             .subsets()
@@ -138,14 +160,17 @@ pub fn engine<T: Rng>(
             .enumerate()
             .map(|(subset_index, subset)| {
                 let prob = if subset.is_empty() {
-                    if total_counter[focal_subset_index] == 0.0 {
-                        mass + (i as f64) * parameters.weights[ii]
-                    } else {
-                        mass
+                    mass + discount * n_occupied_subsets + {
+                        if total_counter[focal_subset_index] == 0.0 {
+                            scaled_weight
+                        } else {
+                            0.0
+                        }
                     }
                 } else {
-                    (subset.n_items() as f64)
-                        + scaled_weight * intersection_counter[focal_subset_index][subset_index]
+                    (subset.n_items() as f64) - discount
+                        + normalized_scaled_weight
+                            * intersection_counter[focal_subset_index][subset_index]
                 };
                 (subset_index, prob)
             })
@@ -191,6 +216,7 @@ mod tests {
         let n_items = 4;
         let mut permutation = Permutation::natural(n_items);
         let mass = Mass::new(2.0);
+        let discount = Discount::new(0.1);
         let mut rng = thread_rng();
         for focal in Partition::iter(n_items) {
             permutation.shuffle(&mut rng);
@@ -200,7 +226,8 @@ mod tests {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
-            let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+            let parameters =
+                FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
             let sample_closure = || sample(&parameters, &mut thread_rng());
             let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
             if let Some(string) = crate::testing::assert_goodness_of_fit(
@@ -221,6 +248,7 @@ mod tests {
         let n_items = 5;
         let mut permutation = Permutation::natural(n_items);
         let mass = Mass::new(2.0);
+        let discount = Discount::new(0.1);
         let mut rng = thread_rng();
         for focal in Partition::iter(n_items) {
             permutation.shuffle(&mut rng);
@@ -230,7 +258,8 @@ mod tests {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
-            let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+            let parameters =
+                FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
             let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
@@ -249,6 +278,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     mass: f64,
+    discount: f64,
     use_random_permutations: i32,
 ) -> () {
     let np = n_partitions as usize;
@@ -264,6 +294,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
         Permutation::from_vector(permutation_vector).unwrap()
     };
     let mass = Mass::new(mass);
+    let discount = Discount::new(discount);
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
     if do_sampling != 0 {
@@ -272,7 +303,8 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
             if use_random_permutations != 0 {
                 permutation.shuffle(&mut rng);
             }
-            let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+            let parameters =
+                FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
             let p = engine(&parameters, TargetOrRandom::Random(rng));
             let labels = p.0.labels();
             for j in 0..ni {
@@ -281,7 +313,8 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
             probs[i] = p.1;
         }
     } else {
-        let parameters = FRPParameters::new(&focal, &weights, &permutation, mass).unwrap();
+        let parameters =
+            FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
         for i in 0..np {
             let mut target_labels = Vec::with_capacity(ni);
             for j in 0..ni {

@@ -24,7 +24,8 @@ void dahl_randompartition__crp_partition(int32_t do_sampling,
                                          int32_t *partition_labels_ptr,
                                          double *partition_probs_ptr,
                                          const int32_t *seed_ptr,
-                                         double mass);
+                                         double mass,
+                                         double discount);
 
 void dahl_randompartition__epa_partition(int32_t do_sampling,
                                          int32_t n_partitions,
@@ -48,6 +49,7 @@ void dahl_randompartition__focal_partition(int32_t do_sampling,
                                            const double *weights_ptr,
                                            const int32_t *permutation_ptr,
                                            double mass,
+                                           double discount,
                                            int32_t use_random_permutations);
 
 void dahl_randompartition__focalrw_crp(int32_t n_attempts,
@@ -55,18 +57,21 @@ void dahl_randompartition__focalrw_crp(int32_t n_attempts,
                                        int32_t *partition_ptr,
                                        double rate,
                                        double mass,
+                                       double discount,
                                        int32_t prior_only,
                                        const void *log_likelihood_function_ptr,
                                        const void *env_ptr,
                                        const int32_t *seed_ptr,
                                        int32_t *n_accepts,
-                                       double crp_mass);
+                                       double crp_mass,
+                                       double crp_discount);
 
 void dahl_randompartition__focalrw_frp(int32_t n_attempts,
                                        int32_t n_items,
                                        int32_t *partition_ptr,
                                        double rate,
                                        double mass,
+                                       double discount,
                                        int32_t prior_only,
                                        const void *log_likelihood_function_ptr,
                                        const void *env_ptr,
@@ -75,7 +80,8 @@ void dahl_randompartition__focalrw_frp(int32_t n_attempts,
                                        const int32_t *frp_partition_ptr,
                                        const double *frp_weights_ptr,
                                        const int32_t *frp_permutation_ptr,
-                                       double frp_mass);
+                                       double frp_mass,
+                                       double frp_discount);
 
 void dahl_randompartition__neal_algorithm3_crp(int32_t n_updates_for_partition,
                                                int32_t n_items,
@@ -84,7 +90,8 @@ void dahl_randompartition__neal_algorithm3_crp(int32_t n_updates_for_partition,
                                                const void *log_posterior_predictive_function_ptr,
                                                const void *env_ptr,
                                                const int32_t *seed_ptr,
-                                               double mass);
+                                               double mass,
+                                               double discount);
 
 void dahl_randompartition__neal_algorithm3_frp(int32_t n_updates_for_partition,
                                                int32_t n_items,
@@ -96,7 +103,8 @@ void dahl_randompartition__neal_algorithm3_frp(int32_t n_updates_for_partition,
                                                const int32_t *focal_ptr,
                                                const double *weights_ptr,
                                                const int32_t *permutation_ptr,
-                                               double mass);
+                                               double mass,
+                                               double discount);
 
 void dahl_randompartition__neal_algorithm3_nggp(int32_t n_updates_for_partition,
                                                 int32_t n_items,
