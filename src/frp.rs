@@ -139,10 +139,16 @@ pub fn engine<T: Rng>(
         let scaled_weight = match std::env::var(key) {
             Ok(val) => {
                 if val.to_lowercase() == "old" {
-                    println!("Using old weighting method.");
+                    match std::env::var("DBD_PUMPKIN_VERBOSE") {
+                        Ok(val) => {
+                            if val.to_lowercase() == "true" {
+                                println!("Using old weighting method.");
+                            }
+                        }
+                        Err(_e) => {}
+                    }
                     parameters.weights[ii]
                 } else {
-                    println!("Using new weighting method.");
                     scaled_weight
                 }
             }
