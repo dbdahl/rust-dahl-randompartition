@@ -200,8 +200,9 @@ mod tests_mcmc {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
         let rate = Rate::new(5.0);
-        let mass = Mass::new(1.0);
-        let discount = Discount::new(0.1);
+        let discount = 0.1;
+        let mass = Mass::new_with_variable_constraint(1.0, discount);
+        let discount = Discount::new(discount);
         let parameters = CRPParameters::new_with_mass_and_discount(mass, discount);
         let log_prior = |p: &Partition| crate::crp::log_pmf(&p, &parameters);
         let log_likelihood = |_indices: &[usize]| 0.0;
@@ -351,8 +352,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
             env_ptr,
             seed_ptr,
         );
-    let neal_functions =
-        crp::CRPParameters::new_with_mass_and_discount(Mass::new(mass), Discount::new(discount));
+    let neal_functions = crp::CRPParameters::new_with_mass_and_discount(
+        Mass::new_with_variable_constraint(mass, discount),
+        Discount::new(discount),
+    );
     let partition = update_neal_algorithm3(
         nup,
         &partition,
@@ -435,7 +438,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
     let permutation_slice = slice::from_raw_parts(permutation_ptr, focal.n_items());
     let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
     let permutation = Permutation::from_vector(permutation_vector).unwrap();
-    let mass = Mass::new(mass);
+    let mass = Mass::new_with_variable_constraint(mass, discount);
     let discount = Discount::new(discount);
     let neal_functions =
         frp::FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
@@ -470,8 +473,10 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     let ni = n_items as usize;
     let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
     let partition = Partition::from(partition_slice);
-    let parameters =
-        CRPParameters::new_with_mass_and_discount(Mass::new(crp_mass), Discount::new(crp_discount));
+    let parameters = CRPParameters::new_with_mass_and_discount(
+        Mass::new_with_variable_constraint(crp_mass, crp_discount),
+        Discount::new(crp_discount),
+    );
     let log_prior = |p: &Partition| crate::crp::log_pmf(&p, &parameters);
     let log_likelihood: Box<dyn Fn(&[usize]) -> f64> = if prior_only != 0 {
         Box::new(|_indices: &[usize]| 0.0)
@@ -486,7 +491,7 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     };
     let log_target = make_posterior(log_prior, log_likelihood);
     let rate = Rate::new(rate);
-    let mass = Mass::new(mass);
+    let mass = Mass::new_with_variable_constraint(mass, discount);
     let discount = Discount::new(discount);
     let mut rng = mk_rng_isaac(seed_ptr);
     let results = update_rwmh(na, &partition, rate, mass, discount, &log_target, &mut rng);
@@ -531,7 +536,7 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
         &frp_partition,
         &frp_weights,
         &frp_permutation,
-        Mass::new(frp_mass),
+        Mass::new_with_variable_constraint(frp_mass, frp_discount),
         Discount::new(frp_discount),
     )
     .unwrap();
@@ -549,7 +554,7 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
     };
     let log_target = make_posterior(log_prior, log_likelihood);
     let rate = Rate::new(rate);
-    let mass = Mass::new(mass);
+    let mass = Mass::new_with_variable_constraint(mass, discount);
     let discount = Discount::new(discount);
     let mut rng = mk_rng_isaac(seed_ptr);
     let results = update_rwmh(na, &partition, rate, mass, discount, &log_target, &mut rng);

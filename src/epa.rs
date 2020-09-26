@@ -128,8 +128,9 @@ mod tests {
     fn test_goodness_of_fit_constructive() {
         let n_items = 4;
         let mut permutation = Permutation::natural(n_items);
-        let mass = Mass::new(1.5);
-        let discount = Discount::new(0.3);
+        let discount = 0.3;
+        let mass = Mass::new_with_variable_constraint(1.5, discount);
+        let discount = Discount::new(discount);
         let mut rng = thread_rng();
         let mut similarity = SquareMatrix::zeros(n_items);
         {
@@ -173,8 +174,9 @@ mod tests {
     fn test_pmf() {
         let n_items = 4;
         let mut permutation = Permutation::natural(n_items);
-        let mass = Mass::new(1.5);
-        let discount = Discount::new(0.3);
+        let discount = 0.3;
+        let mass = Mass::new_with_variable_constraint(1.5, discount);
+        let discount = Discount::new(discount);
         let mut rng = thread_rng();
         let mut similarity = SquareMatrix::zeros(n_items);
         {
@@ -230,7 +232,7 @@ pub unsafe extern "C" fn dahl_randompartition__epa_partition(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
-    let mass = Mass::new(mass);
+    let mass = Mass::new_with_variable_constraint(mass, discount);
     let discount = Discount::new(discount);
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);

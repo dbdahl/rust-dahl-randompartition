@@ -1,13 +1,18 @@
 use core::ops::{Add, Div, Mul, Sub};
 
 macro_rules! constrained_f64 {
-    ( $name:ident, $closure:tt, $msg:expr ) => {
+    ( $name:ident, $closure:tt, $msg:expr, $closure2:tt, $msg2:expr) => {
         #[derive(Debug, Copy, Clone)]
         pub struct $name(f64);
 
         impl $name {
             pub fn new(x: f64) -> Self {
                 assert!($closure(x), $msg);
+                Self(x)
+            }
+
+            pub fn new_with_variable_constraint(x: f64, y: f64) -> Self {
+                assert!($closure2(x, y), $msg2);
                 Self(x)
             }
 
@@ -86,34 +91,50 @@ macro_rules! constrained_f64 {
     };
 }
 
-constrained_f64!(Mass, (|x| x > 0.0), "Mass must be greater than zero.");
+constrained_f64!(
+    Mass,
+    (|x| x > 0.0),
+    "Mass must be greater than zero.",
+    (|x, y: f64| x > -y),
+    "Mass must be greater than the negative of the discount."
+);
 
 constrained_f64!(
     Temperature,
     (|x| x >= 0.0),
-    "Temperature must be greater than or equal to zero."
+    "Temperature must be greater than or equal to zero.",
+    (|_x, _y| false),
+    "Not supported."
 );
 
 constrained_f64!(
     UinNGGP,
     (|x| x >= 0.0),
-    "Temperature must be greater than or equal to zero."
+    "Temperature must be greater than or equal to zero.",
+    (|_x, _y| false),
+    "Not supported."
 );
 
 constrained_f64!(
     Rate,
     (|x| x >= 0.0),
-    "Rate must be greater than or equal to zero."
+    "Rate must be greater than or equal to zero.",
+    (|_x, _y| false),
+    "Not supported."
 );
 
 constrained_f64!(
     Reinforcement,
     (|x| 0.0 <= x && x < 1.0),
-    "Reinforcement must be in [0,1)."
+    "Reinforcement must be in [0,1).",
+    (|_x, _y| false),
+    "Not supported."
 );
 
 constrained_f64!(
     Discount,
     (|x| 0.0 <= x && x < 1.0),
-    "Discount must be in [0,1)."
+    "Discount must be in [0,1).",
+    (|_x, _y| false),
+    "Not supported."
 );

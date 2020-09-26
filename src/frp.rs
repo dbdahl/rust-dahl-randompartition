@@ -221,8 +221,9 @@ mod tests {
     fn test_goodness_of_fit_constructive() {
         let n_items = 4;
         let mut permutation = Permutation::natural(n_items);
-        let mass = Mass::new(2.0);
-        let discount = Discount::new(0.1);
+        let discount = 0.1;
+        let mass = Mass::new_with_variable_constraint(2.0, discount);
+        let discount = Discount::new(discount);
         let mut rng = thread_rng();
         for focal in Partition::iter(n_items) {
             permutation.shuffle(&mut rng);
@@ -253,8 +254,9 @@ mod tests {
     fn test_pmf() {
         let n_items = 5;
         let mut permutation = Permutation::natural(n_items);
-        let mass = Mass::new(2.0);
-        let discount = Discount::new(0.1);
+        let discount = 0.1;
+        let mass = Mass::new_with_variable_constraint(2.0, discount);
+        let discount = Discount::new(discount);
         let mut rng = thread_rng();
         for focal in Partition::iter(n_items) {
             permutation.shuffle(&mut rng);
@@ -299,7 +301,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
-    let mass = Mass::new(mass);
+    let mass = Mass::new_with_variable_constraint(mass, discount);
     let discount = Discount::new(discount);
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);

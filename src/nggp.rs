@@ -254,8 +254,9 @@ mod tests {
             log_pmf_of_partition_given_u(&mut p, &parameters)
         };
         let rate = Rate::new(1.0);
-        let mass = Mass::new(1.5); // Notice that the mass for the proposal doesn't need to match the prior
-        let discount = Discount::new(0.05); // Notice that the discount for the proposal doesn't need to match the prior
+        let discount = 0.05;
+        let mass = Mass::new_with_variable_constraint(1.5, discount); // Notice that the mass for the proposal doesn't need to match the prior
+        let discount = Discount::new(discount); // Notice that the discount for the proposal doesn't need to match the prior
         let mut p = Partition::one_subset(n_items);
         let sample_closure = || {
             p = update_rwmh(
@@ -341,7 +342,6 @@ mod tests {
         );
     }
     */
-
 }
 
 #[no_mangle]

@@ -128,8 +128,9 @@ mod tests {
         let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
         let log_prob_closure2 = |partition: &Partition| log_pmf(partition, &parameters);
         let rate = Rate::new(0.0);
-        let mass = Mass::new(3.0); // Notice that the mass for the proposal doesn't need to match the prior
-        let discount = Discount::new(0.1); // Notice that the discount for the proposal doesn't need to match the prior
+        let discount = 0.1;
+        let mass = Mass::new_with_variable_constraint(3.0, discount); // Notice that the mass for the proposal doesn't need to match the prior
+        let discount = Discount::new(discount); // Notice that the discount for the proposal doesn't need to match the prior
         let mut p = Partition::one_subset(n_items);
         let mut n_accepts = 0;
         let sample_closure = || {
@@ -186,8 +187,10 @@ pub unsafe extern "C" fn dahl_randompartition__crp_partition(
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
-    let parameters =
-        CRPParameters::new_with_mass_and_discount(Mass::new(mass), Discount::new(discount));
+    let parameters = CRPParameters::new_with_mass_and_discount(
+        Mass::new_with_variable_constraint(mass, discount),
+        Discount::new(discount),
+    );
     let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
     let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
     if do_sampling != 0 {
