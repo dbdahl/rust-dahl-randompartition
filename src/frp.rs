@@ -166,11 +166,15 @@ pub fn engine<T: Rng>(
             .enumerate()
             .map(|(subset_index, subset)| {
                 let prob = if subset.is_empty() {
-                    mass + discount * n_occupied_subsets + {
-                        if total_counter[focal_subset_index] == 0.0 {
-                            scaled_weight
-                        } else {
-                            0.0
+                    if n_occupied_subsets == 0.0 {
+                        1.0
+                    } else {
+                        mass + discount * n_occupied_subsets + {
+                            if total_counter[focal_subset_index] == 0.0 {
+                                scaled_weight
+                            } else {
+                                0.0
+                            }
                         }
                     }
                 } else {

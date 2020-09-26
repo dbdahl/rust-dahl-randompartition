@@ -38,10 +38,12 @@ impl NealFunctions for CRPParameters {
 }
 
 pub fn sample<T: Rng>(n_items: usize, parameters: &CRPParameters, rng: &mut T) -> Partition {
-    let mut p = Partition::new(n_items);
     let mass = parameters.mass.unwrap();
     let discount = parameters.discount.unwrap();
-    for i in 0..p.n_items() {
+    let mut p = Partition::new(n_items);
+    p.new_subset();
+    p.add_with_index(0, 0);
+    for i in 1..p.n_items() {
         match p.subsets().last() {
             None => p.new_subset(),
             Some(last) => {
