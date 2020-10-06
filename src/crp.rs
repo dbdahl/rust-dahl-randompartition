@@ -201,7 +201,7 @@ pub unsafe extern "C" fn dahl_randompartition__crp_partition(
             let p = sample(ni, &parameters, rng);
             let labels = p.labels();
             for j in 0..ni {
-                matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+                matrix[np * j + i] = i32::try_from(labels[j].unwrap() + 1).unwrap();
             }
             probs[i] = log_pmf(&p, &parameters);
         }

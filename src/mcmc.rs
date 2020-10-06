@@ -4,6 +4,7 @@ use crate::*;
 
 use crate::crp::CRPParameters;
 use crate::frp::{FRPParameters, Weights};
+use crate::lsp::LSPParameters;
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
@@ -73,8 +74,6 @@ where
 }
 
 pub trait NealFunctionsGeneral {
-    fn new_weight(&self, n_subsets: usize) -> f64;
-    fn existing_weight(&self, index_index: usize, subset: &Subset, partition: &Partition) -> f64;
     fn weight(&self, index_index: usize, subset_index: usize, partition: &Partition) -> f64;
 }
 
@@ -441,7 +440,48 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
     let mass = Mass::new_with_variable_constraint(mass, discount);
     let discount = Discount::new(discount);
     let neal_functions =
-        frp::FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
+        FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
+    let partition = update_neal_algorithm3_generalized(
+        nup,
+        &partition,
+        &permutation,
+        &neal_functions,
+        &log_posterior_predictive,
+        &mut rng,
+    );
+    push_into_slice_for_r(&partition, partition_slice);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_lsp(
+    n_updates_for_partition: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    prior_only: i32,
+    log_posterior_predictive_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
+    focal_ptr: *const i32,
+    rate: f64,
+    permutation_ptr: *const i32,
+) -> () {
+    let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
+        neal_algorithm3_process_arguments(
+            n_updates_for_partition,
+            n_items,
+            partition_ptr,
+            prior_only,
+            log_posterior_predictive_function_ptr,
+            env_ptr,
+            seed_ptr,
+        );
+    let focal_slice = slice::from_raw_parts(focal_ptr, partition.n_items());
+    let focal = Partition::from(focal_slice);
+    let rate = Rate::new(rate);
+    let permutation_slice = slice::from_raw_parts(permutation_ptr, focal.n_items());
+    let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
+    let permutation = Permutation::from_vector(permutation_vector).unwrap();
+    let neal_functions = LSPParameters::new_with_rate(&focal, rate, &permutation).unwrap();
     let partition = update_neal_algorithm3_generalized(
         nup,
         &partition,

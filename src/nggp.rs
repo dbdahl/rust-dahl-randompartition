@@ -375,7 +375,7 @@ pub unsafe extern "C" fn dahl_randompartition__nggp_partition(
             let labels = p.0.labels();
             // let labels = p.labels();
             for j in 0..ni {
-                matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+                matrix[np * j + i] = i32::try_from(labels[j].unwrap() + 1).unwrap();
             }
             probs[i] = p.1;
             // probs[i] = 0.0;

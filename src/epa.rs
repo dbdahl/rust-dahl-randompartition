@@ -246,7 +246,7 @@ pub unsafe extern "C" fn dahl_randompartition__epa_partition(
             let p = engine(&parameters, TargetOrRandom::Random(rng));
             let labels = p.0.labels();
             for j in 0..ni {
-                matrix[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
+                matrix[np * j + i] = i32::try_from(labels[j].unwrap() + 1).unwrap();
             }
             probs[i] = p.1;
         }

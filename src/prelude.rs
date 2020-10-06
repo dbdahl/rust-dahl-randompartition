@@ -124,6 +124,14 @@ constrained_f64!(
 );
 
 constrained_f64!(
+    Scale,
+    (|x| x > 0.0),
+    "Scale must be greater than zero.",
+    (|_x, _y| false),
+    "Not supported."
+);
+
+constrained_f64!(
     Reinforcement,
     (|x| 0.0 <= x && x < 1.0),
     "Reinforcement must be in [0,1).",
