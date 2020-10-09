@@ -25,7 +25,9 @@ void dahl_randompartition__centered_partition(int32_t n_partitions,
                                               const int32_t *center_ptr,
                                               double rate,
                                               double mass,
-                                              double discount);
+                                              double discount,
+                                              int32_t use_vi,
+                                              double a);
 
 void dahl_randompartition__crp_partition(int32_t do_sampling,
                                          int32_t n_partitions,
@@ -113,7 +115,9 @@ void dahl_randompartition__neal_algorithm3_cpp(int32_t n_updates_for_partition,
                                                const int32_t *center_ptr,
                                                double rate,
                                                double mass,
-                                               double discount);
+                                               double discount,
+                                               int32_t use_vi,
+                                               double a);
 
 void dahl_randompartition__neal_algorithm3_crp(int32_t n_updates_for_partition,
                                                int32_t n_items,

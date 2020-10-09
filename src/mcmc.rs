@@ -517,6 +517,8 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_cpp(
     rate: f64,
     mass: f64,
     discount: f64,
+    use_vi: i32,
+    a: f64,
 ) -> () {
     let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
         neal_algorithm3_process_arguments(
@@ -534,7 +536,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_cpp(
     let rate = Rate::new(rate);
     let mass = Mass::new_with_variable_constraint(mass, discount);
     let discount = Discount::new(discount);
-    let neal_functions = CPPParameters::new(&center, rate, mass, discount).unwrap();
+    let neal_functions = CPPParameters::new(&center, rate, mass, discount, use_vi != 0, a).unwrap();
     let partition = update_neal_algorithm3_generalized(
         nup,
         &partition,
