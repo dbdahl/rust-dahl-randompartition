@@ -9,6 +9,7 @@ pub mod crp;
 pub mod epa;
 pub mod frp;
 pub mod lsp;
+pub mod cpp;
 pub mod mcmc;
 pub mod nggp;
 pub mod prelude;

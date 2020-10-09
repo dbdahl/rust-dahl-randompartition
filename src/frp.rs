@@ -85,10 +85,10 @@ impl std::ops::Index<usize> for Weights {
 }
 
 impl<'a, 'b, 'c> NealFunctionsGeneral for FRPParameters<'a, 'b, 'c> {
-    fn weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
+    fn log_weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
         let mut p = partition.clone();
         p.add_with_index(item_index, subset_index);
-        log_pmf_mut(&mut p, self).exp()
+        log_pmf_mut(&mut p, self)
     }
 }
 
@@ -125,28 +125,6 @@ pub fn engine<T: Rng>(
         let n_occupied_subsets = (partition.n_subsets() - 1) as f64;
         let focal_subset_index = parameters.focal.label_of(ii).unwrap();
         let scaled_weight = (i as f64) * parameters.weights[ii];
-
-        // This code chunk should be deleted in production.
-        let key = "DBD_PUMPKIN_SCALING";
-        let scaled_weight = match std::env::var(key) {
-            Ok(val) => {
-                if val.to_lowercase() == "old" {
-                    match std::env::var("DBD_PUMPKIN_VERBOSE") {
-                        Ok(val) => {
-                            if val.to_lowercase() == "true" {
-                                println!("Using old weighting method.");
-                            }
-                        }
-                        Err(_e) => {}
-                    }
-                    parameters.weights[ii]
-                } else {
-                    scaled_weight
-                }
-            }
-            Err(_e) => scaled_weight,
-        };
-
         let normalized_scaled_weight = if total_counter[focal_subset_index] == 0.0 {
             0.0
         } else {

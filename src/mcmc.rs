@@ -2,6 +2,7 @@ use crate::frp;
 use crate::prelude::*;
 use crate::*;
 
+use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
 use crate::frp::{FRPParameters, Weights};
 use crate::lsp::LSPParameters;
@@ -10,6 +11,7 @@ use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
+use std::f64::NEG_INFINITY;
 use std::ffi::c_void;
 use std::slice;
 
@@ -74,7 +76,7 @@ where
 }
 
 pub trait NealFunctionsGeneral {
-    fn weight(&self, index_index: usize, subset_index: usize, partition: &Partition) -> f64;
+    fn log_weight(&self, index_index: usize, subset_index: usize, partition: &Partition) -> f64;
 }
 
 pub fn update_neal_algorithm3_generalized<T, U, V>(
@@ -112,11 +114,20 @@ where
                     empty_subset_at_end = true;
                 }
             }
-            let weights = (0..state.n_subsets()).map(|subset_index| {
-                let pp = neal_functions_generalized.weight(i, subset_index, &state);
-                let indices = &state.subsets()[subset_index].items()[..];
-                log_posterior_predictive(ii, indices).exp() * pp
-            });
+            let mut max_log_weight = NEG_INFINITY;
+            let log_weights: Vec<_> = (0..state.n_subsets())
+                .map(|subset_index| {
+                    let prior_log_weight =
+                        neal_functions_generalized.log_weight(i, subset_index, &state);
+                    let indices = &state.subsets()[subset_index].items()[..];
+                    let log_weight = log_posterior_predictive(ii, indices) + prior_log_weight;
+                    if log_weight > max_log_weight {
+                        max_log_weight = log_weight;
+                    }
+                    log_weight
+                })
+                .collect();
+            let weights = log_weights.iter().map(|lw| (lw - max_log_weight).exp());
             let dist = WeightedIndex::new(weights).unwrap();
             let subset_index = dist.sample(rng);
             state.add_with_index(ii, subset_index);
@@ -482,6 +493,48 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_lsp(
     let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
     let permutation = Permutation::from_vector(permutation_vector).unwrap();
     let neal_functions = LSPParameters::new_with_rate(&focal, rate, &permutation).unwrap();
+    let partition = update_neal_algorithm3_generalized(
+        nup,
+        &partition,
+        &permutation,
+        &neal_functions,
+        &log_posterior_predictive,
+        &mut rng,
+    );
+    push_into_slice_for_r(&partition, partition_slice);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_cpp(
+    n_updates_for_partition: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    prior_only: i32,
+    log_posterior_predictive_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
+    center_ptr: *const i32,
+    rate: f64,
+    mass: f64,
+    discount: f64,
+) -> () {
+    let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
+        neal_algorithm3_process_arguments(
+            n_updates_for_partition,
+            n_items,
+            partition_ptr,
+            prior_only,
+            log_posterior_predictive_function_ptr,
+            env_ptr,
+            seed_ptr,
+        );
+    let center_slice = slice::from_raw_parts(center_ptr, partition.n_items());
+    let center = Partition::from(center_slice);
+    let permutation = Permutation::natural(center.n_items());
+    let rate = Rate::new(rate);
+    let mass = Mass::new_with_variable_constraint(mass, discount);
+    let discount = Discount::new(discount);
+    let neal_functions = CPPParameters::new(&center, rate, mass, discount).unwrap();
     let partition = update_neal_algorithm3_generalized(
         nup,
         &partition,

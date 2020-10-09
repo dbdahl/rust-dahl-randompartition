@@ -74,7 +74,7 @@ pub fn log_pmf(x: &Partition, parameters: &CRPParameters) -> f64 {
     let m = parameters.mass.unwrap();
     let lm = m.ln();
     let mut result = ns * lm + ln_gamma(m) - ln_gamma(m + ni);
-    for subset in x.subsets() {
+    for subset in x.subsets().iter().filter(|subset| subset.n_items() > 0) {
         result += ln_gamma(subset.n_items() as f64);
     }
     result

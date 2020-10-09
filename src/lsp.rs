@@ -55,10 +55,10 @@ impl<'a, 'c> LSPParameters<'a, 'c> {
 }
 
 impl<'a, 'c> NealFunctionsGeneral for LSPParameters<'a, 'c> {
-    fn weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
+    fn log_weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
         let mut p = partition.clone();
         p.add_with_index(item_index, subset_index);
-        log_pmf_mut(&mut p, self).exp()
+        log_pmf_mut(&mut p, self)
     }
 }
 
