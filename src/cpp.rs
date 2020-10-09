@@ -1,7 +1,7 @@
 // Centered partition process
 
 use crate::crp::{log_pmf as crp_log_pmf, CRPParameters};
-use crate::mcmc::NealFunctionsGeneral;
+use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 
 use dahl_partition::*;
@@ -64,7 +64,7 @@ impl<'a> CPPParameters<'a> {
     }
 }
 
-impl<'a> NealFunctionsGeneral for CPPParameters<'a> {
+impl<'a> PriorLogWeight for CPPParameters<'a> {
     fn log_weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
         let mut p = partition.clone();
         p.add_with_index(item_index, subset_index);

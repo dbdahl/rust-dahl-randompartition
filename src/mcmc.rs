@@ -15,67 +15,7 @@ use std::f64::NEG_INFINITY;
 use std::ffi::c_void;
 use std::slice;
 
-pub trait NealFunctions {
-    fn new_weight(&self, n_subsets: usize) -> f64;
-    fn existing_weight(&self, n_subsets: usize, n_items: usize) -> f64;
-}
-
-pub fn update_neal_algorithm3<T, U, V>(
-    n_updates: u32,
-    current: &Partition,
-    neal_functions: &T,
-    log_posterior_predictive: &U,
-    rng: &mut V,
-) -> Partition
-where
-    T: NealFunctions,
-    U: Fn(usize, &[usize]) -> f64,
-    V: Rng,
-{
-    let ni = current.n_items();
-    let mut state = current.clone();
-    state.canonicalize();
-    state.new_subset();
-    let mut empty_subset_at_end = true;
-    for _ in 0..n_updates {
-        for i in 0..ni {
-            // Remove 'i', ensure there is one and only one empty subset, and be efficient.
-            let k = state.label_of(i).unwrap();
-            state.remove(i);
-            state.clean_subset(k);
-            if state.subsets()[k].is_empty() {
-                if empty_subset_at_end {
-                    state.pop_subset();
-                    empty_subset_at_end = k == state.n_subsets() - 1;
-                } else {
-                    state.canonicalize();
-                    state.new_subset();
-                    empty_subset_at_end = true;
-                }
-            }
-            let n_subsets = state.n_subsets() - 1; // Because there is an empty subset
-            let weights = state.subsets().iter().map(|subset| {
-                let pp = if subset.is_empty() {
-                    neal_functions.new_weight(n_subsets)
-                } else {
-                    neal_functions.existing_weight(n_subsets, subset.n_items())
-                };
-                log_posterior_predictive(i, &subset.items()[..]).exp() * pp
-            });
-            let dist = WeightedIndex::new(weights).unwrap();
-            let subset_index = dist.sample(rng);
-            state.add_with_index(i, subset_index);
-            if state.subsets()[subset_index].n_items() == 1 {
-                state.new_subset();
-                empty_subset_at_end = true;
-            }
-        }
-    }
-    state.canonicalize();
-    state
-}
-
-pub trait NealFunctionsGeneral {
+pub trait PriorLogWeight {
     fn log_weight(&self, index_index: usize, subset_index: usize, partition: &Partition) -> f64;
 }
 
@@ -88,7 +28,7 @@ pub fn update_neal_algorithm3_generalized<T, U, V>(
     rng: &mut V,
 ) -> Partition
 where
-    T: NealFunctionsGeneral,
+    T: PriorLogWeight,
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
@@ -242,13 +182,15 @@ mod tests_mcmc {
         let n_items = 5;
         let mut current = Partition::one_subset(n_items);
         let neal_functions = crp::CRPParameters::new_with_mass(Mass::new(1.0));
+        let permutation = Permutation::natural(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            current = update_neal_algorithm3(
+            current = update_neal_algorithm3_generalized(
                 2,
                 &current,
+                &permutation,
                 &neal_functions,
                 &log_posterior_predictive,
                 &mut thread_rng(),
@@ -366,9 +308,11 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
         Mass::new_with_variable_constraint(mass, discount),
         Discount::new(discount),
     );
-    let partition = update_neal_algorithm3(
+    let permutation = Permutation::natural(partition.n_items());
+    let partition = update_neal_algorithm3_generalized(
         nup,
         &partition,
+        &permutation,
         &neal_functions,
         &log_posterior_predictive,
         &mut rng,
@@ -405,9 +349,11 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
     let mass = Mass::new(mass);
     let reinforcement = Reinforcement::new(reinforcement);
     let neal_functions = nggp::NGGPParameters::new(u, mass, reinforcement);
-    let partition = update_neal_algorithm3(
+    let permutation = Permutation::natural(partition.n_items());
+    let partition = update_neal_algorithm3_generalized(
         nup,
         &partition,
+        &permutation,
         &neal_functions,
         &log_posterior_predictive,
         &mut rng,

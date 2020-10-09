@@ -1,6 +1,6 @@
 // Location scale partition distribution
 
-use crate::mcmc::NealFunctionsGeneral;
+use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 use crate::TargetOrRandom;
 
@@ -54,7 +54,7 @@ impl<'a, 'c> LSPParameters<'a, 'c> {
     }
 }
 
-impl<'a, 'c> NealFunctionsGeneral for LSPParameters<'a, 'c> {
+impl<'a, 'c> PriorLogWeight for LSPParameters<'a, 'c> {
     fn log_weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
         let mut p = partition.clone();
         p.add_with_index(item_index, subset_index);

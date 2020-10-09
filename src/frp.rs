@@ -1,6 +1,6 @@
 // Focal random partition distribution
 
-use crate::mcmc::NealFunctionsGeneral;
+use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 use crate::TargetOrRandom;
 
@@ -84,7 +84,7 @@ impl std::ops::Index<usize> for Weights {
     }
 }
 
-impl<'a, 'b, 'c> NealFunctionsGeneral for FRPParameters<'a, 'b, 'c> {
+impl<'a, 'b, 'c> PriorLogWeight for FRPParameters<'a, 'b, 'c> {
     fn log_weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
         let mut p = partition.clone();
         p.add_with_index(item_index, subset_index);

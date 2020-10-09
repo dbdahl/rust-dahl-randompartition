@@ -1,6 +1,6 @@
 // Normalized generalized gamma process
 
-use crate::mcmc::NealFunctions;
+use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 use crate::TargetOrRandom;
 
@@ -30,13 +30,14 @@ impl NGGPParameters {
     }
 }
 
-impl NealFunctions for NGGPParameters {
-    fn new_weight(&self, _n_subsets: usize) -> f64 {
-        self.mass * (self.u + 1.0).powf(self.reinforcement.unwrap())
-    }
-
-    fn existing_weight(&self, _n_subsets: usize, n_items: usize) -> f64 {
-        n_items as f64 - self.reinforcement
+impl PriorLogWeight for NGGPParameters {
+    fn log_weight(&self, _item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
+        let subset = &partition.subsets()[subset_index];
+        if subset.n_items() == 0 {
+            self.mass * (self.u + 1.0).powf(self.reinforcement.unwrap())
+        } else {
+            subset.n_items() as f64 - self.reinforcement
+        }
     }
 }
 
@@ -178,7 +179,7 @@ pub fn log_joint_density(partition: &Partition, parameters: &NGGPParameters) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mcmc::{update_neal_algorithm3, update_rwmh};
+    use crate::mcmc::{update_neal_algorithm3_generalized, update_rwmh};
     use quadrature::integrate;
 
     /*
@@ -223,8 +224,16 @@ mod tests {
             NGGPParameters::new(UinNGGP::new(300.0), Mass::new(2.0), Reinforcement::new(0.2));
         let l = |_i: usize, _indices: &[usize]| 0.0;
         let mut p = Partition::one_subset(n_items);
+        let permutation = Permutation::natural(p.n_items());
         let sample_closure = || {
-            p = update_neal_algorithm3(1, &p, &parameters, &l, &mut thread_rng());
+            p = update_neal_algorithm3_generalized(
+                1,
+                &p,
+                &permutation,
+                &parameters,
+                &l,
+                &mut thread_rng(),
+            );
             p.clone()
         };
         let log_prob_closure =
