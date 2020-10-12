@@ -3,6 +3,7 @@
 use crate::prelude::*;
 use crate::TargetOrRandom;
 
+use crate::mcmc::PriorLogWeight;
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
 use rand::distributions::{Distribution, WeightedIndex};
@@ -11,8 +12,8 @@ use rand_isaac::IsaacRng;
 use std::convert::TryFrom;
 use std::slice;
 
-pub struct DistanceBorrower<'a>(SquareMatrixBorrower<'a>);
-pub struct SimilarityBorrower<'a>(SquareMatrixBorrower<'a>);
+pub struct DistanceBorrower<'a>(pub SquareMatrixBorrower<'a>);
+pub struct SimilarityBorrower<'a>(pub SquareMatrixBorrower<'a>);
 
 pub struct EPAParameters<'a, 'b> {
     similarity: &'a SimilarityBorrower<'a>,
@@ -38,6 +39,14 @@ impl<'a, 'b> EPAParameters<'a, 'b> {
                 discount,
             })
         }
+    }
+}
+
+impl<'a, 'b, 'c> PriorLogWeight for EPAParameters<'a, 'b> {
+    fn log_weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
+        let mut p = partition.clone();
+        p.add_with_index(item_index, subset_index);
+        log_pmf(&mut p, self)
     }
 }
 

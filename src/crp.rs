@@ -84,7 +84,7 @@ pub fn log_pmf(x: &Partition, parameters: &CRPParameters) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mcmc::{update_neal_algorithm3_generalized, update_rwmh};
+    use crate::mcmc::{update_neal_algorithm3, update_rwmh};
     use rand::prelude::*;
 
     #[test]
@@ -111,14 +111,7 @@ mod tests {
         let mut p = Partition::one_subset(n_items);
         let permutation = Permutation::natural(p.n_items());
         let sample_closure = || {
-            p = update_neal_algorithm3_generalized(
-                1,
-                &p,
-                &permutation,
-                &parameters,
-                &l,
-                &mut thread_rng(),
-            );
+            p = update_neal_algorithm3(1, &p, &permutation, &parameters, &l, &mut thread_rng());
             p.clone()
         };
         let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);

@@ -4,6 +4,7 @@ use crate::*;
 
 use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
+use crate::epa::{EPAParameters, SimilarityBorrower};
 use crate::frp::{FRPParameters, Weights};
 use crate::lsp::LSPParameters;
 use dahl_partition::*;
@@ -19,11 +20,11 @@ pub trait PriorLogWeight {
     fn log_weight(&self, index_index: usize, subset_index: usize, partition: &Partition) -> f64;
 }
 
-pub fn update_neal_algorithm3_generalized<T, U, V>(
+pub fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     current: &Partition,
     permutation: &Permutation,
-    neal_functions_generalized: &T,
+    prior_log_weight: &T,
     log_posterior_predictive: &U,
     rng: &mut V,
 ) -> Partition
@@ -57,8 +58,7 @@ where
             let mut max_log_weight = NEG_INFINITY;
             let log_weights: Vec<_> = (0..state.n_subsets())
                 .map(|subset_index| {
-                    let prior_log_weight =
-                        neal_functions_generalized.log_weight(i, subset_index, &state);
+                    let prior_log_weight = prior_log_weight.log_weight(ii, subset_index, &state);
                     let indices = &state.subsets()[subset_index].items()[..];
                     let log_weight = log_posterior_predictive(ii, indices) + prior_log_weight;
                     if log_weight > max_log_weight {
@@ -187,7 +187,7 @@ mod tests_mcmc {
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            current = update_neal_algorithm3_generalized(
+            current = update_neal_algorithm3(
                 2,
                 &current,
                 &permutation,
@@ -309,7 +309,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
         Discount::new(discount),
     );
     let permutation = Permutation::natural(partition.n_items());
-    let partition = update_neal_algorithm3_generalized(
+    let partition = update_neal_algorithm3(
         nup,
         &partition,
         &permutation,
@@ -350,7 +350,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
     let reinforcement = Reinforcement::new(reinforcement);
     let neal_functions = nggp::NGGPParameters::new(u, mass, reinforcement);
     let permutation = Permutation::natural(partition.n_items());
-    let partition = update_neal_algorithm3_generalized(
+    let partition = update_neal_algorithm3(
         nup,
         &partition,
         &permutation,
@@ -398,7 +398,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
     let discount = Discount::new(discount);
     let neal_functions =
         FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
-    let partition = update_neal_algorithm3_generalized(
+    let partition = update_neal_algorithm3(
         nup,
         &partition,
         &permutation,
@@ -439,7 +439,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_lsp(
     let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
     let permutation = Permutation::from_vector(permutation_vector).unwrap();
     let neal_functions = LSPParameters::new_with_rate(&focal, rate, &permutation).unwrap();
-    let partition = update_neal_algorithm3_generalized(
+    let partition = update_neal_algorithm3(
         nup,
         &partition,
         &permutation,
@@ -483,7 +483,50 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_cpp(
     let mass = Mass::new_with_variable_constraint(mass, discount);
     let discount = Discount::new(discount);
     let neal_functions = CPPParameters::new(&center, rate, mass, discount, use_vi != 0, a).unwrap();
-    let partition = update_neal_algorithm3_generalized(
+    let partition = update_neal_algorithm3(
+        nup,
+        &partition,
+        &permutation,
+        &neal_functions,
+        &log_posterior_predictive,
+        &mut rng,
+    );
+    push_into_slice_for_r(&partition, partition_slice);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_epa(
+    n_updates_for_partition: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    prior_only: i32,
+    log_posterior_predictive_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
+    similarity_ptr: *mut f64,
+    permutation_ptr: *const i32,
+    mass: f64,
+    discount: f64,
+) -> () {
+    let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
+        neal_algorithm3_process_arguments(
+            n_updates_for_partition,
+            n_items,
+            partition_ptr,
+            prior_only,
+            log_posterior_predictive_function_ptr,
+            env_ptr,
+            seed_ptr,
+        );
+    let ni = n_items as usize;
+    let similarity = SimilarityBorrower(SquareMatrixBorrower::from_ptr(similarity_ptr, ni));
+    let permutation_slice = slice::from_raw_parts(permutation_ptr, similarity.0.n_items());
+    let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
+    let permutation = Permutation::from_vector(permutation_vector).unwrap();
+    let mass = Mass::new_with_variable_constraint(mass, discount);
+    let discount = Discount::new(discount);
+    let neal_functions = EPAParameters::new(&similarity, &permutation, mass, discount).unwrap();
+    let partition = update_neal_algorithm3(
         nup,
         &partition,
         &permutation,
