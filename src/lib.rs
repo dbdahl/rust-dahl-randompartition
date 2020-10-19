@@ -5,11 +5,12 @@ extern crate dahl_salso;
 extern crate rand;
 extern crate statrs;
 
+mod clust;
+pub mod cpp;
 pub mod crp;
 pub mod epa;
 pub mod frp;
 pub mod lsp;
-pub mod cpp;
 pub mod mcmc;
 pub mod nggp;
 pub mod prelude;
