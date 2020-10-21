@@ -57,8 +57,8 @@ pub fn sample<T: Rng>(n_items: usize, parameters: &CRPParameters, rng: &mut T) -
     clustering.allocate(0, 0);
     for i in 1..clustering.n_items() {
         let n_clusters = clustering.n_clusters();
-        //let weights = clustering.available_labels_for_allocation().map(|label| {
-        let weights = (0..=clustering.n_clusters()).map(|label| {
+        let weights = clustering.available_labels_for_allocation().map(|label| {
+            //let weights = (0..=clustering.n_clusters()).map(|label| {
             let n_items_in_cluster = clustering.size_of(label);
             if n_items_in_cluster == 0 {
                 mass + (n_clusters as f64) * discount
@@ -67,7 +67,7 @@ pub fn sample<T: Rng>(n_items: usize, parameters: &CRPParameters, rng: &mut T) -
             }
         });
         // We're cheating here a bit in that we know the available labels are sequential from 0 to
-        // clustering.active_labels().len() + 1.  This won't be the case in a Gibbs sampling
+        // clustering.n_clusters() + 1, exclusive.  This won't be the case in a Gibbs sampling
         // framework.
         use rand::distributions::{Distribution, WeightedIndex};
         let dist = WeightedIndex::new(weights).unwrap();

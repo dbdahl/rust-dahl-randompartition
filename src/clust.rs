@@ -162,12 +162,8 @@ impl Clustering {
         self.sizes.len() - 1
     }
 
-    pub fn available_labels_for_allocation(&self) -> ClusterLabelsIterator {
-        ClusterLabelsIterator {
-            iter: self.active_labels.iter(),
-            new_label: Some(self.new_label()),
-            done: false,
-        }
+    pub fn available_labels_for_allocation(&self) -> std::ops::RangeInclusive<usize> {
+        0..=self.active_labels.len()
     }
 
     pub fn available_labels_for_reallocation(&self, item: usize) -> ClusterLabelsIterator {
