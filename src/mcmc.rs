@@ -50,7 +50,7 @@ where
                     log_posterior_predictive(ii, indices) + prior.log_weight(ii, label, &state);
                 (label, log_weight)
             });
-            let label = state.select_randomly(labels_and_log_weights, rng);
+            let label = state.select_randomly_with_log_weights(labels_and_log_weights, rng);
             state.reallocate(ii, label);
         }
     }

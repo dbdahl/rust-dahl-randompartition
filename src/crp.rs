@@ -57,19 +57,17 @@ pub fn sample<T: Rng>(n_items: usize, parameters: &CRPParameters, rng: &mut T) -
     clustering.allocate(0, 0);
     for i in 1..clustering.n_items() {
         let n_clusters = clustering.n_clusters();
-        let labels_and_log_weights = clustering.available_labels_for_allocation().map(|label| {
+        let weights = clustering.available_labels_for_allocation().map(|label| {
             let n_items_in_cluster = clustering.size_of(label);
-            (
-                label,
-                if n_items_in_cluster == 0 {
-                    mass + (n_clusters as f64) * discount
-                } else {
-                    (n_items_in_cluster as f64) - discount
-                },
-            )
+            if n_items_in_cluster == 0 {
+                mass + (n_clusters as f64) * discount
+            } else {
+                (n_items_in_cluster as f64) - discount
+            }
         });
-        let label = clustering.select_randomly_with_weights(labels_and_log_weights, rng);
-        clustering.allocate(i, label);
+        use rand::distributions::{Distribution, WeightedIndex};
+        let dist = WeightedIndex::new(weights).unwrap();
+        clustering.allocate(i, dist.sample(rng));
     }
     clustering
 }

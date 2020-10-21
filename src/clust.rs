@@ -183,7 +183,7 @@ impl Clustering {
         }
     }
 
-    pub fn select_randomly<T: Rng, S: Iterator<Item = (usize, f64)>>(
+    pub fn select_randomly_with_log_weights<T: Rng, S: Iterator<Item = (usize, f64)>>(
         &self,
         labels_and_log_weights: S,
         rng: &mut T,
