@@ -65,11 +65,10 @@ pub fn sample<T: Rng>(n_items: usize, parameters: &CRPParameters, rng: &mut T) -
                     mass + (n_clusters as f64) * discount
                 } else {
                     (n_items_in_cluster as f64) - discount
-                }
-                .ln(),
+                },
             )
         });
-        let label = clustering.select_randomly(labels_and_log_weights, rng);
+        let label = clustering.select_randomly_with_weights(labels_and_log_weights, rng);
         clustering.allocate(i, label);
     }
     clustering

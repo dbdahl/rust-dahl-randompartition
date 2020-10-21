@@ -195,6 +195,16 @@ impl Clustering {
         labels[dist.sample(rng)]
     }
 
+    pub fn select_randomly_with_weights<T: Rng, S: Iterator<Item = (usize, f64)>>(
+        &self,
+        labels_and_weights: S,
+        rng: &mut T,
+    ) -> usize {
+        let (labels, weights): (Vec<_>, Vec<_>) = labels_and_weights.unzip();
+        let dist = WeightedIndex::new(weights).unwrap();
+        labels[dist.sample(rng)]
+    }
+
     pub fn get(&mut self, item: usize) -> usize {
         self.labels[item]
     }
