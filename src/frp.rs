@@ -104,7 +104,7 @@ impl<'a, 'b, 'c> PriorLogWeight for FRPParameters<'a, 'b, 'c> {
 impl<'a, 'b, 'c> PriorLogWeight2 for FRPParameters2<'a, 'b, 'c> {
     fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
         let mut p = clustering.clone();
-        p.reassign(item_index, subset_index);
+        p.reallocate(item_index, subset_index);
         log_pmf_mut2(&mut p, self)
     }
 }
@@ -204,7 +204,7 @@ pub fn engine2<T: Rng>(
     let discount = parameters.discount.unwrap();
     if let TargetOrRandom2::Target(t) = &mut target_or_rng {
         assert_eq!(t.n_items(), ni);
-        *t = t.standardize(false, Some(parameters.permutation)).0;
+        *t = t.standardize(0, Some(parameters.permutation), false).0;
     };
     let mut log_probability = 0.0;
     let mut partition = Partition::new(ni);

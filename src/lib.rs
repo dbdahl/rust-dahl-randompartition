@@ -6,22 +6,21 @@ extern crate rand;
 extern crate statrs;
 
 mod clust;
-pub mod cpp;
+//pub mod cpp;
 pub mod crp;
-pub mod epa;
-pub mod frp;
-pub mod lsp;
+//pub mod epa;
+//pub mod frp;
+//pub mod lsp;
 pub mod mcmc;
-pub mod nggp;
+//pub mod nggp;
 pub mod prelude;
 pub mod testing;
 
 use crate::clust::Clustering;
-use dahl_partition::*;
 use rand::prelude::*;
 
 pub enum TargetOrRandom<'a, T: Rng> {
-    Target(&'a mut Partition),
+    Target(&'a mut dahl_partition::Partition),
     Random(&'a mut T),
 }
 

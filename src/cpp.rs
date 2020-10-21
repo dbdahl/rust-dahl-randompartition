@@ -1,14 +1,15 @@
 // Centered partition process
 
-use crate::crp::{log_pmf as crp_log_pmf, CRPParameters};
-use crate::mcmc::PriorLogWeight;
+// use crate::crp::{log_pmf as crp_log_pmf, CRPParameters};
+// use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 
 use dahl_partition::*;
-use dahl_salso::clustering::{Clusterings, WorkingClustering};
+use dahl_salso::clustering::Clusterings;
+// use dahl_salso::clustering::WorkingClustering;
 use dahl_salso::log2cache::Log2Cache;
-use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputer};
-use std::slice;
+// use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputer};
+// use std::slice;
 
 pub struct CPPParameters<'a> {
     center: &'a Partition,
@@ -64,6 +65,7 @@ impl<'a> CPPParameters<'a> {
     }
 }
 
+/*
 impl<'a> PriorLogWeight for CPPParameters<'a> {
     fn log_weight(&self, item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
         let mut p = partition.clone();
@@ -151,3 +153,4 @@ pub unsafe extern "C" fn dahl_randompartition__centered_partition(
         probs[i] = log_pmf(&target, &parameters);
     }
 }
+*/

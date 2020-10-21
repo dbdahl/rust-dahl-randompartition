@@ -1,25 +1,26 @@
-use crate::frp;
+use crate::clust::{Clustering, Permutation};
 use crate::prelude::*;
 use crate::*;
 
-use crate::clust::Clustering;
-
-use crate::cpp::CPPParameters;
-use crate::crp::CRPParameters;
-use crate::epa::{EPAParameters, SimilarityBorrower};
-use crate::frp::{FRPParameters, Weights};
-use crate::lsp::LSPParameters;
-use dahl_partition::*;
+//use crate::frp;
+//use crate::cpp::CPPParameters;
+//use crate::crp::CRPParameters;
+//use crate::epa::{EPAParameters, SimilarityBorrower};
+//use crate::frp::{FRPParameters, Weights};
+//use crate::lsp::LSPParameters;
 use dahl_roxido::mk_rng_isaac;
-use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
-use std::f64::NEG_INFINITY;
 use std::ffi::c_void;
 use std::slice;
 
 pub trait PriorLogWeight {
-    fn log_weight(&self, index_index: usize, subset_index: usize, partition: &Partition) -> f64;
+    fn log_weight(
+        &self,
+        index_index: usize,
+        subset_index: usize,
+        partition: &dahl_partition::Partition,
+    ) -> f64;
 }
 
 pub trait PriorLogWeight2 {
@@ -28,65 +29,35 @@ pub trait PriorLogWeight2 {
 
 pub fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
-    current: &Partition,
+    current: &Clustering,
     permutation: &Permutation,
-    prior_log_weight: &T,
+    prior: &T,
     log_posterior_predictive: &U,
     rng: &mut V,
-) -> Partition
+) -> Clustering
 where
-    T: PriorLogWeight,
+    T: PriorLogWeight2,
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
-    let ni = current.n_items();
     let mut state = current.clone();
-    state.canonicalize();
-    state.new_subset();
-    let mut empty_subset_at_end = true;
     for _ in 0..n_updates {
-        for i in 0..ni {
-            let ii = permutation[i];
-            // Remove 'i', ensure there is one and only one empty subset, and be efficient.
-            let k = state.label_of(ii).unwrap();
-            state.remove(ii);
-            state.clean_subset(k);
-            if state.subsets()[k].is_empty() {
-                if empty_subset_at_end {
-                    state.pop_subset();
-                    empty_subset_at_end = k == state.n_subsets() - 1;
-                } else {
-                    state.canonicalize();
-                    state.new_subset();
-                    empty_subset_at_end = true;
-                }
-            }
-            let mut max_log_weight = NEG_INFINITY;
-            let log_weights: Vec<_> = (0..state.n_subsets())
-                .map(|subset_index| {
-                    let prior_log_weight = prior_log_weight.log_weight(ii, subset_index, &state);
-                    let indices = &state.subsets()[subset_index].items()[..];
-                    let log_weight = log_posterior_predictive(ii, indices) + prior_log_weight;
-                    if log_weight > max_log_weight {
-                        max_log_weight = log_weight;
-                    }
-                    log_weight
-                })
-                .collect();
-            let weights = log_weights.iter().map(|lw| (lw - max_log_weight).exp());
-            let dist = WeightedIndex::new(weights).unwrap();
-            let subset_index = dist.sample(rng);
-            state.add_with_index(ii, subset_index);
-            if state.subsets()[subset_index].n_items() == 1 {
-                state.new_subset();
-                empty_subset_at_end = true;
-            }
+        for i in 0..state.n_items() {
+            let ii = permutation.get(i);
+            let labels_and_log_weights = state.available_labels_for_reallocation(ii).map(|label| {
+                let indices = &state.items_of(label)[..];
+                let log_weight =
+                    log_posterior_predictive(ii, indices) + prior.log_weight(ii, label, &state);
+                (label, log_weight)
+            });
+            let label = state.select_randomly(labels_and_log_weights, rng);
+            state.reallocate(ii, label);
         }
     }
-    state.canonicalize();
     state
 }
 
+/*
 pub fn update_rwmh<T, U>(
     n_attempts: u32,
     current: &Partition,
@@ -131,18 +102,19 @@ where
     state.canonicalize();
     (state, accepts)
 }
+*/
 
-fn make_posterior<'a, T: 'a, U: 'a>(log_prior: T, log_likelihood: U) -> impl Fn(&Partition) -> f64
+fn make_posterior<'a, T: 'a, U: 'a>(log_prior: T, log_likelihood: U) -> impl Fn(&Clustering) -> f64
 where
-    T: Fn(&Partition) -> f64,
+    T: Fn(&Clustering) -> f64,
     U: Fn(&[usize]) -> f64,
 {
-    move |partition: &Partition| {
-        partition
-            .subsets()
+    move |clustering: &Clustering| {
+        clustering
+            .labels()
             .iter()
-            .fold(log_prior(partition), |sum, subset| {
-                sum + log_likelihood(&subset.items()[..])
+            .fold(log_prior(clustering), |sum, label| {
+                sum + log_likelihood(&clustering.items_of(*label)[..])
             })
     }
 }
@@ -151,6 +123,7 @@ where
 mod tests_mcmc {
     use super::*;
 
+    /*
     #[test]
     fn test_crp_rwmh() {
         let n_items = 5;
@@ -182,11 +155,12 @@ mod tests_mcmc {
         let z_stat = (mean_number_of_subsets - 2.283333) / (0.8197222 / n_samples as f64).sqrt();
         assert!(z_stat.abs() < 3.290527);
     }
+    */
 
     #[test]
     fn test_crp_neal_algorithm3() {
         let n_items = 5;
-        let mut current = Partition::one_subset(n_items);
+        let mut current = Clustering::one_cluster(n_items);
         let neal_functions = crp::CRPParameters::new_with_mass(Mass::new(1.0));
         let permutation = Permutation::natural(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
@@ -201,7 +175,7 @@ mod tests_mcmc {
                 &log_posterior_predictive,
                 &mut thread_rng(),
             );
-            sum += current.n_subsets();
+            sum += current.n_clusters();
         }
         let mean_number_of_subsets = (sum as f64) / (n_samples as f64);
         let z_stat = (mean_number_of_subsets - 2.283333) / (0.8197222 / n_samples as f64).sqrt();
@@ -254,14 +228,14 @@ unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
 ) -> (
     u32,
     &'a mut [i32],
-    Partition,
+    Clustering,
     impl Fn(usize, &[usize]) -> f64,
     IsaacRng,
 ) {
     let nup = n_updates_for_partition as u32;
     let ni = n_items as usize;
-    let partition_slice = slice::from_raw_parts_mut(partition_ptr, ni);
-    let partition = Partition::from(partition_slice);
+    let clustering_slice = slice::from_raw_parts_mut(partition_ptr, ni);
+    let clustering = Clustering::from_slice(clustering_slice);
     let log_posterior_predictive: Box<dyn Fn(usize, &[usize]) -> f64> = if prior_only != 0 {
         Box::new(|_i: usize, _indices: &[usize]| 0.0)
     } else {
@@ -277,15 +251,11 @@ unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
     let rng = mk_rng_isaac(seed_ptr);
     (
         nup,
-        partition_slice,
-        partition,
+        clustering_slice,
+        clustering,
         log_posterior_predictive,
         rng,
     )
-}
-
-unsafe fn push_into_slice_for_r(partition: &Partition, slice: &mut [i32]) {
-    partition.labels_into_slice(slice, |x| (x.unwrap() as i32) + 1);
 }
 
 #[no_mangle]
@@ -323,9 +293,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
         &log_posterior_predictive,
         &mut rng,
     );
-    push_into_slice_for_r(&partition, partition_slice);
+    partition.push_into_slice_i32(partition_slice);
 }
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
     n_updates_for_partition: i32,
@@ -367,7 +338,9 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
     *u_ptr = super::nggp::update_u(u, &partition, mass, reinforcement, nuu, &mut rng).unwrap();
     push_into_slice_for_r(&partition, partition_slice);
 }
+*/
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
     n_updates_for_partition: i32,
@@ -414,7 +387,9 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
     );
     push_into_slice_for_r(&partition, partition_slice);
 }
+*/
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_lsp(
     n_updates_for_partition: i32,
@@ -455,7 +430,9 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_lsp(
     );
     push_into_slice_for_r(&partition, partition_slice);
 }
+*/
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_cpp(
     n_updates_for_partition: i32,
@@ -499,7 +476,9 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_cpp(
     );
     push_into_slice_for_r(&partition, partition_slice);
 }
+*/
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_epa(
     n_updates_for_partition: i32,
@@ -542,7 +521,9 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_epa(
     );
     push_into_slice_for_r(&partition, partition_slice);
 }
+*/
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     n_attempts: i32,
@@ -588,7 +569,9 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_crp(
     push_into_slice_for_r(&results.0, partition_slice);
     *n_accepts = results.1 as i32;
 }
+*/
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
     n_attempts: i32,
@@ -651,3 +634,4 @@ pub unsafe extern "C" fn dahl_randompartition__focalrw_frp(
     push_into_slice_for_r(&results.0, partition_slice);
     *n_accepts = results.1 as i32;
 }
+*/
