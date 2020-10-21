@@ -2,6 +2,8 @@ use crate::frp;
 use crate::prelude::*;
 use crate::*;
 
+use crate::clust::Clustering;
+
 use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
 use crate::epa::{EPAParameters, SimilarityBorrower};
@@ -18,6 +20,10 @@ use std::slice;
 
 pub trait PriorLogWeight {
     fn log_weight(&self, index_index: usize, subset_index: usize, partition: &Partition) -> f64;
+}
+
+pub trait PriorLogWeight2 {
+    fn log_weight(&self, index_index: usize, subset_index: usize, partition: &Clustering) -> f64;
 }
 
 pub fn update_neal_algorithm3<T, U, V>(

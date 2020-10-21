@@ -16,10 +16,16 @@ pub mod nggp;
 pub mod prelude;
 pub mod testing;
 
+use crate::clust::Clustering;
 use dahl_partition::*;
 use rand::prelude::*;
 
 pub enum TargetOrRandom<'a, T: Rng> {
     Target(&'a mut Partition),
+    Random(&'a mut T),
+}
+
+pub enum TargetOrRandom2<'a, T: Rng> {
+    Target(Clustering),
     Random(&'a mut T),
 }

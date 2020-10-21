@@ -1,8 +1,9 @@
 // Focal random partition distribution
 
-use crate::mcmc::PriorLogWeight;
+use crate::clust::{Clustering, Permutation as Permutation2};
+use crate::mcmc::{PriorLogWeight, PriorLogWeight2};
 use crate::prelude::*;
-use crate::TargetOrRandom;
+use crate::{TargetOrRandom, TargetOrRandom2};
 
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
@@ -16,6 +17,14 @@ pub struct FRPParameters<'a, 'b, 'c> {
     focal: &'a Partition,
     weights: &'b Weights,
     permutation: &'c Permutation,
+    mass: Mass,
+    discount: Discount,
+}
+
+pub struct FRPParameters2<'a, 'b, 'c> {
+    focal: &'a Partition,
+    weights: &'b Weights,
+    permutation: &'c Permutation2,
     mass: Mass,
     discount: Discount,
 }
@@ -92,6 +101,13 @@ impl<'a, 'b, 'c> PriorLogWeight for FRPParameters<'a, 'b, 'c> {
     }
 }
 
+impl<'a, 'b, 'c> PriorLogWeight2 for FRPParameters2<'a, 'b, 'c> {
+    fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
+        let mut p = clustering.clone();
+        p.reassign(item_index, subset_index);
+        log_pmf_mut2(&mut p, self)
+    }
+}
 pub fn engine<T: Rng>(
     parameters: &FRPParameters,
     mut target_or_rng: TargetOrRandom<T>,
@@ -113,6 +129,92 @@ pub fn engine<T: Rng>(
     }
     for i in 0..ni {
         let ii = parameters.permutation[i];
+        // Ensure there is an empty subset
+        match partition.subsets().last() {
+            None => partition.new_subset(),
+            Some(last) => {
+                if !last.is_empty() {
+                    partition.new_subset()
+                }
+            }
+        }
+        let n_occupied_subsets = (partition.n_subsets() - 1) as f64;
+        let focal_subset_index = parameters.focal.label_of(ii).unwrap();
+        let scaled_weight = (i as f64) * parameters.weights[ii];
+        let normalized_scaled_weight = if total_counter[focal_subset_index] == 0.0 {
+            0.0
+        } else {
+            scaled_weight / total_counter[focal_subset_index]
+        };
+        let probs: Vec<f64> = partition
+            .subsets()
+            .iter()
+            .enumerate()
+            .map(|(subset_index, subset)| {
+                let prob = if subset.is_empty() {
+                    if n_occupied_subsets == 0.0 {
+                        1.0
+                    } else {
+                        mass + discount * n_occupied_subsets + {
+                            if total_counter[focal_subset_index] == 0.0 {
+                                scaled_weight
+                            } else {
+                                0.0
+                            }
+                        }
+                    }
+                } else {
+                    (subset.n_items() as f64) - discount
+                        + normalized_scaled_weight
+                            * intersection_counter[focal_subset_index][subset_index]
+                };
+                prob
+            })
+            .collect();
+        let subset_index = match &mut target_or_rng {
+            TargetOrRandom::Random(rng) => {
+                let dist = WeightedIndex::new(probs.iter()).unwrap();
+                dist.sample(*rng)
+            }
+            TargetOrRandom::Target(t) => t.label_of(ii).unwrap(),
+        };
+        let numerator = probs[subset_index];
+        let denominator: f64 = probs.iter().sum();
+        log_probability += (numerator / denominator).ln();
+        if subset_index == intersection_counter[0].len() {
+            for counter in intersection_counter.iter_mut() {
+                counter.push(0.0);
+            }
+        }
+        intersection_counter[focal_subset_index][subset_index] += 1.0;
+        total_counter[focal_subset_index] += 1.0;
+        partition.add_with_index(ii, subset_index);
+    }
+    partition.canonicalize();
+    (partition, log_probability)
+}
+
+pub fn engine2<T: Rng>(
+    parameters: &FRPParameters2,
+    mut target_or_rng: TargetOrRandom2<T>,
+) -> (Partition, f64) {
+    let nsf = parameters.focal.n_subsets();
+    let ni = parameters.focal.n_items();
+    let mass = parameters.mass.unwrap();
+    let discount = parameters.discount.unwrap();
+    if let TargetOrRandom2::Target(t) = &mut target_or_rng {
+        assert_eq!(t.n_items(), ni);
+        *t = t.standardize(false, Some(parameters.permutation)).0;
+    };
+    let mut log_probability = 0.0;
+    let mut partition = Partition::new(ni);
+    let mut total_counter = vec![0.0; nsf];
+    let mut intersection_counter = Vec::with_capacity(nsf);
+    for _ in 0..nsf {
+        intersection_counter.push(Vec::new())
+    }
+    for i in 0..ni {
+        let ii = parameters.permutation.get(i);
         // Ensure there is an empty subset
         match partition.subsets().last() {
             None => partition.new_subset(),
@@ -156,11 +258,11 @@ pub fn engine<T: Rng>(
             })
             .collect();
         let subset_index = match &mut target_or_rng {
-            TargetOrRandom::Random(rng) => {
+            TargetOrRandom2::Random(rng) => {
                 let dist = WeightedIndex::new(probs.iter().map(|x| x.1)).unwrap();
                 dist.sample(*rng)
             }
-            TargetOrRandom::Target(t) => t.label_of(ii).unwrap(),
+            TargetOrRandom2::Target(t) => t.get(ii),
         };
         let numerator = probs[subset_index].1;
         let denominator = probs.iter().fold(0.0, |sum, x| sum + x.1);
@@ -189,6 +291,14 @@ pub fn log_pmf(target: &Partition, parameters: &FRPParameters) -> f64 {
 
 pub fn log_pmf_mut(target: &mut Partition, parameters: &FRPParameters) -> f64 {
     engine(parameters, TargetOrRandom::Target::<IsaacRng>(target)).1
+}
+
+pub fn log_pmf_mut2(target: &mut Clustering, parameters: &FRPParameters2) -> f64 {
+    engine2(
+        parameters,
+        TargetOrRandom2::Target::<IsaacRng>(target.clone()),
+    )
+    .1
 }
 
 #[cfg(test)]

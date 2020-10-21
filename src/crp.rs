@@ -1,11 +1,12 @@
 // Chinese restaurant process
 
+use crate::clust::Clustering;
 use crate::mcmc::PriorLogWeight;
+use crate::mcmc::PriorLogWeight2;
 use crate::prelude::*;
 
 use dahl_partition::*;
 use dahl_roxido::mk_rng_isaac;
-use rand::distributions::{Distribution, WeightedIndex};
 use rand::Rng;
 use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
@@ -38,35 +39,36 @@ impl PriorLogWeight for CRPParameters {
     }
 }
 
+impl PriorLogWeight2 for CRPParameters {
+    fn log_weight(&self, _item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
+        let size = clustering.size_of(subset_index);
+        if size == 0 {
+            self.mass.unwrap() + (clustering.n_clusters() as f64) * self.discount.unwrap()
+        } else {
+            size as f64 - self.discount.unwrap()
+        }
+    }
+}
+
 pub fn sample<T: Rng>(n_items: usize, parameters: &CRPParameters, rng: &mut T) -> Partition {
     let mass = parameters.mass.unwrap();
     let discount = parameters.discount.unwrap();
-    let mut p = Partition::new(n_items);
-    p.new_subset();
-    p.add_with_index(0, 0);
+    let mut p = Clustering::new(n_items);
+    p.assign(0, 0);
     for i in 1..p.n_items() {
-        match p.subsets().last() {
-            None => p.new_subset(),
-            Some(last) => {
-                if !last.is_empty() {
-                    p.new_subset()
-                }
-            }
-        }
-        let n_occupied_subsets = (p.n_subsets() - 1) as f64;
-        let probs = p.subsets().iter().map(|subset| {
-            if subset.is_empty() {
-                mass + n_occupied_subsets * discount
+        let n_clusters = p.n_clusters();
+        let probs = p.available_labels_iter().map(|label| {
+            let n_items_in_cluster = p.size_of(label);
+            if n_items_in_cluster == 0 {
+                mass + (n_clusters as f64) * discount
             } else {
-                (subset.n_items() as f64) - discount
+                (n_items_in_cluster as f64) - discount
             }
         });
-        let dist = WeightedIndex::new(probs).unwrap();
-        let subset_index = dist.sample(rng);
-        p.add_with_index(i, subset_index);
+        let label = p.select_randomly(probs, rng);
+        p.assign(i, label);
     }
-    p.canonicalize();
-    p
+    Partition::from(p.labels())
 }
 
 pub fn log_pmf(x: &Partition, parameters: &CRPParameters) -> f64 {
