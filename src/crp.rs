@@ -58,7 +58,6 @@ pub fn sample<T: Rng>(n_items: usize, parameters: &CRPParameters, rng: &mut T) -
     for i in 1..clustering.n_items() {
         let n_clusters = clustering.n_clusters();
         let weights = clustering.available_labels_for_allocation().map(|label| {
-            //let weights = (0..=clustering.n_clusters()).map(|label| {
             let n_items_in_cluster = clustering.size_of(label);
             if n_items_in_cluster == 0 {
                 mass + (n_clusters as f64) * discount
