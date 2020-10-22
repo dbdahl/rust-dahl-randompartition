@@ -238,13 +238,14 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
     };
     let perm = Permutation::natural(current.n_items());
     let mut rng = mk_rng_isaac(seed_ptr);
-    let clustering = match prior_id {
+    let mut clustering = match prior_id {
         0 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
+    clustering = clustering.standardize(1, None, false).0;
     clustering.push_into_slice_i32(clustering_slice);
 }
 

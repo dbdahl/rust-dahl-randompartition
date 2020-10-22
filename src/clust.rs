@@ -124,7 +124,7 @@ impl Clustering {
         Self::from_vector(labels.iter().map(|x| *x as usize).collect())
     }
 
-    pub(crate) unsafe fn push_into_slice_i32(&self, slice: &mut [i32]) {
+    pub unsafe fn push_into_slice_i32(&self, slice: &mut [i32]) {
         slice.iter_mut().zip(self.labels.iter()).for_each(|(x, y)| {
             *x = *y as i32;
         });
