@@ -138,6 +138,14 @@ impl Clustering {
         self.active_labels.len()
     }
 
+    pub fn n_clusters_without(&self, item: usize) -> usize {
+        if self.sizes[self.labels[item]] > 1 {
+            self.active_labels.len()
+        } else {
+            self.active_labels.len() - 1
+        }
+    }
+
     pub fn labels(&self) -> &Vec<usize> {
         &self.labels
     }
@@ -186,7 +194,10 @@ impl Clustering {
     ) -> usize {
         let (labels, log_weights): (Vec<_>, Vec<_>) = labels_and_log_weights.unzip();
         let max_log_weight = log_weights.iter().cloned().fold(f64::NAN, f64::max);
-        let weights = log_weights.iter().map(|x| (*x - max_log_weight).exp());
+        let weights: Vec<_> = log_weights
+            .iter()
+            .map(|x| (*x - max_log_weight).exp())
+            .collect();
         let dist = WeightedIndex::new(weights).unwrap();
         labels[dist.sample(rng)]
     }
@@ -248,6 +259,23 @@ impl Clustering {
         let mut i = 0;
         while items.len() != size {
             if self.labels[i] == label {
+                items.push(i);
+            }
+            i += 1;
+        }
+        items
+    }
+
+    pub fn items_of_without(&self, label: usize, item: usize) -> Vec<usize> {
+        let size = if self.labels[item] == label {
+            self.sizes[label] - 1
+        } else {
+            self.sizes[label]
+        };
+        let mut items = Vec::with_capacity(size);
+        let mut i = 0;
+        while items.len() != size {
+            if i != item && self.labels[i] == label {
                 items.push(i);
             }
             i += 1;

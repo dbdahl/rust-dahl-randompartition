@@ -8,8 +8,6 @@ homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-dahl-partition = { git="https://dahl-git.byu.edu/dahl/rust-dahl-partition.git" }
-# dahl-partition = { path="/home/dahl/docs/devel/rust-dahl-partition" }
 dahl-roxido = { git="https://dahl-git.byu.edu/dahl/rust-dahl-roxido.git" }
 # dahl-roxido = { path="/home/dahl/docs/devel/rust-dahl-roxido" }
 dahl-salso = { git="https://dahl-git.byu.edu/dahl/rust-dahl-salso.git" }

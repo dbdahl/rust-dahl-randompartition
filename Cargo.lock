@@ -105,7 +105,6 @@ dependencies = [
 name = "dahl-randompartition"
 version = "0.1.0"
 dependencies = [
- "dahl-partition",
  "dahl-roxido",
  "dahl-salso",
  "quadrature",

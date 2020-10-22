@@ -1,10 +1,10 @@
 use crate::clust::{Clustering, Permutation};
 use crate::prelude::*;
-use crate::*;
+//use crate::*;
 
 //use crate::frp;
 //use crate::cpp::CPPParameters;
-//use crate::crp::CRPParameters;
+use crate::crp::CRPParameters;
 //use crate::epa::{EPAParameters, SimilarityBorrower};
 //use crate::frp::{FRPParameters, Weights};
 //use crate::lsp::LSPParameters;
@@ -15,15 +15,6 @@ use std::ffi::c_void;
 use std::slice;
 
 pub trait PriorLogWeight {
-    fn log_weight(
-        &self,
-        index_index: usize,
-        subset_index: usize,
-        partition: &dahl_partition::Partition,
-    ) -> f64;
-}
-
-pub trait PriorLogWeight2 {
     fn log_weight(&self, index_index: usize, subset_index: usize, partition: &Clustering) -> f64;
 }
 
@@ -36,7 +27,7 @@ pub fn update_neal_algorithm3<T, U, V>(
     rng: &mut V,
 ) -> Clustering
 where
-    T: PriorLogWeight2,
+    T: PriorLogWeight,
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
@@ -45,7 +36,7 @@ where
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
             let labels_and_log_weights = state.available_labels_for_reallocation(ii).map(|label| {
-                let indices = &state.items_of(label)[..];
+                let indices = &state.items_of_without(label, ii)[..];
                 let log_weight =
                     log_posterior_predictive(ii, indices) + prior.log_weight(ii, label, &state);
                 (label, log_weight)
@@ -161,7 +152,7 @@ mod tests_mcmc {
     fn test_crp_neal_algorithm3() {
         let n_items = 5;
         let mut current = Clustering::one_cluster(n_items);
-        let neal_functions = crp::CRPParameters::new_with_mass(Mass::new(1.0));
+        let neal_functions = CRPParameters::new_with_mass(Mass::new(1.0));
         let permutation = Permutation::natural(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
@@ -280,7 +271,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
             env_ptr,
             seed_ptr,
         );
-    let neal_functions = crp::CRPParameters::new_with_mass_and_discount(
+    let neal_functions = CRPParameters::new_with_mass_and_discount(
         Mass::new_with_variable_constraint(mass, discount),
         Discount::new(discount),
     );

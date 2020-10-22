@@ -2,7 +2,7 @@
 
 use crate::clust::Clustering;
 //use crate::mcmc::PriorLogWeight;
-use crate::mcmc::PriorLogWeight2;
+use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 
 use dahl_roxido::mk_rng_isaac;
@@ -38,11 +38,12 @@ impl PriorLogWeight for CRPParameters {
 }
 */
 
-impl PriorLogWeight2 for CRPParameters {
+impl PriorLogWeight for CRPParameters {
     fn log_weight(&self, item: usize, label: usize, clustering: &Clustering) -> f64 {
         let size = clustering.size_of_without(label, item);
         if size == 0 {
-            self.mass.unwrap() + (clustering.n_clusters() as f64) * self.discount.unwrap()
+            self.mass.unwrap()
+                + (clustering.n_clusters_without(item) as f64) * self.discount.unwrap()
         } else {
             size as f64 - self.discount.unwrap()
         }
@@ -90,7 +91,7 @@ pub fn log_pmf(x: &Clustering, parameters: &CRPParameters) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    //use crate::mcmc::{update_neal_algorithm3, update_rwmh};
+    use crate::clust::Permutation;
     use rand::prelude::*;
 
     #[test]
@@ -109,16 +110,16 @@ mod tests {
         );
     }
 
-    /*
     #[test]
     fn test_goodness_of_fit_neal_algorithm3() {
         let n_items = 5;
         let parameters = CRPParameters::new_with_mass(Mass::new(2.0));
         let l = |_i: usize, _indices: &[usize]| 0.0;
-        let mut clustering = Partition::one_subset(n_items);
-        let permutation = Permutation::natural(clustering.n_items());
+        let mut clustering = Clustering::one_cluster(n_items);
+        let rng = &mut thread_rng();
+        let permutation = Permutation::random(clustering.n_items(), rng);
         let sample_closure = || {
-            clustering = update_neal_algorithm3(
+            clustering = crate::mcmc::update_neal_algorithm3(
                 1,
                 &clustering,
                 &permutation,
@@ -126,7 +127,7 @@ mod tests {
                 &l,
                 &mut thread_rng(),
             );
-            clustering.clone()
+            clustering.standardize(0, None, false).0
         };
         let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
         crate::testing::assert_goodness_of_fit(
@@ -138,7 +139,6 @@ mod tests {
             0.001,
         );
     }
-    */
 
     /*
     #[test]

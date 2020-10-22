@@ -9,7 +9,7 @@ pub fn assert_goodness_of_fit(
     log_pmf: impl Fn(&mut Clustering) -> f64,
     n_calls_per_sample: usize,
     alpha: f64,
-) -> Option<String> {
+) {
     let ns = n_samples as f64;
     let mut map = HashMap::new();
     for i in 0..(n_calls_per_sample * n_samples) {
@@ -36,15 +36,18 @@ pub fn assert_goodness_of_fit(
         }
     }
     df -= 1;
-    let distr = ChiSquared::new(df as f64).unwrap();
-    let p_value = 1.0 - distr.cdf(chisq);
+    let p_value = if df > 0 {
+        let distr = ChiSquared::new(df as f64).unwrap();
+        1.0 - distr.cdf(chisq)
+    } else {
+        println!("Warning.... insufficient degrees of freedom!");
+        1.0
+    };
     if p_value <= alpha {
         panic!(format!(
             "Rejected goodness of fit test... p-value: {:.8}, chisq: {:.2}, df: {}",
             p_value, chisq, df
-        ))
-    } else {
-        None
+        ));
     }
 }
 
