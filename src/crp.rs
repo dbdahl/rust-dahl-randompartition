@@ -94,10 +94,24 @@ pub fn log_pmf(x: &Clustering, parameters: &CRPParameters) -> f64 {
     let ni = x.n_items() as f64;
     let ns = x.n_clusters() as f64;
     let m = parameters.mass.unwrap();
-    let lm = m.ln();
-    let mut result = ns * lm + ln_gamma(m) - ln_gamma(m + ni);
-    for label in x.active_labels() {
-        result += ln_gamma(x.size_of(*label) as f64);
+    let d = parameters.discount.unwrap();
+    let mut result = -ln_gamma(m + ni);
+    if d == 0.0 {
+        result += ns * m.ln() + ln_gamma(m);
+        for label in x.active_labels() {
+            result += ln_gamma(x.size_of(*label) as f64);
+        }
+    } else {
+        let mut cum_d = 0.0;
+        for label in x.active_labels() {
+            result += (m + cum_d).ln();
+            cum_d += d;
+            let mut cum = 1.0;
+            for i in 1..x.size_of(*label) {
+                cum *= i as f64 - d;
+            }
+            result += cum.ln();
+        }
     }
     result
 }
