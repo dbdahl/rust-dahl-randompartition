@@ -25,18 +25,32 @@ impl CRPParameters {
     }
 }
 
-/*
-impl PriorLogWeight for CRPParameters {
-    fn log_weight(&self, _item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
-        let subset = &partition.subsets()[subset_index];
-        if subset.n_items() == 0 {
-            self.mass.unwrap() + ((partition.n_subsets() - 1) as f64) * self.discount.unwrap()
-        } else {
-            subset.n_items() as f64 - self.discount.unwrap()
-        }
-    }
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__crpparameters_new(
+    mass: f64,
+    discount: f64,
+) -> *mut CRPParameters {
+    let d = Discount::new(discount);
+    let m = Mass::new_with_variable_constraint(mass, discount);
+    // First we create a new object.
+    let obj = CRPParameters::new_with_mass_and_discount(m, d);
+    // Then copy it to the heap (so we have a stable pointer to it).
+    let boxed_obj = Box::new(obj);
+    // Then return a pointer by converting our `Box<_>` into a raw pointer
+    Box::into_raw(boxed_obj)
 }
-*/
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__crpparameters_free(obj: *mut CRPParameters) {
+    // As a rule of thumb, freeing a null pointer is just a noop.
+    if obj.is_null() {
+        return;
+    }
+    // Convert the raw pointer back to a Box<_>
+    let boxed = Box::from_raw(obj);
+    // Then explicitly drop it (optional)
+    drop(boxed);
+}
 
 impl PriorLogWeight for CRPParameters {
     fn log_weight(&self, item: usize, label: usize, clustering: &Clustering) -> f64 {

@@ -208,6 +208,46 @@ impl RR_SEXP_vector_INTSXP {
     }
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
+    n_updates_for_partition: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    prior_only: i32,
+    log_posterior_predictive_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32)
+    prior_id: i32,
+    prior_ptr: *const c_void,
+) -> () {
+    let nup = n_updates_for_partition as u32;
+    let ni = n_items as usize;
+    let clustering_slice = slice::from_raw_parts_mut(partition_ptr, ni);
+    let current = Clustering::from_slice(clustering_slice);
+    let log_like: Box<dyn Fn(usize, &[usize]) -> f64> = if prior_only != 0 {
+        Box::new(|_i: usize, _indices: &[usize]| 0.0)
+    } else {
+        Box::new(move |i: usize, indices: &[usize]| {
+            callRFunction_logPosteriorPredictiveOfItem(
+                log_posterior_predictive_function_ptr,
+                (i as i32) + 1,
+                RR_SEXP_vector_INTSXP::from_slice(indices),
+                env_ptr,
+            )
+        })
+    };
+    let perm = Permutation::natural(current.n_items());
+    let mut rng = mk_rng_isaac(seed_ptr);
+    let clustering = match prior_id {
+        0 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
+            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        _ => panic!("Unsupported prior ID: {}", prior_id),
+    };
+    clustering.push_into_slice_i32(clustering_slice);
+}
+
 unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
     n_updates_for_partition: i32,
     n_items: i32,
