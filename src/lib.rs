@@ -8,17 +8,9 @@ pub mod clust;
 //pub mod cpp;
 pub mod crp;
 //pub mod epa;
-//pub mod frp;
+pub mod frp;
 //pub mod lsp;
 pub mod mcmc;
 //pub mod nggp;
 pub mod prelude;
 pub mod testing;
-
-use crate::clust::Clustering;
-use rand::prelude::*;
-
-pub enum TargetOrRandom<'a, T: Rng> {
-    Target(Clustering),
-    Random(&'a mut T),
-}

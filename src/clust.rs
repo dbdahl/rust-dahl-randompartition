@@ -187,29 +187,43 @@ impl Clustering {
         }
     }
 
-    pub fn select_randomly_with_log_weights<T: Rng, S: Iterator<Item = (usize, f64)>>(
-        &self,
-        labels_and_log_weights: S,
-        rng: &mut T,
-    ) -> usize {
-        let (labels, log_weights): (Vec<_>, Vec<_>) = labels_and_log_weights.unzip();
-        let max_log_weight = log_weights.iter().cloned().fold(f64::NAN, f64::max);
-        let weights: Vec<_> = log_weights
-            .iter()
-            .map(|x| (*x - max_log_weight).exp())
-            .collect();
-        let dist = WeightedIndex::new(weights).unwrap();
-        labels[dist.sample(rng)]
-    }
-
-    pub fn select_randomly_with_weights<T: Rng, S: Iterator<Item = (usize, f64)>>(
+    pub fn select<T: Rng, S: Iterator<Item = (usize, f64)>>(
         &self,
         labels_and_weights: S,
-        rng: &mut T,
-    ) -> usize {
+        weights_on_log_scale: bool,
+        label: usize,
+        rng: Option<&mut T>,
+        with_probability: bool,
+    ) -> (usize, f64) {
         let (labels, weights): (Vec<_>, Vec<_>) = labels_and_weights.unzip();
-        let dist = WeightedIndex::new(weights).unwrap();
-        labels[dist.sample(rng)]
+        let w = if weights_on_log_scale {
+            let max_log_weight = weights.iter().cloned().fold(f64::NAN, f64::max);
+            weights
+                .iter()
+                .map(|x| (*x - max_log_weight).exp())
+                .collect::<Vec<_>>()
+        } else {
+            weights
+        };
+        let (label, index) = match rng {
+            Some(r) => {
+                let dist = WeightedIndex::new(w.iter()).unwrap();
+                let index = dist.sample(r);
+                (labels[index], index)
+            }
+            None => {
+                if with_probability {
+                    (label, labels.iter().position(|x| *x == label).unwrap())
+                } else {
+                    (label, 0)
+                }
+            }
+        };
+        if with_probability {
+            (label, (w[index] / w.iter().sum::<f64>()).ln())
+        } else {
+            (label, 0.0)
+        }
     }
 
     pub fn get(&mut self, item: usize) -> usize {
@@ -283,7 +297,19 @@ impl Clustering {
         items
     }
 
-    pub fn standardize(
+    pub fn standardize(&self) -> Self {
+        self.relabel(0, None, false).0
+    }
+
+    pub fn standardize_by(&self, permutation: &Permutation) -> Self {
+        if permutation.natural {
+            self.relabel(0, None, false).0
+        } else {
+            self.relabel(0, Some(permutation), false).0
+        }
+    }
+
+    pub fn relabel(
         &self,
         first_label: usize,
         permutation: Option<&Permutation>,
@@ -294,7 +320,7 @@ impl Clustering {
             assert_eq!(n_items, p.len());
         };
         let mut labels = Vec::with_capacity(n_items);
-        let mut sizes = Vec::new();
+        let mut sizes = Vec::with_capacity(first_label + self.active_labels.len() + 1);
         let mut map = HashMap::new();
         let mut next_new_label = first_label;
         for i in 0..n_items {
@@ -318,7 +344,8 @@ impl Clustering {
         let mapping = if with_mapping {
             let mut pairs: Vec<_> = map.into_iter().collect();
             pairs.sort_by(|x, y| (*x).1.partial_cmp(&y.1).unwrap());
-            Some(pairs.iter().map(|x| x.0).collect())
+            let x = (0..first_label).chain(pairs.iter().map(|x| x.0)).collect();
+            Some(x)
         } else {
             None
         };
@@ -415,7 +442,7 @@ impl<'a> Iterator for ClusterLabelsIterator<'a> {
 pub struct Permutation {
     x: Vec<usize>,
     n_items: usize,
-    natural: bool,
+    pub natural: bool,
 }
 
 impl Permutation {
@@ -526,12 +553,12 @@ mod tests {
             &clustering,
             "Clustering { labels: [2, 2, 4, 3, 4], sizes: [0, 0, 2, 1, 2, 0], active_labels: [2, 3, 4], expired_labels: [] }",
         );
-        let (clustering, map) = clustering.standardize(1, None, true);
+        let (clustering, map) = clustering.relabel(1, None, true);
         check_output(
             &clustering,
             "Clustering { labels: [1, 1, 2, 3, 2], sizes: [0, 2, 2, 1, 0], active_labels: [1, 2, 3], expired_labels: [] }",
         );
-        check_output(&map, "Some([2, 4, 3])");
+        check_output(&map, "Some([0, 2, 4, 3])");
     }
 
     #[test]

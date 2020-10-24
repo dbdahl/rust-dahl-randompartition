@@ -6,7 +6,7 @@ use crate::prelude::*;
 //use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
 //use crate::epa::{EPAParameters, SimilarityBorrower};
-//use crate::frp::{FRPParameters, Weights};
+use crate::frp::FRPParameters;
 //use crate::lsp::LSPParameters;
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
@@ -35,14 +35,14 @@ where
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
-            let labels_and_log_weights = state.available_labels_for_reallocation(ii).map(|label| {
+            let labels_and_weights = state.available_labels_for_reallocation(ii).map(|label| {
                 let indices = &state.items_of_without(label, ii)[..];
                 let log_weight =
                     log_posterior_predictive(ii, indices) + prior.log_weight(ii, label, &state);
                 (label, log_weight)
             });
-            let label = state.select_randomly_with_log_weights(labels_and_log_weights, rng);
-            state.reallocate(ii, label);
+            let pair = state.select(labels_and_weights, true, 0, Some(rng), false);
+            state.reallocate(ii, pair.0);
         }
     }
     state
@@ -243,9 +243,13 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
             let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
+        1 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
+            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
-    clustering = clustering.standardize(1, None, false).0;
+    clustering = clustering.relabel(1, None, false).0;
     clustering.push_into_slice_i32(clustering_slice);
 }
 

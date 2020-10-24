@@ -25,33 +25,6 @@ impl CRPParameters {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__crpparameters_new(
-    mass: f64,
-    discount: f64,
-) -> *mut CRPParameters {
-    let d = Discount::new(discount);
-    let m = Mass::new_with_variable_constraint(mass, discount);
-    // First we create a new object.
-    let obj = CRPParameters::new_with_mass_and_discount(m, d);
-    // Then copy it to the heap (so we have a stable pointer to it).
-    let boxed_obj = Box::new(obj);
-    // Then return a pointer by converting our `Box<_>` into a raw pointer
-    Box::into_raw(boxed_obj)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__crpparameters_free(obj: *mut CRPParameters) {
-    // As a rule of thumb, freeing a null pointer is just a noop.
-    if obj.is_null() {
-        return;
-    }
-    // Convert the raw pointer back to a Box<_>
-    let boxed = Box::from_raw(obj);
-    // Then explicitly drop it (optional)
-    drop(boxed);
-}
-
 impl PriorLogWeight for CRPParameters {
     fn log_weight(&self, item: usize, label: usize, clustering: &Clustering) -> f64 {
         let size = clustering.size_of_without(label, item);
@@ -155,7 +128,7 @@ mod tests {
                 &l,
                 &mut thread_rng(),
             );
-            clustering.standardize(0, None, false).0
+            clustering.relabel(0, None, false).0
         };
         let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
         crate::testing::assert_goodness_of_fit(
@@ -224,6 +197,33 @@ mod tests {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__crpparameters_new(
+    mass: f64,
+    discount: f64,
+) -> *mut CRPParameters {
+    let d = Discount::new(discount);
+    let m = Mass::new_with_variable_constraint(mass, discount);
+    // First we create a new object.
+    let obj = CRPParameters::new_with_mass_and_discount(m, d);
+    // Then copy it to the heap (so we have a stable pointer to it).
+    let boxed_obj = Box::new(obj);
+    // Then return a pointer by converting our `Box<_>` into a raw pointer
+    Box::into_raw(boxed_obj)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__crpparameters_free(obj: *mut CRPParameters) {
+    // As a rule of thumb, freeing a null pointer is just a noop.
+    if obj.is_null() {
+        return;
+    }
+    // Convert the raw pointer back to a Box<_>
+    let boxed = Box::from_raw(obj);
+    // Then explicitly drop it (optional)
+    drop(boxed);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__crp_partition(
     do_sampling: i32,
     n_partitions: i32,
@@ -256,7 +256,7 @@ pub unsafe extern "C" fn dahl_randompartition__crp_partition(
         for i in 0..np {
             let mut target_labels = Vec::with_capacity(ni);
             for j in 0..ni {
-                target_labels.push((matrix[np * j + i] - 1) as usize);
+                target_labels.push(matrix[np * j + i] as usize);
             }
             let target = Clustering::from_vector(target_labels);
             probs[i] = log_pmf(&target, &parameters);
