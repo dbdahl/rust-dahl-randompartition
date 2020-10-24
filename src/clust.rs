@@ -255,7 +255,7 @@ impl Clustering {
         if *old_label_size == 0 {
             // Linear search is faster than binary search for integer arrays with less than, say,
             // 150 elements, i.e., active clusters.
-            self.active_labels.remove(
+            self.active_labels.swap_remove(
                 self.active_labels
                     .iter()
                     .position(|x| *x == old_label)
