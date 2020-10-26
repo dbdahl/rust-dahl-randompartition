@@ -132,6 +132,10 @@ impl Clustering {
         }
     }
 
+    pub fn max_label(&self) -> usize {
+        self.sizes.len() - 1
+    }
+
     pub fn allocation(&self) -> &Vec<usize> {
         &self.allocation
     }
@@ -164,6 +168,29 @@ impl Clustering {
 
     pub fn available_labels_for_allocation(&self) -> std::ops::RangeInclusive<usize> {
         0..=self.active_labels.len()
+    }
+
+    pub fn available_labels_for_allocation2(
+        &self,
+        target: Option<&Self>,
+        item: usize,
+    ) -> ClusterLabelsIterator {
+        let new_label = match target {
+            Some(target) => {
+                let what = target[item];
+                if self.active_labels.contains(&what) {
+                    Some(self.new_label())
+                } else {
+                    Some(what)
+                }
+            }
+            None => Some(self.new_label()),
+        };
+        ClusterLabelsIterator {
+            iter: self.active_labels.iter(),
+            new_label,
+            done: false,
+        }
     }
 
     pub fn available_labels_for_reallocation(&self, item: usize) -> ClusterLabelsIterator {
@@ -225,6 +252,10 @@ impl Clustering {
     pub fn allocate(&mut self, item: usize, label: usize) {
         self.allocation[item] = label;
         if label >= self.sizes.len() {
+            if label > self.sizes.len() {
+                self.available_labels.reserve(label - self.sizes.len());
+                self.available_labels.extend(self.sizes.len()..label);
+            }
             self.sizes.resize(label + 1, 0);
             self.active_labels.push(label);
         } else {
@@ -255,7 +286,7 @@ impl Clustering {
             self.active_labels.swap_remove(
                 self.active_labels
                     .iter()
-                    .position(|x| *x == old_label)
+                    .rposition(|x| *x == old_label)
                     .unwrap(),
             );
             self.available_labels.push(old_label)
@@ -404,6 +435,7 @@ impl Iterator for ClusteringIterator {
     }
 }
 
+#[derive(Clone)]
 pub struct ClusterLabelsIterator<'a> {
     iter: std::slice::Iter<'a, usize>,
     new_label: Option<usize>,
@@ -558,7 +590,7 @@ mod tests {
         let mut clustering = Clustering::singleton_clusters(5);
         let new_label = 6;
         clustering.reallocate(1, new_label);
-        check_output(&clustering, "Clustering { allocation: [0, 6, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 0, 1], active_labels: [0, 6, 2, 3, 4], available_labels: [1] }");
+        check_output(&clustering, "Clustering { allocation: [0, 6, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 0, 1], active_labels: [0, 6, 2, 3, 4], available_labels: [5, 1] }");
     }
 
     #[test]

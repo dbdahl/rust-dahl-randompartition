@@ -90,7 +90,7 @@ impl PriorLogWeight for FRPParameters {
     fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
         let mut p = clustering.clone();
         p.reallocate(item_index, subset_index);
-        log_pmf(&p, self)
+        engine::<IsaacRng>(self, Some(&p), None).1
     }
 }
 
@@ -105,6 +105,7 @@ pub fn engine<T: Rng>(
     let p: Clustering;
     let target = match target {
         Some(target) => {
+            //p = target.clone(); //target.standardize_by(&parameters.permutation);
             p = target.standardize_by(&parameters.permutation);
             Some(&p)
         }
@@ -112,7 +113,7 @@ pub fn engine<T: Rng>(
     };
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut total_counter = vec![0.0; parameters.focal.new_label()];
+    let mut total_counter = vec![0.0; parameters.focal.max_label() + 1];
     let mut intersection_counter = Vec::with_capacity(total_counter.len());
     for _ in 0..total_counter.len() {
         intersection_counter.push(Vec::new())
@@ -127,43 +128,44 @@ pub fn engine<T: Rng>(
             scaled_weight / total_counter[focal_subset_index]
         };
         let n_occupied_subsets = clustering.n_clusters() as f64;
-        let labels_and_weights = clustering.available_labels_for_allocation().map(|label| {
-            let n_items_in_cluster = clustering.size_of(label);
-            let weight = if n_items_in_cluster == 0 {
-                if n_occupied_subsets == 0.0 {
-                    1.0
-                } else {
-                    mass + discount * n_occupied_subsets + {
-                        if total_counter[focal_subset_index] == 0.0 {
-                            scaled_weight
+        let labels_and_weights =
+            clustering
+                .available_labels_for_allocation2(target, ii)
+                .map(|label| {
+                    let n_items_in_cluster = clustering.size_of(label);
+                    let weight = if n_items_in_cluster == 0 {
+                        if n_occupied_subsets == 0.0 {
+                            1.0
                         } else {
-                            0.0
+                            mass + discount * n_occupied_subsets + {
+                                if total_counter[focal_subset_index] == 0.0 {
+                                    scaled_weight
+                                } else {
+                                    0.0
+                                }
+                            }
                         }
-                    }
-                }
-            } else {
-                (n_items_in_cluster as f64) - discount
-                    + normalized_scaled_weight * intersection_counter[focal_subset_index][label]
-            };
-            (label, weight)
-        });
-        //        println!( "i {}, ii {}\ntarget {:?}\nfocal {:?}\ncurrent {:?}", i, ii, target.unwrap(), parameters.focal, clustering );
-        //        println!("{:?}", labels_and_weights.clone().collect::<Vec<_>>());
+                    } else {
+                        (n_items_in_cluster as f64) - discount
+                            + normalized_scaled_weight
+                                * intersection_counter[focal_subset_index][label]
+                    };
+                    (label, weight)
+                });
         let (subset_index, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_weights, false, 0, Some(r), true),
             None => clustering.select::<IsaacRng, _>(
                 labels_and_weights,
                 false,
-                target.unwrap()[i],
+                target.unwrap()[ii],
                 None,
                 true,
             ),
         };
-        //        println!("*");
         log_probability += log_probability_contribution;
-        if subset_index == intersection_counter[0].len() {
+        if subset_index >= intersection_counter[0].len() {
             for counter in intersection_counter.iter_mut() {
-                counter.push(0.0);
+                counter.resize(subset_index + 1, 0.0);
             }
         }
         intersection_counter[focal_subset_index][subset_index] += 1.0;
