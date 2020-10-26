@@ -88,29 +88,20 @@ impl std::ops::Index<usize> for Weights {
 
 impl PriorLogWeight for FRPParameters {
     fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
-        let mut p = clustering.clone();
-        p.reallocate(item_index, subset_index);
-        engine::<IsaacRng>(self, Some(&p), None).1
+        let mut p = clustering.allocation().clone();
+        p[item_index] = subset_index;
+        engine::<IsaacRng>(self, Some(&p[..]), None).1
     }
 }
 
 pub fn engine<T: Rng>(
     parameters: &FRPParameters,
-    target: Option<&Clustering>,
+    target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
     let ni = parameters.focal.n_items();
     let mass = parameters.mass.unwrap();
     let discount = parameters.discount.unwrap();
-    let p: Clustering;
-    let target = match target {
-        Some(target) => {
-            //p = target.clone(); //target.standardize_by(&parameters.permutation);
-            p = target.standardize_by(&parameters.permutation);
-            Some(&p)
-        }
-        None => None,
-    };
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
     let mut total_counter = vec![0.0; parameters.focal.max_label() + 1];
@@ -271,7 +262,7 @@ pub fn sample<T: Rng>(parameters: &FRPParameters, rng: &mut T) -> Clustering {
 }
 
 pub fn log_pmf(target: &Clustering, parameters: &FRPParameters) -> f64 {
-    engine::<IsaacRng>(parameters, Some(target), None).1
+    engine::<IsaacRng>(parameters, Some(target.allocation()), None).1
 }
 
 #[cfg(test)]
@@ -426,7 +417,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
                 target_labels.push(matrix[np * j + i] as usize);
             }
             let target = Clustering::from_vector(target_labels);
-            let p = engine::<IsaacRng>(&parameters, Some(&target), None);
+            let p = engine::<IsaacRng>(&parameters, Some(target.allocation()), None);
             probs[i] = p.1;
         }
     }

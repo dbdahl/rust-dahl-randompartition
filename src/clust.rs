@@ -172,7 +172,7 @@ impl Clustering {
 
     pub fn available_labels_for_allocation2(
         &self,
-        target: Option<&Self>,
+        target: Option<&[usize]>,
         item: usize,
     ) -> ClusterLabelsIterator {
         let new_label = match target {
