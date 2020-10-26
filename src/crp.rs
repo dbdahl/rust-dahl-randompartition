@@ -114,7 +114,8 @@ mod tests {
     #[test]
     fn test_goodness_of_fit_neal_algorithm3() {
         let n_items = 5;
-        let parameters = CRPParameters::new_with_mass(Mass::new(2.0));
+        let parameters =
+            CRPParameters::new_with_mass_and_discount(Mass::new(2.0), Discount::new(0.1));
         let l = |_i: usize, _indices: &[usize]| 0.0;
         let mut clustering = Clustering::one_cluster(n_items);
         let rng = &mut thread_rng();
@@ -246,7 +247,7 @@ pub unsafe extern "C" fn dahl_randompartition__crp_partition(
         let rng = &mut mk_rng_isaac(seed_ptr);
         for i in 0..np {
             let clustering = sample(ni, &parameters, rng);
-            let labels = clustering.labels();
+            let labels = clustering.allocation();
             for j in 0..ni {
                 matrix[np * j + i] = (labels[j] + 1) as i32;
             }

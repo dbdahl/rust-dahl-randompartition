@@ -102,7 +102,7 @@ where
 {
     move |clustering: &Clustering| {
         clustering
-            .labels()
+            .allocation()
             .iter()
             .fold(log_prior(clustering), |sum, label| {
                 sum + log_likelihood(&clustering.items_of(*label)[..])

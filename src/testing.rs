@@ -15,7 +15,7 @@ pub fn assert_goodness_of_fit(
     for i in 0..(n_calls_per_sample * n_samples) {
         let s = sample();
         if (i + 1) % n_calls_per_sample == 0 {
-            let key = s.labels().clone();
+            let key = s.allocation().clone();
             *map.entry(key).or_insert(0) += 1;
         }
     }

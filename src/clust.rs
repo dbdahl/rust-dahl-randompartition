@@ -5,16 +5,16 @@ use std::ops::Index;
 
 #[derive(Debug, Clone)]
 pub struct Clustering {
-    labels: Vec<usize>,
+    allocation: Vec<usize>,
     sizes: Vec<usize>,
     active_labels: Vec<usize>,
-    expired_labels: Vec<usize>,
+    available_labels: Vec<usize>,
 }
 
 impl Index<usize> for Clustering {
     type Output = usize;
     fn index(&self, item: usize) -> &Self::Output {
-        &self.labels[item]
+        &self.allocation[item]
     }
 }
 
@@ -53,70 +53,53 @@ impl Clustering {
 
     pub fn unallocated(n_items: usize) -> Self {
         Self {
-            labels: vec![usize::max_value(); n_items],
-            sizes: {
-                let mut sizes = Vec::new();
-                sizes.push(0);
-                sizes
-            },
+            allocation: vec![usize::max_value(); n_items],
+            sizes: Vec::new(),
             active_labels: Vec::new(),
-            expired_labels: Vec::new(),
+            available_labels: Vec::new(),
         }
     }
 
     pub fn one_cluster(n_items: usize) -> Self {
         Self {
-            labels: vec![0; n_items],
-            sizes: {
-                let mut sizes = Vec::new();
-                sizes.push(n_items);
-                sizes.push(0);
-                sizes
-            },
-            active_labels: {
-                let mut active_labels = Vec::new();
-                active_labels.push(0);
-                active_labels
-            },
-            expired_labels: Vec::new(),
+            allocation: vec![0; n_items],
+            sizes: vec![n_items; 1],
+            active_labels: vec![0; 1],
+            available_labels: Vec::new(),
         }
     }
 
     pub fn singleton_clusters(n_items: usize) -> Self {
-        let labels: Vec<_> = (0..n_items).collect();
-        let active_labels = labels.clone();
+        let allocation: Vec<_> = (0..n_items).collect();
+        let active_labels = allocation.clone();
         Self {
-            labels,
-            sizes: {
-                let mut sizes = Vec::new();
-                sizes.resize(n_items, 1);
-                sizes.push(0);
-                sizes
-            },
+            allocation,
+            sizes: vec![1; n_items],
             active_labels,
-            expired_labels: Vec::new(),
+            available_labels: Vec::new(),
         }
     }
 
     pub fn from_vector(labels: Vec<usize>) -> Self {
         let mut x = Self {
-            labels,
+            allocation: labels,
             sizes: Vec::new(),
             active_labels: Vec::new(),
-            expired_labels: Vec::new(),
+            available_labels: Vec::new(),
         };
-        for label in &x.labels {
+        for label in &x.allocation {
             if *label >= x.sizes.len() {
                 x.sizes.resize(*label + 1, 0)
             }
             x.sizes[*label] += 1;
         }
         for (index, size) in x.sizes.iter().enumerate() {
-            if *size != 0 {
+            if *size == 0 {
+                x.available_labels.push(index);
+            } else {
                 x.active_labels.push(index);
             }
         }
-        x.sizes.push(0);
         x
     }
 
@@ -125,13 +108,16 @@ impl Clustering {
     }
 
     pub unsafe fn push_into_slice_i32(&self, slice: &mut [i32]) {
-        slice.iter_mut().zip(self.labels.iter()).for_each(|(x, y)| {
-            *x = *y as i32;
-        });
+        slice
+            .iter_mut()
+            .zip(self.allocation.iter())
+            .for_each(|(x, y)| {
+                *x = *y as i32;
+            });
     }
 
     pub fn n_items(&self) -> usize {
-        self.labels.len()
+        self.allocation.len()
     }
 
     pub fn n_clusters(&self) -> usize {
@@ -139,26 +125,29 @@ impl Clustering {
     }
 
     pub fn n_clusters_without(&self, item: usize) -> usize {
-        if self.sizes[self.labels[item]] > 1 {
+        if self.size_of(self.allocation[item]) > 1 {
             self.active_labels.len()
         } else {
             self.active_labels.len() - 1
         }
     }
 
-    pub fn labels(&self) -> &Vec<usize> {
-        &self.labels
+    pub fn allocation(&self) -> &Vec<usize> {
+        &self.allocation
     }
 
     pub fn size_of(&self, label: usize) -> usize {
-        self.sizes[label]
+        match self.sizes.get(label) {
+            Some(size) => *size,
+            None => 0,
+        }
     }
 
     pub fn size_of_without(&self, label: usize, item: usize) -> usize {
-        if self.labels[item] == label {
-            self.sizes[label] - 1
+        if self.allocation[item] == label {
+            self.size_of(label) - 1
         } else {
-            self.sizes[label]
+            self.size_of(label)
         }
     }
 
@@ -167,7 +156,10 @@ impl Clustering {
     }
 
     pub fn new_label(&self) -> usize {
-        self.sizes.len() - 1
+        match self.available_labels.last() {
+            Some(label) => *label,
+            None => self.sizes.len(),
+        }
     }
 
     pub fn available_labels_for_allocation(&self) -> std::ops::RangeInclusive<usize> {
@@ -175,7 +167,7 @@ impl Clustering {
     }
 
     pub fn available_labels_for_reallocation(&self, item: usize) -> ClusterLabelsIterator {
-        let new_label = if self.sizes[self.labels[item]] > 1 {
+        let new_label = if self.size_of(self.allocation[item]) > 1 {
             Some(self.new_label())
         } else {
             None
@@ -227,25 +219,30 @@ impl Clustering {
     }
 
     pub fn get(&mut self, item: usize) -> usize {
-        self.labels[item]
+        self.allocation[item]
     }
 
     pub fn allocate(&mut self, item: usize, label: usize) {
-        if self.sizes[label] == 0 {
-            if label != self.sizes.len() - 1 {
-                panic!(
-                    "Attempting to allocate using an invalid cluster label.  Use value from 'new_label' function."
-                );
-            }
+        self.allocation[item] = label;
+        if label >= self.sizes.len() {
+            self.sizes.resize(label + 1, 0);
             self.active_labels.push(label);
-            self.sizes.push(0);
+        } else {
+            if self.sizes[label] == 0 {
+                self.available_labels.swap_remove(
+                    self.available_labels
+                        .iter()
+                        .rposition(|x| *x == label)
+                        .unwrap(),
+                );
+                self.active_labels.push(label);
+            }
         }
-        self.labels[item] = label;
         self.sizes[label] += 1;
     }
 
     pub fn reallocate(&mut self, item: usize, label: usize) {
-        let old_label = self.labels[item];
+        let old_label = self.allocation[item];
         if old_label == label {
             return;
         }
@@ -261,18 +258,18 @@ impl Clustering {
                     .position(|x| *x == old_label)
                     .unwrap(),
             );
-            self.expired_labels.push(old_label)
+            self.available_labels.push(old_label)
         }
     }
 
     // The functions below are somewhat expensive.
 
     pub fn items_of(&self, label: usize) -> Vec<usize> {
-        let size = self.sizes[label];
+        let size = self.size_of(label);
         let mut items = Vec::with_capacity(size);
         let mut i = 0;
         while items.len() != size {
-            if self.labels[i] == label {
+            if self.allocation[i] == label {
                 items.push(i);
             }
             i += 1;
@@ -281,15 +278,11 @@ impl Clustering {
     }
 
     pub fn items_of_without(&self, label: usize, item: usize) -> Vec<usize> {
-        let size = if self.labels[item] == label {
-            self.sizes[label] - 1
-        } else {
-            self.sizes[label]
-        };
+        let size = self.size_of_without(label, item);
         let mut items = Vec::with_capacity(size);
         let mut i = 0;
         while items.len() != size {
-            if i != item && self.labels[i] == label {
+            if i != item && self.allocation[i] == label {
                 items.push(i);
             }
             i += 1;
@@ -328,7 +321,7 @@ impl Clustering {
                 None => i,
                 Some(p) => p.get(i),
             };
-            let c = *map.entry(self.labels[ii]).or_insert_with(|| {
+            let c = *map.entry(self.allocation[ii]).or_insert_with(|| {
                 let c = next_new_label;
                 next_new_label += 1;
                 c
@@ -350,13 +343,12 @@ impl Clustering {
             None
         };
         let active_labels = (first_label..sizes.len()).collect();
-        sizes.push(0);
         (
             Self {
-                labels,
+                allocation: labels,
                 sizes,
                 active_labels,
-                expired_labels: Vec::new(),
+                available_labels: Vec::new(),
             },
             mapping,
         )
@@ -541,32 +533,32 @@ mod tests {
         let clustering = Clustering::one_cluster(5);
         check_output(
             &clustering,
-            "Clustering { labels: [0, 0, 0, 0, 0], sizes: [5, 0], active_labels: [0], expired_labels: [] }",
+            "Clustering { allocation: [0, 0, 0, 0, 0], sizes: [5], active_labels: [0], available_labels: [] }",
         );
         let clustering = Clustering::singleton_clusters(5);
         check_output(
             &clustering,
-            "Clustering { labels: [0, 1, 2, 3, 4], sizes: [1, 1, 1, 1, 1, 0], active_labels: [0, 1, 2, 3, 4], expired_labels: [] }",
+            "Clustering { allocation: [0, 1, 2, 3, 4], sizes: [1, 1, 1, 1, 1], active_labels: [0, 1, 2, 3, 4], available_labels: [] }",
         );
         let clustering = Clustering::from_vector(vec![2, 2, 4, 3, 4]);
         check_output(
             &clustering,
-            "Clustering { labels: [2, 2, 4, 3, 4], sizes: [0, 0, 2, 1, 2, 0], active_labels: [2, 3, 4], expired_labels: [] }",
+            "Clustering { allocation: [2, 2, 4, 3, 4], sizes: [0, 0, 2, 1, 2], active_labels: [2, 3, 4], available_labels: [0, 1] }",
         );
         let (clustering, map) = clustering.relabel(1, None, true);
         check_output(
             &clustering,
-            "Clustering { labels: [1, 1, 2, 3, 2], sizes: [0, 2, 2, 1, 0], active_labels: [1, 2, 3], expired_labels: [] }",
+            "Clustering { allocation: [1, 1, 2, 3, 2], sizes: [0, 2, 2, 1], active_labels: [1, 2, 3], available_labels: [] }",
         );
         check_output(&map, "Some([0, 2, 4, 3])");
     }
 
     #[test]
-    #[should_panic]
-    fn test_add_to_nonexisting_cluster() {
+    fn test_add_to_unlisted_cluster() {
         let mut clustering = Clustering::singleton_clusters(5);
         let new_label = 6;
         clustering.reallocate(1, new_label);
+        check_output(&clustering, "Clustering { allocation: [0, 6, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 0, 1], active_labels: [0, 6, 2, 3, 4], available_labels: [1] }");
     }
 
     #[test]
@@ -574,18 +566,16 @@ mod tests {
         let mut clustering = Clustering::singleton_clusters(5);
         let new_label = clustering.new_label();
         clustering.reallocate(1, new_label);
-        check_output(&clustering, "Clustering { labels: [0, 5, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 1, 0], active_labels: [0, 2, 3, 4, 5], expired_labels: [1] }");
-        clustering.new_label();
-        check_output(&clustering, "Clustering { labels: [0, 5, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 1, 0], active_labels: [0, 2, 3, 4, 5], expired_labels: [1] }");
+        check_output(&clustering, "Clustering { allocation: [0, 5, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 1], active_labels: [0, 5, 2, 3, 4], available_labels: [1] }");
         clustering.reallocate(3, 2);
+        check_output(&clustering, "Clustering { allocation: [0, 5, 2, 2, 4], sizes: [1, 0, 2, 0, 1, 1], active_labels: [0, 5, 2, 4], available_labels: [1, 3] }");
     }
 
     #[test]
-    #[should_panic]
-    fn test_add_to_improper_cluster() {
+    fn test_add_to_available_cluster() {
         let mut clustering = Clustering::from_vector(vec![0, 5, 2, 2, 4]);
-        clustering.new_label();
         clustering.reallocate(3, 1);
+        check_output(&clustering, "Clustering { allocation: [0, 5, 2, 1, 4], sizes: [1, 1, 1, 0, 1, 1], active_labels: [0, 2, 4, 5, 1], available_labels: [3] }");
     }
 
     #[test]

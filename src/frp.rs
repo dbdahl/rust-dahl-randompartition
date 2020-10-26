@@ -411,7 +411,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
                 parameters.shuffle_permutation(&mut rng);
             }
             let p = engine(&parameters, None, Some(rng));
-            let labels = p.0.labels();
+            let labels = p.0.allocation();
             for j in 0..ni {
                 matrix[np * j + i] = i32::try_from(labels[j] + 1).unwrap();
             }
