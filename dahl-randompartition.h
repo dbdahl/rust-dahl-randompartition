@@ -54,6 +54,12 @@ extern double callRFunction_logPosteriorPredictiveOfItem(const void *fn_ptr,
                                                          RR_SEXP_vector_INTSXP indices,
                                                          const void *env_ptr);
 
+extern double callRFunction_logLikelihoodOfItem(const void *fn_ptr,
+                                                int32_t i,
+                                                int32_t label,
+                                                int32_t is_new,
+                                                const void *env_ptr);
+
 extern double callRFunction_logIntegratedLikelihoodOfSubset(const void *fn_ptr,
                                                             RR_SEXP_vector_INTSXP indices,
                                                             const void *env_ptr);
@@ -65,6 +71,16 @@ void dahl_randompartition__neal_algorithm3(int32_t n_updates_for_partition,
                                            int32_t *partition_ptr,
                                            int32_t prior_only,
                                            const void *log_posterior_predictive_function_ptr,
+                                           const void *env_ptr,
+                                           const int32_t *seed_ptr,
+                                           int32_t prior_id,
+                                           const void *prior_ptr);
+
+void dahl_randompartition__neal_algorithm8(int32_t n_updates_for_partition,
+                                           int32_t n_items,
+                                           int32_t *partition_ptr,
+                                           int32_t prior_only,
+                                           const void *log_likelihood_function_ptr,
                                            const void *env_ptr,
                                            const int32_t *seed_ptr,
                                            int32_t prior_id,

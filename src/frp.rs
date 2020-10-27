@@ -119,30 +119,28 @@ pub fn engine<T: Rng>(
             scaled_weight / total_counter[focal_subset_index]
         };
         let n_occupied_subsets = clustering.n_clusters() as f64;
-        let labels_and_weights =
-            clustering
-                .available_labels_for_allocation2(target, ii)
-                .map(|label| {
-                    let n_items_in_cluster = clustering.size_of(label);
-                    let weight = if n_items_in_cluster == 0 {
-                        if n_occupied_subsets == 0.0 {
-                            1.0
-                        } else {
-                            mass + discount * n_occupied_subsets + {
-                                if total_counter[focal_subset_index] == 0.0 {
-                                    scaled_weight
-                                } else {
-                                    0.0
-                                }
+        let labels_and_weights = clustering
+            .available_labels_for_allocation_with_target(target, ii)
+            .map(|label| {
+                let n_items_in_cluster = clustering.size_of(label);
+                let weight = if n_items_in_cluster == 0 {
+                    if n_occupied_subsets == 0.0 {
+                        1.0
+                    } else {
+                        mass + discount * n_occupied_subsets + {
+                            if total_counter[focal_subset_index] == 0.0 {
+                                scaled_weight
+                            } else {
+                                0.0
                             }
                         }
-                    } else {
-                        (n_items_in_cluster as f64) - discount
-                            + normalized_scaled_weight
-                                * intersection_counter[focal_subset_index][label]
-                    };
-                    (label, weight)
-                });
+                    }
+                } else {
+                    (n_items_in_cluster as f64) - discount
+                        + normalized_scaled_weight * intersection_counter[focal_subset_index][label]
+                };
+                (label, weight)
+            });
         let (subset_index, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_weights, false, 0, Some(r), true),
             None => clustering.select::<IsaacRng, _>(

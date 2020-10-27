@@ -107,6 +107,21 @@ impl Clustering {
         Self::from_vector(labels.iter().map(|x| *x as usize).collect())
     }
 
+    pub fn exclude_label(&mut self, label: usize) {
+        if label >= self.sizes.len() {
+            panic!("Cluster with label {} does not already exists.", label);
+        }
+        if self.sizes[label] != 0 {
+            panic!("Cluster with label {} is not empty.");
+        }
+        self.available_labels.swap_remove(
+            self.available_labels
+                .iter()
+                .rposition(|x| *x == label)
+                .unwrap(),
+        );
+    }
+
     pub unsafe fn push_into_slice_i32(&self, slice: &mut [i32]) {
         slice
             .iter_mut()
@@ -170,7 +185,7 @@ impl Clustering {
         0..=self.active_labels.len()
     }
 
-    pub fn available_labels_for_allocation2(
+    pub fn available_labels_for_allocation_with_target(
         &self,
         target: Option<&[usize]>,
         item: usize,

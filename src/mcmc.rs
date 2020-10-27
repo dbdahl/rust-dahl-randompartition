@@ -48,6 +48,36 @@ where
     state
 }
 
+pub fn update_neal_algorithm8<T, U, V>(
+    n_updates: u32,
+    current: &Clustering,
+    permutation: &Permutation,
+    prior: &T,
+    log_likelihood_contribution_fn: &U,
+    rng: &mut V,
+) -> Clustering
+where
+    T: PriorLogWeight,
+    U: Fn(usize, usize, bool) -> f64,
+    V: Rng,
+{
+    let mut state = current.clone();
+    for _ in 0..n_updates {
+        for i in 0..state.n_items() {
+            let ii = permutation.get(i);
+            let labels_and_weights = state.available_labels_for_reallocation(ii).map(|label| {
+                let log_weight =
+                    log_likelihood_contribution_fn(ii, label, state.size_of(label) == 0)
+                        + prior.log_weight(ii, label, &state);
+                (label, log_weight)
+            });
+            let pair = state.select(labels_and_weights, true, 0, Some(rng), false);
+            state.reallocate(ii, pair.0);
+        }
+    }
+    state
+}
+
 /*
 pub fn update_rwmh<T, U>(
     n_attempts: u32,
@@ -181,6 +211,13 @@ extern "C" {
         indices: RR_SEXP_vector_INTSXP,
         env_ptr: *const c_void,
     ) -> f64;
+    fn callRFunction_logLikelihoodOfItem(
+        fn_ptr: *const c_void,
+        i: i32,
+        label: i32,
+        is_new: i32,
+        env_ptr: *const c_void,
+    ) -> f64;
     fn callRFunction_logIntegratedLikelihoodOfSubset(
         fn_ptr: *const c_void,
         indices: RR_SEXP_vector_INTSXP,
@@ -216,7 +253,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
     prior_only: i32,
     log_posterior_predictive_function_ptr: *const c_void,
     env_ptr: *const c_void,
-    seed_ptr: *const i32, // Assumed length is 32)
+    seed_ptr: *const i32, // Assumed length is 32
     prior_id: i32,
     prior_ptr: *const c_void,
 ) -> () {
@@ -252,6 +289,55 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
     clustering = clustering.relabel(1, None, false).0;
     clustering.push_into_slice_i32(clustering_slice);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
+    n_updates_for_partition: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    prior_only: i32,
+    log_likelihood_function_ptr: *const c_void,
+    env_ptr: *const c_void,
+    seed_ptr: *const i32, // Assumed length is 32
+    prior_id: i32,
+    prior_ptr: *const c_void,
+) -> () {
+    let nup = n_updates_for_partition as u32;
+    let ni = n_items as usize;
+    let clustering_slice = slice::from_raw_parts_mut(partition_ptr, ni);
+    let mut clustering = Clustering::from_slice(clustering_slice);
+    clustering.exclude_label(0);
+    let log_like: Box<dyn Fn(usize, usize, bool) -> f64> = if prior_only != 0 {
+        Box::new(|_i: usize, _label: usize, _is_new: bool| 0.0)
+    } else {
+        Box::new(move |i: usize, label: usize, is_new: bool| {
+            callRFunction_logLikelihoodOfItem(
+                log_likelihood_function_ptr,
+                (i + 1) as i32,
+                label as i32,
+                is_new as i32,
+                env_ptr,
+            )
+        })
+    };
+    let perm = Permutation::natural(clustering.n_items());
+    let mut rng = mk_rng_isaac(seed_ptr);
+    clustering = match prior_id {
+        0 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
+            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        1 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
+            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        _ => panic!("Unsupported prior ID: {}", prior_id),
+    };
+    // clustering = clustering.relabel(1, None, false).0;
+    clustering.push_into_slice_i32(clustering_slice);
+}
+
+// Legacy stuff....
 
 unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
     n_updates_for_partition: i32,
@@ -372,55 +458,6 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_nggp(
         &mut rng,
     );
     *u_ptr = super::nggp::update_u(u, &partition, mass, reinforcement, nuu, &mut rng).unwrap();
-    push_into_slice_for_r(&partition, partition_slice);
-}
-*/
-
-/*
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_frp(
-    n_updates_for_partition: i32,
-    n_items: i32,
-    partition_ptr: *mut i32,
-    prior_only: i32,
-    log_posterior_predictive_function_ptr: *const c_void,
-    env_ptr: *const c_void,
-    seed_ptr: *const i32, // Assumed length is 32
-    focal_ptr: *const i32,
-    weights_ptr: *const f64,
-    permutation_ptr: *const i32,
-    mass: f64,
-    discount: f64,
-) -> () {
-    let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
-        neal_algorithm3_process_arguments(
-            n_updates_for_partition,
-            n_items,
-            partition_ptr,
-            prior_only,
-            log_posterior_predictive_function_ptr,
-            env_ptr,
-            seed_ptr,
-        );
-    let focal_slice = slice::from_raw_parts(focal_ptr, partition.n_items());
-    let focal = Partition::from(focal_slice);
-    let weights_slice = slice::from_raw_parts(weights_ptr, focal.n_items());
-    let weights = Weights::from(weights_slice).unwrap();
-    let permutation_slice = slice::from_raw_parts(permutation_ptr, focal.n_items());
-    let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
-    let permutation = Permutation::from_vector(permutation_vector).unwrap();
-    let mass = Mass::new_with_variable_constraint(mass, discount);
-    let discount = Discount::new(discount);
-    let neal_functions =
-        FRPParameters::new(&focal, &weights, &permutation, mass, discount).unwrap();
-    let partition = update_neal_algorithm3(
-        nup,
-        &partition,
-        &permutation,
-        &neal_functions,
-        &log_posterior_predictive,
-        &mut rng,
-    );
     push_into_slice_for_r(&partition, partition_slice);
 }
 */
