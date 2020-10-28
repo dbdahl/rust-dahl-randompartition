@@ -1,7 +1,6 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-//use crate::mcmc::PriorLogWeight;
 use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 

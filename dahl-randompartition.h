@@ -7,6 +7,8 @@ typedef struct CRPParameters CRPParameters;
 
 typedef struct FRPParameters FRPParameters;
 
+typedef struct LSPParameters LSPParameters;
+
 typedef struct {
   const void *sexp_ptr;
   int32_t *data_ptr;
@@ -48,6 +50,25 @@ void dahl_randompartition__focal_partition(int32_t do_sampling,
                                            double mass,
                                            double discount,
                                            int32_t use_random_permutations);
+
+LSPParameters *dahl_randompartition__lspparameters_new(int32_t n_items,
+                                                       const int32_t *focal_ptr,
+                                                       double rate,
+                                                       const int32_t *permutation_ptr,
+                                                       int32_t use_random_permutations);
+
+void dahl_randompartition__lspparameters_free(LSPParameters *obj);
+
+void dahl_randompartition__ls_partition(int32_t do_sampling,
+                                        int32_t n_partitions,
+                                        int32_t n_items,
+                                        int32_t *partition_labels_ptr,
+                                        double *partition_probs_ptr,
+                                        const int32_t *seed_ptr,
+                                        const int32_t *location_ptr,
+                                        double rate,
+                                        const int32_t *permutation_ptr,
+                                        int32_t use_random_permutations);
 
 extern double callRFunction_logPosteriorPredictiveOfItem(const void *fn_ptr,
                                                          int32_t i,

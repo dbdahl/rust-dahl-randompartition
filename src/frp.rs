@@ -161,99 +161,8 @@ pub fn engine<T: Rng>(
         total_counter[focal_subset_index] += 1.0;
         clustering.allocate(ii, subset_index);
     }
-    if !parameters.permutation.natural {
-        clustering = clustering.relabel(0, None, false).0;
-    }
     (clustering, log_probability)
 }
-
-/*
-pub fn engine2<T: Rng>(
-    parameters: &FRPParameters,
-    mut target_or_rng: TargetOrRandom2<T>,
-) -> (Partition, f64) {
-    let nsf = parameters.focal.n_subsets();
-    let ni = parameters.focal.n_items();
-    let mass = parameters.mass.unwrap();
-    let discount = parameters.discount.unwrap();
-    if let TargetOrRandom::Target(t) = &mut target_or_rng {
-        assert_eq!(t.n_items(), ni);
-        *t = t.standardize(0, Some(parameters.permutation)).0;
-    };
-    let mut log_probability = 0.0;
-    let mut partition = Clustering::unallocated(ni);
-    let mut total_counter = vec![0.0; nsf];
-    let mut intersection_counter = Vec::with_capacity(nsf);
-    for _ in 0..nsf {
-        intersection_counter.push(Vec::new())
-    }
-    for i in 0..ni {
-        let ii = parameters.permutation.get(i);
-        // Ensure there is an empty subset
-        match partition.subsets().last() {
-            None => partition.new_subset(),
-            Some(last) => {
-                if !last.is_empty() {
-                    partition.new_subset()
-                }
-            }
-        }
-        let n_occupied_subsets = (partition.n_subsets() - 1) as f64;
-        let focal_subset_index = parameters.focal.label_of(ii).unwrap();
-        let scaled_weight = (i as f64) * parameters.weights[ii];
-        let normalized_scaled_weight = if total_counter[focal_subset_index] == 0.0 {
-            0.0
-        } else {
-            scaled_weight / total_counter[focal_subset_index]
-        };
-        let probs: Vec<(usize, f64)> = partition
-            .subsets()
-            .iter()
-            .enumerate()
-            .map(|(subset_index, subset)| {
-                let prob = if subset.is_empty() {
-                    if n_occupied_subsets == 0.0 {
-                        1.0
-                    } else {
-                        mass + discount * n_occupied_subsets + {
-                            if total_counter[focal_subset_index] == 0.0 {
-                                scaled_weight
-                            } else {
-                                0.0
-                            }
-                        }
-                    }
-                } else {
-                    (subset.n_items() as f64) - discount
-                        + normalized_scaled_weight
-                            * intersection_counter[focal_subset_index][subset_index]
-                };
-                (subset_index, prob)
-            })
-            .collect();
-        let subset_index = match &mut target_or_rng {
-            TargetOrRandom::Random(rng) => {
-                let dist = WeightedIndex::new(probs.iter().map(|x| x.1)).unwrap();
-                dist.sample(*rng)
-            }
-            TargetOrRandom::Target(t) => t.get(ii),
-        };
-        let numerator = probs[subset_index].1;
-        let denominator = probs.iter().fold(0.0, |sum, x| sum + x.1);
-        log_probability += (numerator / denominator).ln();
-        if subset_index == intersection_counter[0].len() {
-            for counter in intersection_counter.iter_mut() {
-                counter.push(0.0);
-            }
-        }
-        intersection_counter[focal_subset_index][subset_index] += 1.0;
-        total_counter[focal_subset_index] += 1.0;
-        partition.add_with_index(ii, subset_index);
-    }
-    partition.canonicalize();
-    (partition, log_probability)
-}
-*/
 
 pub fn sample<T: Rng>(parameters: &FRPParameters, rng: &mut T) -> Clustering {
     engine(parameters, None, Some(rng)).0
@@ -285,7 +194,7 @@ mod tests {
             let parameters =
                 FRPParameters::new(focal, weights, permutation, mass, discount).unwrap();
             let sample_closure = || sample(&parameters, &mut thread_rng());
-            let log_prob_closure = |partition: &mut Clustering| log_pmf(partition, &parameters);
+            let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
             crate::testing::assert_goodness_of_fit(
                 10000,
                 n_items,
@@ -293,7 +202,7 @@ mod tests {
                 log_prob_closure,
                 1,
                 0.001,
-            )
+            );
         }
     }
 
@@ -314,7 +223,7 @@ mod tests {
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
                 FRPParameters::new(focal, weights, permutation, mass, discount).unwrap();
-            let log_prob_closure = |partition: &mut Clustering| log_pmf(partition, &parameters);
+            let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
     }
