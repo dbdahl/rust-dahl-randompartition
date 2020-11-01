@@ -1,6 +1,6 @@
 use crate::clust::{Clustering, Permutation};
 use crate::prelude::*;
-//use crate::*;
+use crate::push_into_slice_i32;
 
 //use crate::frp;
 //use crate::cpp::CPPParameters;
@@ -205,25 +205,30 @@ mod tests_mcmc {
 }
 
 extern "C" {
-    fn callRFunction_logPosteriorPredictiveOfItem(
+    fn rrAllocVectorINTSXP(len: i32) -> RR_SEXP_vector_INTSXP;
+    fn callRFunction_logIntegratedLikelihoodItem(
         fn_ptr: *const c_void,
         i: i32,
         indices: RR_SEXP_vector_INTSXP,
         env_ptr: *const c_void,
     ) -> f64;
-    fn callRFunction_logLikelihoodOfItem(
+    fn callRFunction_logIntegratedLikelihoodSubset(
+        fn_ptr: *const c_void,
+        indices: RR_SEXP_vector_INTSXP,
+        env_ptr: *const c_void,
+    ) -> f64;
+    fn callRFunction_logLikelihoodItem(
         fn_ptr: *const c_void,
         i: i32,
         label: i32,
         is_new: i32,
         env_ptr: *const c_void,
     ) -> f64;
-    fn callRFunction_logIntegratedLikelihoodOfSubset(
-        fn_ptr: *const c_void,
-        indices: RR_SEXP_vector_INTSXP,
-        env_ptr: *const c_void,
-    ) -> f64;
-    fn rrAllocVectorINTSXP(len: i32) -> RR_SEXP_vector_INTSXP;
+}
+
+#[repr(C)]
+pub struct RR_SEXP {
+    pub sexp_ptr: *const c_void,
 }
 
 #[repr(C)]
@@ -234,12 +239,21 @@ pub struct RR_SEXP_vector_INTSXP {
 }
 
 impl RR_SEXP_vector_INTSXP {
-    fn from_slice(slice: &[usize]) -> Self {
+    fn from_slice_offset_by_1(slice: &[usize]) -> Self {
         let result = unsafe { rrAllocVectorINTSXP(slice.len() as i32) };
         let into_slice: &mut [i32] =
             unsafe { slice::from_raw_parts_mut(result.data_ptr, result.len as usize) };
         for (x, y) in into_slice.iter_mut().zip(slice) {
             *x = (*y as i32) + 1;
+        }
+        result
+    }
+    fn from_slice(slice: &[usize]) -> Self {
+        let result = unsafe { rrAllocVectorINTSXP(slice.len() as i32) };
+        let into_slice: &mut [i32] =
+            unsafe { slice::from_raw_parts_mut(result.data_ptr, result.len as usize) };
+        for (x, y) in into_slice.iter_mut().zip(slice) {
+            *x = *y as i32;
         }
         result
     }
@@ -265,10 +279,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
         Box::new(|_i: usize, _indices: &[usize]| 0.0)
     } else {
         Box::new(move |i: usize, indices: &[usize]| {
-            callRFunction_logPosteriorPredictiveOfItem(
+            callRFunction_logIntegratedLikelihoodItem(
                 log_posterior_predictive_function_ptr,
                 (i as i32) + 1,
-                RR_SEXP_vector_INTSXP::from_slice(indices),
+                RR_SEXP_vector_INTSXP::from_slice_offset_by_1(indices),
                 env_ptr,
             )
         })
@@ -291,7 +305,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
     clustering = clustering.relabel(1, None, false).0;
-    clustering.push_into_slice_i32(clustering_slice);
+    push_into_slice_i32(&clustering.allocation()[..], clustering_slice);
 }
 
 #[no_mangle]
@@ -305,6 +319,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
     seed_ptr: *const i32, // Assumed length is 32
     prior_id: i32,
     prior_ptr: *const c_void,
+    map_ptr: &mut RR_SEXP,
 ) -> () {
     let nup = n_updates_for_partition as u32;
     let ni = n_items as usize;
@@ -315,7 +330,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
         Box::new(|_i: usize, _label: usize, _is_new: bool| 0.0)
     } else {
         Box::new(move |i: usize, label: usize, is_new: bool| {
-            callRFunction_logLikelihoodOfItem(
+            callRFunction_logLikelihoodItem(
                 log_likelihood_function_ptr,
                 (i + 1) as i32,
                 label as i32,
@@ -341,8 +356,9 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
-    // clustering = clustering.relabel(1, None, false).0;
-    clustering.push_into_slice_i32(clustering_slice);
+    let (clustering, map) = clustering.relabel(1, None, true);
+    push_into_slice_i32(&clustering.allocation()[..], clustering_slice);
+    map_ptr.sexp_ptr = RR_SEXP_vector_INTSXP::from_slice(&map.unwrap()[1..]).sexp_ptr;
 }
 
 // Legacy stuff....
@@ -370,10 +386,10 @@ unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
         Box::new(|_i: usize, _indices: &[usize]| 0.0)
     } else {
         Box::new(move |i: usize, indices: &[usize]| {
-            callRFunction_logPosteriorPredictiveOfItem(
+            callRFunction_logIntegratedLikelihoodItem(
                 log_posterior_predictive_function_ptr,
                 (i as i32) + 1,
-                RR_SEXP_vector_INTSXP::from_slice(indices),
+                RR_SEXP_vector_INTSXP::from_slice_offset_by_1(indices),
                 env_ptr,
             )
         })
@@ -423,7 +439,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
         &log_posterior_predictive,
         &mut rng,
     );
-    partition.push_into_slice_i32(partition_slice);
+    push_into_slice_i32(&partition.allocation()[..], partition_slice);
 }
 
 /*

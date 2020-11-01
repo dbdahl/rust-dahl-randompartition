@@ -122,15 +122,6 @@ impl Clustering {
         );
     }
 
-    pub unsafe fn push_into_slice_i32(&self, slice: &mut [i32]) {
-        slice
-            .iter_mut()
-            .zip(self.allocation.iter())
-            .for_each(|(x, y)| {
-                *x = *y as i32;
-            });
-    }
-
     pub fn n_items(&self) -> usize {
         self.allocation.len()
     }
