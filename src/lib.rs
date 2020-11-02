@@ -5,7 +5,7 @@ extern crate rand;
 extern crate statrs;
 
 pub mod clust;
-//pub mod cpp;
+pub mod cpp;
 pub mod crp;
 //pub mod epa;
 pub mod frp;

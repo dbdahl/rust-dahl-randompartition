@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct CPPParameters CPPParameters;
+
 typedef struct CRPParameters CRPParameters;
 
 typedef struct FRPParameters FRPParameters;
@@ -18,6 +20,27 @@ typedef struct {
 typedef struct {
   const void *sexp_ptr;
 } RR_SEXP;
+
+CPPParameters *dahl_randompartition__cppparameters_new(int32_t n_items,
+                                                       const int32_t *focal_ptr,
+                                                       double rate,
+                                                       double mass,
+                                                       double discount,
+                                                       bool use_vi,
+                                                       double a);
+
+void dahl_randompartition__cppparameters_free(CPPParameters *obj);
+
+void dahl_randompartition__centered_partition(int32_t n_partitions,
+                                              int32_t n_items,
+                                              int32_t *partition_labels_ptr,
+                                              double *partition_probs_ptr,
+                                              const int32_t *center_ptr,
+                                              double rate,
+                                              double mass,
+                                              double discount,
+                                              int32_t use_vi,
+                                              double a);
 
 CRPParameters *dahl_randompartition__crpparameters_new(double mass, double discount);
 

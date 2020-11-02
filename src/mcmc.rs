@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::push_into_slice_i32;
 
 //use crate::frp;
-//use crate::cpp::CPPParameters;
+use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
 //use crate::epa::{EPAParameters, SimilarityBorrower};
 use crate::frp::FRPParameters;
@@ -302,6 +302,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
             let p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
+        3 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
     clustering = clustering.relabel(1, None, false).0;
@@ -352,6 +356,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
         }
         2 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
+            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        3 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
             update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
@@ -517,52 +525,6 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_lsp(
     let permutation_vector: Vec<usize> = permutation_slice.iter().map(|x| *x as usize).collect();
     let permutation = Permutation::from_vector(permutation_vector).unwrap();
     let neal_functions = LSPParameters::new_with_rate(&focal, rate, &permutation).unwrap();
-    let partition = update_neal_algorithm3(
-        nup,
-        &partition,
-        &permutation,
-        &neal_functions,
-        &log_posterior_predictive,
-        &mut rng,
-    );
-    push_into_slice_for_r(&partition, partition_slice);
-}
-*/
-
-/*
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_cpp(
-    n_updates_for_partition: i32,
-    n_items: i32,
-    partition_ptr: *mut i32,
-    prior_only: i32,
-    log_posterior_predictive_function_ptr: *const c_void,
-    env_ptr: *const c_void,
-    seed_ptr: *const i32, // Assumed length is 32
-    center_ptr: *const i32,
-    rate: f64,
-    mass: f64,
-    discount: f64,
-    use_vi: i32,
-    a: f64,
-) -> () {
-    let (nup, partition_slice, partition, log_posterior_predictive, mut rng) =
-        neal_algorithm3_process_arguments(
-            n_updates_for_partition,
-            n_items,
-            partition_ptr,
-            prior_only,
-            log_posterior_predictive_function_ptr,
-            env_ptr,
-            seed_ptr,
-        );
-    let center_slice = slice::from_raw_parts(center_ptr, partition.n_items());
-    let center = Partition::from(center_slice);
-    let permutation = Permutation::natural(center.n_items());
-    let rate = Rate::new(rate);
-    let mass = Mass::new_with_variable_constraint(mass, discount);
-    let discount = Discount::new(discount);
-    let neal_functions = CPPParameters::new(&center, rate, mass, discount, use_vi != 0, a).unwrap();
     let partition = update_neal_algorithm3(
         nup,
         &partition,
