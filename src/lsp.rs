@@ -12,10 +12,10 @@ use std::convert::TryFrom;
 use std::slice;
 
 pub struct LSPParameters {
-    location: Clustering,
-    scale: Scale,
-    rate: Rate,
-    permutation: Permutation,
+    pub location: Clustering,
+    pub scale: Scale,
+    pub rate: Rate,
+    pub permutation: Permutation,
 }
 
 impl LSPParameters {
@@ -201,7 +201,7 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
 ) -> *mut LSPParameters {
     let ni = n_items as usize;
     let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
-    let permutation = if use_random_permutations != 0 {
+    let permutation = if use_random_permutations == 0 {
         Permutation::natural(ni)
     } else {
         let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);

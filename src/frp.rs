@@ -12,11 +12,11 @@ use std::convert::TryFrom;
 use std::slice;
 
 pub struct FRPParameters {
-    focal: Clustering,
-    weights: Weights,
-    permutation: Permutation,
-    mass: Mass,
-    discount: Discount,
+    pub focal: Clustering,
+    pub weights: Weights,
+    pub permutation: Permutation,
+    pub mass: Mass,
+    pub discount: Discount,
 }
 
 impl FRPParameters {
@@ -245,7 +245,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     let ni = n_items as usize;
     let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
-    let permutation = if use_random_permutations != 0 {
+    let permutation = if use_random_permutations == 0 {
         Permutation::natural(ni)
     } else {
         let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
@@ -294,7 +294,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     let ni = n_items as usize;
     let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
-    let permutation = if use_random_permutations != 0 {
+    let permutation = if use_random_permutations == 0 {
         Permutation::natural(ni)
     } else {
         let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
@@ -310,7 +310,7 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     if do_sampling != 0 {
         let mut rng = &mut mk_rng_isaac(seed_ptr);
         for i in 0..np {
-            if use_random_permutations != 0 {
+            if use_random_permutations == 0 {
                 parameters.shuffle_permutation(&mut rng);
             }
             let p = engine(&parameters, None, Some(rng));

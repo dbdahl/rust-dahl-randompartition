@@ -23,7 +23,7 @@ pub fn sample_into_slice<S: PriorSampler, T: Rng, F: Fn(&mut S, &mut T) -> ()>(
 ) {
     for i in 0..n_partitions {
         callback(prior, rng);
-        let p = prior.sample(rng);
+        let p = prior.sample(rng).standardize();
         let labels = p.allocation();
         for j in 0..n_items {
             matrix[n_partitions * j + i] = i32::try_from(labels[j] + 1).unwrap();
@@ -54,8 +54,9 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
         1 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
             if use_random_permutation {
-                let callback =
-                    |p: &mut FRPParameters, rng: &mut IsaacRng| p.shuffle_permutation(rng);
+                let callback = |p: &mut FRPParameters, rng: &mut IsaacRng| {
+                    p.shuffle_permutation(rng);
+                };
                 sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
             } else {
                 let callback = |_p: &mut FRPParameters, _rng: &mut IsaacRng| {};
@@ -65,8 +66,9 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
         2 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
             if use_random_permutation {
-                let callback =
-                    |p: &mut LSPParameters, rng: &mut IsaacRng| p.shuffle_permutation(rng);
+                let callback = |p: &mut LSPParameters, rng: &mut IsaacRng| {
+                    p.shuffle_permutation(rng);
+                };
                 sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
             } else {
                 let callback = |_p: &mut LSPParameters, _rng: &mut IsaacRng| {};

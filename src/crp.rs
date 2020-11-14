@@ -75,9 +75,9 @@ pub fn log_pmf(x: &Clustering, parameters: &CRPParameters) -> f64 {
     let ns = x.n_clusters() as f64;
     let m = parameters.mass.unwrap();
     let d = parameters.discount.unwrap();
-    let mut result = -ln_gamma(m + ni);
+    let mut result = ln_gamma(m) - ln_gamma(m + ni);
     if d == 0.0 {
-        result += ns * m.ln() + ln_gamma(m);
+        result += ns * m.ln();
         for label in x.active_labels() {
             result += ln_gamma(x.size_of(*label) as f64);
         }
@@ -195,8 +195,16 @@ mod tests {
     */
 
     #[test]
-    fn test_pmf() {
+    fn test_pmf_without_discount() {
         let parameters = CRPParameters::new_with_mass(Mass::new(1.5), 5);
+        let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+        crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
+    }
+
+    #[test]
+    fn test_pmf_with_discount() {
+        let parameters =
+            CRPParameters::new_with_mass_and_discount(Mass::new(1.5), Discount::new(0.1), 5);
         let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
