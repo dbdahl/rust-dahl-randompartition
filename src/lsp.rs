@@ -3,6 +3,7 @@
 use crate::clust::{Clustering, Permutation};
 use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
+use crate::prior::PriorSampler;
 
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
@@ -64,7 +65,13 @@ impl PriorLogWeight for LSPParameters {
     }
 }
 
-pub fn engine<T: Rng>(
+impl PriorSampler for LSPParameters {
+    fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
+        engine(self, None, Some(rng)).0
+    }
+}
+
+fn engine<T: Rng>(
     parameters: &LSPParameters,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,

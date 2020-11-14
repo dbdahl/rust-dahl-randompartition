@@ -180,9 +180,8 @@ mod tests_mcmc {
 
     #[test]
     fn test_crp_neal_algorithm3() {
-        let n_items = 5;
-        let mut current = Clustering::one_cluster(n_items);
-        let neal_functions = CRPParameters::new_with_mass(Mass::new(1.0));
+        let mut current = Clustering::one_cluster(5);
+        let neal_functions = CRPParameters::new_with_mass(Mass::new(1.0), current.n_items());
         let permutation = Permutation::natural(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
@@ -437,6 +436,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
     let neal_functions = CRPParameters::new_with_mass_and_discount(
         Mass::new_with_variable_constraint(mass, discount),
         Discount::new(discount),
+        n_items as usize,
     );
     let permutation = Permutation::natural(partition.n_items());
     let partition = update_neal_algorithm3(

@@ -89,8 +89,11 @@ pub fn log_pmf(target: &Clustering, parameters: &CPPParameters) -> f64 {
             .center_as_clusterings
             .make_confusion_matrices(&target_as_working),
     );
-    let crp_parameters =
-        CRPParameters::new_with_mass_and_discount(parameters.mass, parameters.discount);
+    let crp_parameters = CRPParameters::new_with_mass_and_discount(
+        parameters.mass,
+        parameters.discount,
+        parameters.center.n_items(),
+    );
     crp_log_pmf(target, &crp_parameters) - parameters.rate.unwrap() * distance
 }
 

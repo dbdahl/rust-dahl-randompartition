@@ -13,6 +13,7 @@ pub mod lsp;
 pub mod mcmc;
 //pub mod nggp;
 pub mod prelude;
+pub mod prior;
 pub mod testing;
 
 pub unsafe fn push_into_slice_i32(from_slice: &[usize], to_slice: &mut [i32]) {

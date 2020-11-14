@@ -42,7 +42,9 @@ void dahl_randompartition__centered_partition(int32_t n_partitions,
                                               int32_t use_vi,
                                               double a);
 
-CRPParameters *dahl_randompartition__crpparameters_new(double mass, double discount);
+CRPParameters *dahl_randompartition__crpparameters_new(double mass,
+                                                       double discount,
+                                                       int32_t n_items);
 
 void dahl_randompartition__crpparameters_free(CRPParameters *obj);
 
@@ -144,3 +146,11 @@ void dahl_randompartition__neal_algorithm3_crp(int32_t n_updates_for_partition,
                                                const int32_t *seed_ptr,
                                                double mass,
                                                double discount);
+
+void dahl_randompartition__sample_partition(int32_t n_partitions,
+                                            int32_t n_items,
+                                            int32_t *partition_labels_ptr,
+                                            const int32_t *seed_ptr,
+                                            int32_t prior_id,
+                                            const void *prior_ptr,
+                                            bool use_random_permutation);

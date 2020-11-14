@@ -3,6 +3,7 @@
 use crate::clust::{Clustering, Permutation};
 use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
+use crate::prior::PriorSampler;
 
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
@@ -94,7 +95,13 @@ impl PriorLogWeight for FRPParameters {
     }
 }
 
-pub fn engine<T: Rng>(
+impl PriorSampler for FRPParameters {
+    fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
+        engine(self, None, Some(rng)).0
+    }
+}
+
+fn engine<T: Rng>(
     parameters: &FRPParameters,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
@@ -164,10 +171,6 @@ pub fn engine<T: Rng>(
     (clustering, log_probability)
 }
 
-pub fn sample<T: Rng>(parameters: &FRPParameters, rng: &mut T) -> Clustering {
-    engine(parameters, None, Some(rng)).0
-}
-
 pub fn log_pmf(target: &Clustering, parameters: &FRPParameters) -> f64 {
     engine::<IsaacRng>(parameters, Some(target.allocation()), None).1
 }
@@ -193,7 +196,7 @@ mod tests {
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
                 FRPParameters::new(focal, weights, permutation, mass, discount).unwrap();
-            let sample_closure = || sample(&parameters, &mut thread_rng());
+            let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
             crate::testing::assert_goodness_of_fit(
                 10000,
