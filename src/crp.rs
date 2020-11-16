@@ -3,9 +3,8 @@
 use crate::clust::Clustering;
 use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
-use crate::prior::PriorSampler;
+use crate::prior::{PartitionLogProbability, PartitionSampler};
 
-use dahl_roxido::mk_rng_isaac;
 use rand::Rng;
 use statrs::function::gamma::ln_gamma;
 
@@ -43,7 +42,7 @@ impl PriorLogWeight for CRPParameters {
     }
 }
 
-impl PriorSampler for CRPParameters {
+impl PartitionSampler for CRPParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         let mass = self.mass.unwrap();
         let discount = self.discount.unwrap();
@@ -70,30 +69,36 @@ impl PriorSampler for CRPParameters {
     }
 }
 
-pub fn log_pmf(x: &Clustering, parameters: &CRPParameters) -> f64 {
-    let ni = x.n_items() as f64;
-    let ns = x.n_clusters() as f64;
-    let m = parameters.mass.unwrap();
-    let d = parameters.discount.unwrap();
-    let mut result = ln_gamma(m) - ln_gamma(m + ni);
-    if d == 0.0 {
-        result += ns * m.ln();
-        for label in x.active_labels() {
-            result += ln_gamma(x.size_of(*label) as f64);
-        }
-    } else {
-        let mut cum_d = 0.0;
-        for label in x.active_labels() {
-            result += (m + cum_d).ln();
-            cum_d += d;
-            let mut cum = 1.0;
-            for i in 1..x.size_of(*label) {
-                cum *= i as f64 - d;
+impl PartitionLogProbability for CRPParameters {
+    fn log_probability(&self, partition: &Clustering) -> f64 {
+        let ni = partition.n_items() as f64;
+        let ns = partition.n_clusters() as f64;
+        let m = self.mass.unwrap();
+        let d = self.discount.unwrap();
+        let mut result = ln_gamma(m) - ln_gamma(m + ni);
+        if d == 0.0 {
+            result += ns * m.ln();
+            for label in partition.active_labels() {
+                result += ln_gamma(partition.size_of(*label) as f64);
             }
-            result += cum.ln();
+        } else {
+            let mut cum_d = 0.0;
+            for label in partition.active_labels() {
+                result += (m + cum_d).ln();
+                cum_d += d;
+                let mut cum = 1.0;
+                for i in 1..partition.size_of(*label) {
+                    cum *= i as f64 - d;
+                }
+                result += cum.ln();
+            }
         }
+        result
     }
-    result
+
+    fn is_normalized(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
@@ -106,7 +111,7 @@ mod tests {
     fn test_goodness_of_fit_constructive() {
         let parameters = CRPParameters::new_with_mass(Mass::new(2.0), 5);
         let sample_closure = || parameters.sample(&mut thread_rng());
-        let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_goodness_of_fit(
             100000,
             parameters.n_items,
@@ -136,7 +141,7 @@ mod tests {
             );
             clustering.relabel(0, None, false).0
         };
-        let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_goodness_of_fit(
             10000,
             parameters.n_items,
@@ -197,7 +202,7 @@ mod tests {
     #[test]
     fn test_pmf_without_discount() {
         let parameters = CRPParameters::new_with_mass(Mass::new(1.5), 5);
-        let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
 
@@ -205,7 +210,7 @@ mod tests {
     fn test_pmf_with_discount() {
         let parameters =
             CRPParameters::new_with_mass_and_discount(Mass::new(1.5), Discount::new(0.1), 5);
-        let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
 }
@@ -238,6 +243,7 @@ pub unsafe extern "C" fn dahl_randompartition__crpparameters_free(obj: *mut CRPP
     drop(boxed);
 }
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__crp_partition(
     do_sampling: i32,
@@ -279,3 +285,4 @@ pub unsafe extern "C" fn dahl_randompartition__crp_partition(
         }
     }
 }
+*/

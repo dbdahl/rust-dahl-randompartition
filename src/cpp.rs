@@ -1,10 +1,11 @@
 // Centered partition process
 
 use crate::clust::Clustering;
-use crate::crp::{log_pmf as crp_log_pmf, CRPParameters};
+use crate::crp::CRPParameters;
 use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 
+use crate::prior::PartitionLogProbability;
 use dahl_salso::clustering::Clusterings;
 use dahl_salso::clustering::WorkingClustering;
 use dahl_salso::log2cache::Log2Cache;
@@ -68,7 +69,16 @@ impl PriorLogWeight for CPPParameters {
     }
 }
 
-pub fn log_pmf(target: &Clustering, parameters: &CPPParameters) -> f64 {
+impl PartitionLogProbability for CPPParameters {
+    fn log_probability(&self, partition: &Clustering) -> f64 {
+        log_pmf(partition, self)
+    }
+    fn is_normalized(&self) -> bool {
+        false
+    }
+}
+
+fn log_pmf(target: &Clustering, parameters: &CPPParameters) -> f64 {
     let computer: Box<dyn CMLossComputer> = if parameters.use_vi {
         Box::new(VICMLossComputer::new(parameters.a, &parameters.log2cache))
     } else {
@@ -94,7 +104,7 @@ pub fn log_pmf(target: &Clustering, parameters: &CPPParameters) -> f64 {
         parameters.discount,
         parameters.center.n_items(),
     );
-    crp_log_pmf(target, &crp_parameters) - parameters.rate.unwrap() * distance
+    crp_parameters.log_probability(target) - parameters.rate.unwrap() * distance
 }
 
 #[cfg(test)]
@@ -115,7 +125,8 @@ mod tests {
             let rate = Rate::new(rng.gen_range(0.0, 10.0));
             //let rate = Rate::new(0.0);
             let parameters = CPPParameters::use_vi(center, rate, mass, discount).unwrap();
-            let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+            let log_prob_closure =
+                |clustering: &mut Clustering| parameters.log_probability(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
@@ -157,6 +168,7 @@ pub unsafe extern "C" fn dahl_randompartition__cppparameters_free(obj: *mut CPPP
     drop(boxed);
 }
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__centered_partition(
     n_partitions: i32,
@@ -188,3 +200,4 @@ pub unsafe extern "C" fn dahl_randompartition__centered_partition(
         probs[i] = log_pmf(&target, &parameters);
     }
 }
+*/

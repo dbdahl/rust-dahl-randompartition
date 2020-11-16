@@ -3,12 +3,10 @@
 use crate::clust::{Clustering, Permutation};
 use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
-use crate::prior::PriorSampler;
+use crate::prior::{PartitionLogProbability, PartitionSampler};
 
-use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
-use std::convert::TryFrom;
 use std::slice;
 
 pub struct LSPParameters {
@@ -65,9 +63,18 @@ impl PriorLogWeight for LSPParameters {
     }
 }
 
-impl PriorSampler for LSPParameters {
+impl PartitionSampler for LSPParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine(self, None, Some(rng)).0
+    }
+}
+
+impl PartitionLogProbability for LSPParameters {
+    fn log_probability(&self, partition: &Clustering) -> f64 {
+        engine::<IsaacRng>(self, Some(partition.allocation()), None).1
+    }
+    fn is_normalized(&self) -> bool {
+        true
     }
 }
 
@@ -142,6 +149,7 @@ fn engine<T: Rng>(
     (clustering, log_probability)
 }
 
+/*
 pub fn sample<T: Rng>(parameters: &LSPParameters, rng: &mut T) -> Clustering {
     engine(parameters, None, Some(rng)).0
 }
@@ -149,6 +157,7 @@ pub fn sample<T: Rng>(parameters: &LSPParameters, rng: &mut T) -> Clustering {
 pub fn log_pmf(target: &Clustering, parameters: &LSPParameters) -> f64 {
     engine::<IsaacRng>(parameters, Some(target.allocation()), None).1
 }
+*/
 
 #[cfg(test)]
 mod tests {
@@ -163,8 +172,9 @@ mod tests {
             let rate = Rate::new(rng.gen_range(0.0, 10.0));
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters = LSPParameters::new_with_rate(location, rate, permutation).unwrap();
-            let sample_closure = || sample(&parameters, &mut thread_rng());
-            let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+            let sample_closure = || parameters.sample(&mut thread_rng());
+            let log_prob_closure =
+                |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_goodness_of_fit(
                 10000,
                 n_items,
@@ -185,7 +195,8 @@ mod tests {
             let rate = Rate::new(rng.gen_range(0.0, 10.0));
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters = LSPParameters::new_with_rate(location, rate, permutation).unwrap();
-            let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+            let log_prob_closure =
+                |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
     }
@@ -230,6 +241,7 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_free(obj: *mut LSPP
     drop(boxed);
 }
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__ls_partition(
     do_sampling: i32,
@@ -283,3 +295,4 @@ pub unsafe extern "C" fn dahl_randompartition__ls_partition(
         }
     }
 }
+*/

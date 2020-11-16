@@ -1,5 +1,4 @@
 use crate::clust::{Clustering, Permutation};
-use crate::prelude::*;
 use crate::push_into_slice_i32;
 
 //use crate::frp;
@@ -10,7 +9,6 @@ use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
-use rand_isaac::IsaacRng;
 use std::ffi::c_void;
 use std::slice;
 
@@ -143,6 +141,7 @@ where
 #[cfg(test)]
 mod tests_mcmc {
     use super::*;
+    use crate::prelude::*;
 
     /*
     #[test]
@@ -370,6 +369,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
 
 // Legacy stuff....
 
+/*
 unsafe fn neal_algorithm3_process_arguments<'a, 'b>(
     n_updates_for_partition: i32,
     n_items: i32,
@@ -449,6 +449,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3_crp(
     );
     push_into_slice_i32(&partition.allocation()[..], partition_slice);
 }
+*/
 
 /*
 #[no_mangle]

@@ -1,4 +1,5 @@
 use crate::clust::Clustering;
+use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
@@ -9,25 +10,47 @@ use std::convert::TryFrom;
 use std::ffi::c_void;
 use std::slice;
 
-pub trait PriorSampler {
+pub trait PartitionSampler {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering;
 }
 
-pub fn sample_into_slice<S: PriorSampler, T: Rng, F: Fn(&mut S, &mut T) -> ()>(
+pub trait PartitionLogProbability {
+    fn log_probability(&self, partition: &Clustering) -> f64;
+    fn is_normalized(&self) -> bool;
+}
+
+pub fn sample_into_slice<S: PartitionSampler, T: Rng, F: Fn(&mut S, &mut T) -> ()>(
     n_partitions: usize,
     n_items: usize,
     matrix: &mut [i32],
     rng: &mut T,
-    prior: &mut S,
+    distr: &mut S,
     callback: F,
 ) {
     for i in 0..n_partitions {
-        callback(prior, rng);
-        let p = prior.sample(rng).standardize();
+        callback(distr, rng);
+        let p = distr.sample(rng).standardize();
         let labels = p.allocation();
         for j in 0..n_items {
             matrix[n_partitions * j + i] = i32::try_from(labels[j] + 1).unwrap();
         }
+    }
+}
+
+pub fn log_probabilities_into_slice<S: PartitionLogProbability>(
+    n_partitions: usize,
+    n_items: usize,
+    matrix: &[i32],
+    log_probabilities: &mut [f64],
+    distr: &mut S,
+) {
+    for i in 0..n_partitions {
+        let mut target_labels = Vec::with_capacity(n_items);
+        for j in 0..n_items {
+            target_labels.push(matrix[n_partitions * j + i] as usize);
+        }
+        let target = Clustering::from_vector(target_labels);
+        log_probabilities[i] = distr.log_probability(&target);
     }
 }
 
@@ -77,6 +100,40 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
         }
         3 => {
             panic!("Cannot sample from the CPP ({})", prior_id);
+        }
+        _ => panic!("Unsupported prior ID: {}", prior_id),
+    };
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_randompartition__log_probability_of_partition(
+    n_partitions: i32,
+    n_items: i32,
+    partition_labels_ptr: *mut i32,
+    log_probabilities_ptr: *mut f64,
+    prior_id: i32,
+    prior_ptr: *const c_void,
+) -> () {
+    let np = n_partitions as usize;
+    let ni = n_items as usize;
+    let matrix: &[i32] = slice::from_raw_parts(partition_labels_ptr, np * ni);
+    let log_probabilities: &mut [f64] = slice::from_raw_parts_mut(log_probabilities_ptr, np);
+    match prior_id {
+        0 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
+        }
+        1 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
+        }
+        2 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
+        }
+        3 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };

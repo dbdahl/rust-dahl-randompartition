@@ -3,12 +3,10 @@
 use crate::clust::{Clustering, Permutation};
 use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
-use crate::prior::PriorSampler;
+use crate::prior::{PartitionLogProbability, PartitionSampler};
 
-use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
-use std::convert::TryFrom;
 use std::slice;
 
 pub struct FRPParameters {
@@ -95,9 +93,18 @@ impl PriorLogWeight for FRPParameters {
     }
 }
 
-impl PriorSampler for FRPParameters {
+impl PartitionSampler for FRPParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine(self, None, Some(rng)).0
+    }
+}
+
+impl PartitionLogProbability for FRPParameters {
+    fn log_probability(&self, partition: &Clustering) -> f64 {
+        engine::<IsaacRng>(self, Some(partition.allocation()), None).1
+    }
+    fn is_normalized(&self) -> bool {
+        true
     }
 }
 
@@ -171,10 +178,6 @@ fn engine<T: Rng>(
     (clustering, log_probability)
 }
 
-pub fn log_pmf(target: &Clustering, parameters: &FRPParameters) -> f64 {
-    engine::<IsaacRng>(parameters, Some(target.allocation()), None).1
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,7 +200,8 @@ mod tests {
             let parameters =
                 FRPParameters::new(focal, weights, permutation, mass, discount).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
-            let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+            let log_prob_closure =
+                |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_goodness_of_fit(
                 10000,
                 n_items,
@@ -226,7 +230,8 @@ mod tests {
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
                 FRPParameters::new(focal, weights, permutation, mass, discount).unwrap();
-            let log_prob_closure = |clustering: &mut Clustering| log_pmf(clustering, &parameters);
+            let log_prob_closure =
+                |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
     }
@@ -275,6 +280,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_free(obj: *mut FRPP
     drop(boxed);
 }
 
+/*
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__focal_partition(
     do_sampling: i32,
@@ -332,3 +338,4 @@ pub unsafe extern "C" fn dahl_randompartition__focal_partition(
         }
     }
 }
+*/
