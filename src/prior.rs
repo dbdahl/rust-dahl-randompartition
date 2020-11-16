@@ -62,7 +62,7 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
     seed_ptr: *const i32, // Assumed length is 32
     prior_id: i32,
     prior_ptr: *const c_void,
-    use_random_permutation: bool,
+    randomize_permutation: bool,
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
@@ -76,7 +76,7 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
         }
         1 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
-            if use_random_permutation {
+            if randomize_permutation {
                 let callback = |p: &mut FRPParameters, rng: &mut IsaacRng| {
                     p.shuffle_permutation(rng);
                 };
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
         }
         2 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
-            if use_random_permutation {
+            if randomize_permutation {
                 let callback = |p: &mut LSPParameters, rng: &mut IsaacRng| {
                     p.shuffle_permutation(rng);
                 };

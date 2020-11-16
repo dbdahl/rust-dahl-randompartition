@@ -99,7 +99,7 @@ void dahl_randompartition__sample_partition(int32_t n_partitions,
                                             const int32_t *seed_ptr,
                                             int32_t prior_id,
                                             const void *prior_ptr,
-                                            bool use_random_permutation);
+                                            bool randomize_permutation);
 
 void dahl_randompartition__log_probability_of_partition(int32_t n_partitions,
                                                         int32_t n_items,
