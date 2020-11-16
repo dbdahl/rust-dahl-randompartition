@@ -167,37 +167,3 @@ pub unsafe extern "C" fn dahl_randompartition__cppparameters_free(obj: *mut CPPP
     // Then explicitly drop it (optional)
     drop(boxed);
 }
-
-/*
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__centered_partition(
-    n_partitions: i32,
-    n_items: i32,
-    partition_labels_ptr: *mut i32,
-    partition_probs_ptr: *mut f64,
-    center_ptr: *const i32,
-    rate: f64,
-    mass: f64,
-    discount: f64,
-    use_vi: i32,
-    a: f64,
-) -> () {
-    let np = n_partitions as usize;
-    let ni = n_items as usize;
-    let center = Clustering::from_slice(slice::from_raw_parts(center_ptr, ni));
-    let rate = Rate::new(rate);
-    let mass = Mass::new_with_variable_constraint(mass, discount);
-    let discount = Discount::new(discount);
-    let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
-    let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
-    let parameters = CPPParameters::new(center, rate, mass, discount, use_vi != 0, a).unwrap();
-    for i in 0..np {
-        let mut target_labels = Vec::with_capacity(ni);
-        for j in 0..ni {
-            target_labels.push(matrix[np * j + i] as usize);
-        }
-        let target = Clustering::from_vector(target_labels);
-        probs[i] = log_pmf(&target, &parameters);
-    }
-}
-*/

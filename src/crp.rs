@@ -152,53 +152,6 @@ mod tests {
         );
     }
 
-    /*
-    #[test]
-    fn test_goodness_of_fit_rwmh() {
-        let n_items = 5;
-        let parameters = CRPParameters::new_with_mass(Mass::new(2.0));
-        let log_prob_closure = |partition: &mut Partition| log_pmf(partition, &parameters);
-        let log_prob_closure2 = |partition: &Partition| log_pmf(partition, &parameters);
-        let rate = Rate::new(0.0);
-        let discount = 0.1;
-        let mass = Mass::new_with_variable_constraint(3.0, discount); // Notice that the mass for the proposal doesn't need to match the prior
-        let discount = Discount::new(discount); // Notice that the discount for the proposal doesn't need to match the prior
-        let mut p = Partition::one_subset(n_items);
-        let mut n_accepts = 0;
-        let sample_closure = || {
-            let temp = update_rwmh(
-                1,
-                &p,
-                rate,
-                mass,
-                discount,
-                &log_prob_closure2,
-                &mut thread_rng(),
-            );
-            p = temp.0;
-            n_accepts += temp.1 as usize;
-            p.clone()
-        };
-        let n_samples = 10000;
-        let n_calls_per_sample = 5;
-        if let Some(mut string) = crate::testing::assert_goodness_of_fit(
-            n_samples,
-            n_items,
-            sample_closure,
-            log_prob_closure,
-            n_calls_per_sample,
-            0.001,
-        ) {
-            let x = format!(
-                ", acceptance_rate = {:.2}",
-                (n_accepts as f64) / (n_calls_per_sample * n_samples) as f64
-            );
-            string.push_str(&x[..]);
-            panic!(string);
-        }
-    }
-    */
-
     #[test]
     fn test_pmf_without_discount() {
         let parameters = CRPParameters::new_with_mass(Mass::new(1.5), 5);
@@ -242,47 +195,3 @@ pub unsafe extern "C" fn dahl_randompartition__crpparameters_free(obj: *mut CRPP
     // Then explicitly drop it (optional)
     drop(boxed);
 }
-
-/*
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__crp_partition(
-    do_sampling: i32,
-    n_partitions: i32,
-    n_items: i32,
-    partition_labels_ptr: *mut i32,
-    partition_probs_ptr: *mut f64,
-    seed_ptr: *const i32, // Assumed length is 32
-    mass: f64,
-    discount: f64,
-) -> () {
-    let np = n_partitions as usize;
-    let ni = n_items as usize;
-    let parameters = CRPParameters::new_with_mass_and_discount(
-        Mass::new_with_variable_constraint(mass, discount),
-        Discount::new(discount),
-        ni,
-    );
-    let matrix: &mut [i32] = std::slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
-    let probs: &mut [f64] = std::slice::from_raw_parts_mut(partition_probs_ptr, np);
-    if do_sampling != 0 {
-        let rng = &mut mk_rng_isaac(seed_ptr);
-        for i in 0..np {
-            let clustering = parameters.sample(rng);
-            let labels = clustering.allocation();
-            for j in 0..ni {
-                matrix[np * j + i] = (labels[j] + 1) as i32;
-            }
-            probs[i] = log_pmf(&clustering, &parameters);
-        }
-    } else {
-        for i in 0..np {
-            let mut target_labels = Vec::with_capacity(ni);
-            for j in 0..ni {
-                target_labels.push(matrix[np * j + i] as usize);
-            }
-            let target = Clustering::from_vector(target_labels);
-            probs[i] = log_pmf(&target, &parameters);
-        }
-    }
-}
-*/

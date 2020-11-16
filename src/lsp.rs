@@ -149,16 +149,6 @@ fn engine<T: Rng>(
     (clustering, log_probability)
 }
 
-/*
-pub fn sample<T: Rng>(parameters: &LSPParameters, rng: &mut T) -> Clustering {
-    engine(parameters, None, Some(rng)).0
-}
-
-pub fn log_pmf(target: &Clustering, parameters: &LSPParameters) -> f64 {
-    engine::<IsaacRng>(parameters, Some(target.allocation()), None).1
-}
-*/
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,59 +230,3 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_free(obj: *mut LSPP
     // Then explicitly drop it (optional)
     drop(boxed);
 }
-
-/*
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__ls_partition(
-    do_sampling: i32,
-    n_partitions: i32,
-    n_items: i32,
-    partition_labels_ptr: *mut i32,
-    partition_probs_ptr: *mut f64,
-    seed_ptr: *const i32, // Assumed length is 32
-    location_ptr: *const i32,
-    rate: f64,
-    permutation_ptr: *const i32,
-    use_random_permutations: i32,
-) -> () {
-    let np = n_partitions as usize;
-    let ni = n_items as usize;
-    let location = Clustering::from_slice(slice::from_raw_parts(location_ptr, ni));
-    let rate = Rate::new(rate);
-    let permutation = if use_random_permutations != 0 {
-        Permutation::natural(ni)
-    } else {
-        let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
-        let permutation_vector: Vec<usize> =
-            permutation_slice.iter().map(|x| *x as usize).collect();
-        Permutation::from_vector(permutation_vector).unwrap()
-    };
-    let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
-    let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
-    let mut parameters = LSPParameters::new_with_rate(location, rate, permutation).unwrap();
-    if do_sampling != 0 {
-        let mut rng = &mut mk_rng_isaac(seed_ptr);
-        for i in 0..np {
-            if use_random_permutations != 0 {
-                parameters.shuffle_permutation(&mut rng);
-            }
-            let p = engine(&parameters, None, Some(rng));
-            let labels = p.0.allocation();
-            for j in 0..ni {
-                matrix[np * j + i] = i32::try_from(labels[j] + 1).unwrap();
-            }
-            probs[i] = p.1;
-        }
-    } else {
-        for i in 0..np {
-            let mut target_labels = Vec::with_capacity(ni);
-            for j in 0..ni {
-                target_labels.push(matrix[np * j + i] as usize);
-            }
-            let target = Clustering::from_vector(target_labels);
-            let p = engine::<IsaacRng>(&parameters, Some(target.allocation()), None);
-            probs[i] = p.1;
-        }
-    }
-}
-*/
