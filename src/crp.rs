@@ -217,9 +217,9 @@ mod tests {
 
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__crpparameters_new(
+    n_items: i32,
     mass: f64,
     discount: f64,
-    n_items: i32,
 ) -> *mut CRPParameters {
     let d = Discount::new(discount);
     let m = Mass::new_with_variable_constraint(mass, discount);

@@ -31,9 +31,9 @@ CPPParameters *dahl_randompartition__cppparameters_new(int32_t n_items,
 
 void dahl_randompartition__cppparameters_free(CPPParameters *obj);
 
-CRPParameters *dahl_randompartition__crpparameters_new(double mass,
-                                                       double discount,
-                                                       int32_t n_items);
+CRPParameters *dahl_randompartition__crpparameters_new(int32_t n_items,
+                                                       double mass,
+                                                       double discount);
 
 void dahl_randompartition__crpparameters_free(CRPParameters *obj);
 
