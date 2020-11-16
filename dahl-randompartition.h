@@ -41,7 +41,7 @@ FRPParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
                                                        const int32_t *focal_ptr,
                                                        const double *weights_ptr,
                                                        const int32_t *permutation_ptr,
-                                                       int32_t use_random_permutations,
+                                                       int32_t use_natural_permutation,
                                                        double mass,
                                                        double discount);
 
@@ -51,7 +51,7 @@ LSPParameters *dahl_randompartition__lspparameters_new(int32_t n_items,
                                                        const int32_t *focal_ptr,
                                                        double rate,
                                                        const int32_t *permutation_ptr,
-                                                       int32_t use_random_permutations);
+                                                       int32_t use_natural_permutation);
 
 void dahl_randompartition__lspparameters_free(LSPParameters *obj);
 

@@ -198,11 +198,11 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
     focal_ptr: *const i32,
     rate: f64,
     permutation_ptr: *const i32,
-    use_random_permutations: i32,
+    use_natural_permutation: i32,
 ) -> *mut LSPParameters {
     let ni = n_items as usize;
     let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
-    let permutation = if use_random_permutations == 0 {
+    let permutation = if use_natural_permutation != 0 {
         Permutation::natural(ni)
     } else {
         let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);

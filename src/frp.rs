@@ -243,14 +243,14 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     focal_ptr: *const i32,
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
-    use_random_permutations: i32,
+    use_natural_permutation: i32,
     mass: f64,
     discount: f64,
 ) -> *mut FRPParameters {
     let ni = n_items as usize;
     let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
-    let permutation = if use_random_permutations == 0 {
+    let permutation = if use_natural_permutation != 0 {
         Permutation::natural(ni)
     } else {
         let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
