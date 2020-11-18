@@ -1,6 +1,7 @@
 use crate::clust::Clustering;
 use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
+use crate::epa::EPAParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
 use dahl_roxido::mk_rng_isaac;
@@ -101,6 +102,18 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
         3 => {
             panic!("Cannot sample from the CPP ({})", prior_id);
         }
+        4 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
+            if randomize_permutation {
+                let callback = |p: &mut EPAParameters, rng: &mut IsaacRng| {
+                    p.shuffle_permutation(rng);
+                };
+                sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
+            } else {
+                let callback = |_p: &mut EPAParameters, _rng: &mut IsaacRng| {};
+                sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
+            }
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
 }
@@ -133,6 +146,10 @@ pub unsafe extern "C" fn dahl_randompartition__log_probability_of_partition(
         }
         3 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
+        }
+        4 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

@@ -332,7 +332,7 @@ impl Clustering {
     }
 
     pub fn standardize_by(&self, permutation: &Permutation) -> Self {
-        if permutation.natural {
+        if permutation.natural_and_fixed {
             self.relabel(0, None, false).0
         } else {
             self.relabel(0, Some(permutation), false).0
@@ -472,7 +472,7 @@ impl<'a> Iterator for ClusterLabelsIterator<'a> {
 pub struct Permutation {
     x: Vec<usize>,
     n_items: usize,
-    pub natural: bool,
+    pub natural_and_fixed: bool,
 }
 
 impl Permutation {
@@ -483,7 +483,7 @@ impl Permutation {
             Some(Self {
                 x: Vec::from(x),
                 n_items: y.len(),
-                natural: false,
+                natural_and_fixed: false,
             })
         } else {
             None
@@ -497,18 +497,27 @@ impl Permutation {
             Some(Self {
                 x,
                 n_items: y.len(),
-                natural: false,
+                natural_and_fixed: false,
             })
         } else {
             None
         }
     }
 
-    pub fn natural(n_items: usize) -> Self {
+    pub fn natural_and_fixed(n_items: usize) -> Self {
         Self {
             x: Vec::new(),
             n_items,
-            natural: true,
+            natural_and_fixed: true,
+        }
+    }
+
+    pub fn natural(n_items: usize) -> Self {
+        let x = (0..n_items).collect();
+        Self {
+            x,
+            n_items,
+            natural_and_fixed: false,
         }
     }
 
@@ -519,7 +528,7 @@ impl Permutation {
     }
 
     pub fn get(&self, i: usize) -> usize {
-        if self.natural {
+        if self.natural_and_fixed {
             if i >= self.n_items {
                 panic!("Index out of bounds.")
             } else {
@@ -539,7 +548,7 @@ impl Permutation {
     }
 
     pub fn slice_until(&self, end: usize) -> &[usize] {
-        if self.natural {
+        if self.natural_and_fixed {
             panic!("Not supported.");
         } else {
             &self.x[..end]
@@ -547,7 +556,7 @@ impl Permutation {
     }
 
     pub fn slice_from(&self, start: usize) -> &[usize] {
-        if self.natural {
+        if self.natural_and_fixed {
             panic!("Not supported");
         } else {
             &self.x[start..]

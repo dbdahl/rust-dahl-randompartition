@@ -7,6 +7,8 @@ typedef struct CPPParameters CPPParameters;
 
 typedef struct CRPParameters CRPParameters;
 
+typedef struct EPAParameters EPAParameters;
+
 typedef struct FRPParameters FRPParameters;
 
 typedef struct LSPParameters LSPParameters;
@@ -36,6 +38,15 @@ CRPParameters *dahl_randompartition__crpparameters_new(int32_t n_items,
                                                        double discount);
 
 void dahl_randompartition__crpparameters_free(CRPParameters *obj);
+
+EPAParameters *dahl_randompartition__epaparameters_new(int32_t n_items,
+                                                       double *similarity_ptr,
+                                                       const int32_t *permutation_ptr,
+                                                       int32_t use_natural_permutation,
+                                                       double mass,
+                                                       double discount);
+
+void dahl_randompartition__epaparameters_free(EPAParameters *obj);
 
 FRPParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
                                                        const int32_t *focal_ptr,

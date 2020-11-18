@@ -5,6 +5,7 @@ use crate::push_into_slice_i32;
 use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
 //use crate::epa::{EPAParameters, SimilarityBorrower};
+use crate::epa::EPAParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
 use dahl_roxido::mk_rng_isaac;
@@ -100,7 +101,7 @@ mod tests_mcmc {
     fn test_crp_neal_algorithm3() {
         let mut current = Clustering::one_cluster(5);
         let neal_functions = CRPParameters::new_with_mass(Mass::new(1.0), current.n_items());
-        let permutation = Permutation::natural(current.n_items());
+        let permutation = Permutation::natural_and_fixed(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
         let n_samples = 10000;
@@ -204,7 +205,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
             )
         })
     };
-    let perm = Permutation::natural(current.n_items());
+    let perm = Permutation::natural_and_fixed(current.n_items());
     let mut rng = mk_rng_isaac(seed_ptr);
     let mut clustering = match prior_id {
         0 => {
@@ -221,6 +222,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
         }
         3 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        4 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
@@ -260,7 +265,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
             )
         })
     };
-    let perm = Permutation::natural(clustering.n_items());
+    let perm = Permutation::natural_and_fixed(clustering.n_items());
     let mut rng = mk_rng_isaac(seed_ptr);
     clustering = match prior_id {
         0 => {
@@ -277,6 +282,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
         }
         3 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        4 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
             update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

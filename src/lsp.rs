@@ -203,7 +203,7 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
     let ni = n_items as usize;
     let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
     let permutation = if use_natural_permutation != 0 {
-        Permutation::natural(ni)
+        Permutation::natural_and_fixed(ni)
     } else {
         let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
         let permutation_vector: Vec<usize> =
