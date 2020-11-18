@@ -13,7 +13,7 @@ pub fn assert_goodness_of_fit(
     let ns = n_samples as f64;
     let mut map = HashMap::new();
     for i in 0..(n_calls_per_sample * n_samples) {
-        let s = sample();
+        let s = sample().standardize();
         if (i + 1) % n_calls_per_sample == 0 {
             let key = s.allocation().clone();
             *map.entry(key).or_insert(0) += 1;

@@ -11,6 +11,7 @@ use std::slice;
 
 type SimilarityBorrower<'a> = SquareMatrixBorrower<'a>;
 
+#[derive(Debug)]
 pub struct EPAParameters<'a> {
     similarity: SimilarityBorrower<'a>,
     permutation: Permutation,
@@ -44,6 +45,7 @@ impl<'a> EPAParameters<'a> {
 
 /// A data structure representing a square matrix.
 ///
+#[derive(Debug)]
 pub struct SquareMatrix {
     data: Vec<f64>,
     n_items: usize,
@@ -93,6 +95,7 @@ impl SquareMatrix {
     }
 }
 
+#[derive(Debug)]
 pub struct SquareMatrixBorrower<'a> {
     data: &'a mut [f64],
     n_items: usize,
@@ -235,11 +238,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_goodness_of_fit_nstructive() {
+    fn test_goodness_of_fit_constructive() {
         let n_items = 4;
         let mut rng = thread_rng();
         let permutation = Permutation::random(n_items, &mut rng);
-        //let permutation = Permutation::natural(n_items);
         let discount = 0.3;
         let mass = Mass::new_with_variable_constraint(1.5, discount);
         let discount = Discount::new(discount);
@@ -282,7 +284,7 @@ mod tests {
     fn test_pmf() {
         let n_items = 4;
         let mut rng = thread_rng();
-        let mut permutation = Permutation::random(n_items, &mut rng);
+        let permutation = Permutation::random(n_items, &mut rng);
         let discount = 0.3;
         let mass = Mass::new_with_variable_constraint(1.5, discount);
         let discount = Discount::new(discount);
@@ -306,7 +308,6 @@ mod tests {
             data[11] = 0.6;
             data[15] = 0.0;
         }
-        permutation.shuffle(&mut rng);
         let similarity_borrower = similarity.view();
         let parameters =
             EPAParameters::new(similarity_borrower, permutation, mass, discount).unwrap();

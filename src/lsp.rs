@@ -9,6 +9,7 @@ use rand::prelude::*;
 use rand_isaac::IsaacRng;
 use std::slice;
 
+#[derive(Debug)]
 pub struct LSPParameters {
     pub location: Clustering,
     pub scale: Scale,

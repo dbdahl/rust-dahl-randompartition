@@ -14,6 +14,7 @@ use statrs::function::gamma::ln_gamma;
 use std::convert::TryFrom;
 use std::slice;
 
+#[derive(Debug)]
 pub struct NGGPParameters {
     u: UinNGGP,
     mass: Mass,
