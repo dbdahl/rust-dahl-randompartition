@@ -54,7 +54,8 @@ FRPParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
                                                        const int32_t *permutation_ptr,
                                                        int32_t use_natural_permutation,
                                                        double mass,
-                                                       double discount);
+                                                       double discount,
+                                                       double power);
 
 void dahl_randompartition__frpparameters_free(FRPParameters *obj);
 

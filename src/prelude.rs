@@ -146,3 +146,11 @@ constrained_f64!(
     (|_x, _y| false),
     "Not supported."
 );
+
+constrained_f64!(
+    Power,
+    (|x| x >= 0.0),
+    "Power must be greater than or equal to zero.",
+    (|_x, _y| false),
+    "Not supported."
+);

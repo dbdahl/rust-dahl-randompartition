@@ -15,6 +15,7 @@ pub struct FRPParameters {
     pub permutation: Permutation,
     pub mass: Mass,
     pub discount: Discount,
+    pub power: Power,
 }
 
 impl FRPParameters {
@@ -24,6 +25,7 @@ impl FRPParameters {
         permutation: Permutation,
         mass: Mass,
         discount: Discount,
+        power: Power,
     ) -> Option<Self> {
         if weights.len() != focal.n_items() {
             None
@@ -36,6 +38,7 @@ impl FRPParameters {
                 permutation,
                 mass,
                 discount,
+                power,
             })
         }
     }
@@ -116,6 +119,7 @@ fn engine<T: Rng>(
     let ni = parameters.focal.n_items();
     let mass = parameters.mass.unwrap();
     let discount = parameters.discount.unwrap();
+    let power = parameters.power.unwrap();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
     let mut total_counter = vec![0.0; parameters.focal.max_label() + 1];
@@ -150,7 +154,7 @@ fn engine<T: Rng>(
                         }
                     }
                 } else {
-                    (n_items_in_cluster as f64) - discount
+                    ((n_items_in_cluster as f64) - discount).powf(power)
                         + normalized_scaled_weight * intersection_counter[focal_subset_index][label]
                 };
                 (label, weight)
@@ -188,6 +192,7 @@ mod tests {
         let discount = 0.1;
         let mass = Mass::new_with_variable_constraint(2.0, discount);
         let discount = Discount::new(discount);
+        let power = Power::new(0.5);
         let mut rng = thread_rng();
         for focal in Clustering::iter(n_items) {
             let focal = Clustering::from_vector(focal);
@@ -198,7 +203,7 @@ mod tests {
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
-                FRPParameters::new(focal, weights, permutation, mass, discount).unwrap();
+                FRPParameters::new(focal, weights, permutation, mass, discount, power).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
@@ -219,6 +224,7 @@ mod tests {
         let discount = 0.1;
         let mass = Mass::new_with_variable_constraint(2.0, discount);
         let discount = Discount::new(discount);
+        let power = Power::new(0.5);
         let mut rng = thread_rng();
         for focal in Clustering::iter(n_items) {
             let focal = Clustering::from_vector(focal);
@@ -229,7 +235,7 @@ mod tests {
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
-                FRPParameters::new(focal, weights, permutation, mass, discount).unwrap();
+                FRPParameters::new(focal, weights, permutation, mass, discount, power).unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
@@ -246,6 +252,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     use_natural_permutation: i32,
     mass: f64,
     discount: f64,
+    power: f64,
 ) -> *mut FRPParameters {
     let ni = n_items as usize;
     let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
@@ -260,8 +267,9 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     };
     let d = Discount::new(discount);
     let m = Mass::new_with_variable_constraint(mass, discount);
+    let p = Power::new(power);
     // First we create a new object.
-    let obj = FRPParameters::new(focal, weights, permutation, m, d).unwrap();
+    let obj = FRPParameters::new(focal, weights, permutation, m, d, p).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
