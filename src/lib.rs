@@ -12,6 +12,7 @@ pub mod frp;
 pub mod lsp;
 pub mod mcmc;
 //pub mod nggp;
+pub mod fixed;
 pub mod prelude;
 pub mod prior;
 pub mod testing;

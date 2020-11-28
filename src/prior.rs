@@ -2,6 +2,7 @@ use crate::clust::Clustering;
 use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
 use crate::epa::EPAParameters;
+use crate::fixed::FixedPartitionParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
 use dahl_roxido::mk_rng_isaac;
@@ -71,11 +72,16 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
     let rng = &mut mk_rng_isaac(seed_ptr);
     match prior_id {
         0 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut FixedPartitionParameters).unwrap();
+            let callback = |_p: &mut FixedPartitionParameters, _rng: &mut IsaacRng| {};
+            sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
+        }
+        1 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
             let callback = |_p: &mut CRPParameters, _rng: &mut IsaacRng| {};
             sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
         }
-        1 => {
+        2 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
             if randomize_permutation {
                 let callback = |p: &mut FRPParameters, rng: &mut IsaacRng| {
@@ -87,7 +93,7 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
                 sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
             }
         }
-        2 => {
+        3 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
             if randomize_permutation {
                 let callback = |p: &mut LSPParameters, rng: &mut IsaacRng| {
@@ -99,10 +105,10 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
                 sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
             }
         }
-        3 => {
+        4 => {
             panic!("Cannot sample from the CPP ({})", prior_id);
         }
-        4 => {
+        5 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
             if randomize_permutation {
                 let callback = |p: &mut EPAParameters, rng: &mut IsaacRng| {
@@ -133,22 +139,26 @@ pub unsafe extern "C" fn dahl_randompartition__log_probability_of_partition(
     let log_probabilities: &mut [f64] = slice::from_raw_parts_mut(log_probabilities_ptr, np);
     match prior_id {
         0 => {
-            let mut p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut FixedPartitionParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         1 => {
-            let mut p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         2 => {
-            let mut p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         3 => {
-            let mut p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         4 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
+        }
+        5 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }

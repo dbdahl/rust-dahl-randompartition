@@ -208,23 +208,24 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
     let perm = Permutation::natural_and_fixed(current.n_items());
     let mut rng = mk_rng_isaac(seed_ptr);
     let mut clustering = match prior_id {
-        0 => {
+        0 => current,
+        1 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
-        1 => {
+        2 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
-        2 => {
+        3 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
-        3 => {
+        4 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
-        4 => {
+        5 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
@@ -250,8 +251,8 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
     let nup = n_updates_for_partition as u32;
     let ni = n_items as usize;
     let clustering_slice = slice::from_raw_parts_mut(partition_ptr, ni);
-    let mut clustering = Clustering::from_slice(clustering_slice);
-    clustering.exclude_label(0);
+    let mut current = Clustering::from_slice(clustering_slice);
+    current.exclude_label(0);
     let log_like: Box<dyn Fn(usize, usize, bool) -> f64> = if prior_only != 0 {
         Box::new(|_i: usize, _label: usize, _is_new: bool| 0.0)
     } else {
@@ -265,32 +266,33 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
             )
         })
     };
-    let perm = Permutation::natural_and_fixed(clustering.n_items());
+    let perm = Permutation::natural_and_fixed(current.n_items());
     let mut rng = mk_rng_isaac(seed_ptr);
-    clustering = match prior_id {
-        0 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
-            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
-        }
+    current = match prior_id {
+        0 => current,
         1 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
-            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
+            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         2 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
-            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
+            let p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
+            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         3 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
-            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
+            let p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
+            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         4 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        5 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
-            update_neal_algorithm8(nup, &clustering, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
-    let (clustering, map) = clustering.relabel(1, None, true);
+    let (clustering, map) = current.relabel(1, None, true);
     push_into_slice_i32(&clustering.allocation()[..], clustering_slice);
     map_ptr.sexp_ptr = RR_SEXP_vector_INTSXP::from_slice(&map.unwrap()[1..]).sexp_ptr;
 }

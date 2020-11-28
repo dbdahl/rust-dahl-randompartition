@@ -11,6 +11,8 @@ typedef struct EPAParameters EPAParameters;
 
 typedef struct FRPParameters FRPParameters;
 
+typedef struct FixedPartitionParameters FixedPartitionParameters;
+
 typedef struct LSPParameters LSPParameters;
 
 typedef struct {
@@ -104,6 +106,11 @@ void dahl_randompartition__neal_algorithm8(int32_t n_updates_for_partition,
                                            int32_t prior_id,
                                            const void *prior_ptr,
                                            RR_SEXP *map_ptr);
+
+FixedPartitionParameters *dahl_randompartition__fixedpartitionparameters_new(int32_t n_items,
+                                                                             const int32_t *clustering_ptr);
+
+void dahl_randompartition__fixedpartitionparameters_free(FixedPartitionParameters *obj);
 
 void dahl_randompartition__sample_partition(int32_t n_partitions,
                                             int32_t n_items,
