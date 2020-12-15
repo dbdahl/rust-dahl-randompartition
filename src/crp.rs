@@ -8,7 +8,7 @@ use crate::prior::{PartitionLogProbability, PartitionSampler};
 use rand::Rng;
 use statrs::function::gamma::ln_gamma;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CRPParameters {
     mass: Mass,
     discount: Discount,
@@ -104,7 +104,7 @@ impl PartitionLogProbability for CRPParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clust::Permutation;
+    use crate::perm::Permutation;
     use rand::prelude::*;
 
     #[test]

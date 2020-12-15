@@ -13,9 +13,12 @@ pub mod lsp;
 pub mod mcmc;
 //pub mod nggp;
 pub mod fixed;
+pub mod perm;
 pub mod prelude;
 pub mod prior;
 pub mod testing;
+pub mod trp;
+pub mod wgt;
 
 pub unsafe fn push_into_slice_i32(from_slice: &[usize], to_slice: &mut [i32]) {
     to_slice.iter_mut().zip(from_slice).for_each(|(x, y)| {

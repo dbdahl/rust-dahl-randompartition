@@ -1,47 +1,49 @@
 // Focal random partition distribution
 
 use crate::clust::Clustering;
+use crate::crp::CRPParameters;
 use crate::mcmc::PriorLogWeight;
 use crate::perm::Permutation;
-use crate::prelude::*;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
 use crate::wgt::Weights;
 
+use crate::cpp::CPPParameters;
+use crate::epa::EPAParameters;
+use crate::frp::FRPParameters;
+use crate::lsp::LSPParameters;
+use dahl_salso::LossFunction;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
+use std::ffi::c_void;
 use std::slice;
 
-#[derive(Debug, Clone)]
-pub struct FRPParameters {
-    pub focal: Clustering,
+pub struct TRPParameters {
+    pub target: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
-    pub mass: Mass,
-    pub discount: Discount,
-    pub power: Power,
+    pub base_distribution: Box<dyn PartitionLogProbability>,
+    pub loss_function: LossFunction,
 }
 
-impl FRPParameters {
+impl TRPParameters {
     pub fn new(
-        focal: Clustering,
+        target: Clustering,
         weights: Weights,
         permutation: Permutation,
-        mass: Mass,
-        discount: Discount,
-        power: Power,
+        base_distribution: Box<dyn PartitionLogProbability>,
+        loss_function: LossFunction,
     ) -> Option<Self> {
-        if weights.len() != focal.n_items() {
+        if weights.len() != target.n_items() {
             None
-        } else if focal.n_items() != permutation.len() {
+        } else if target.n_items() != permutation.len() {
             None
         } else {
             Some(Self {
-                focal: focal.standardize(),
+                target: target.standardize(),
                 weights,
                 permutation,
-                mass,
-                discount,
-                power,
+                base_distribution,
+                loss_function,
             })
         }
     }
@@ -51,7 +53,7 @@ impl FRPParameters {
     }
 }
 
-impl PriorLogWeight for FRPParameters {
+impl PriorLogWeight for TRPParameters {
     fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
         let mut p = clustering.allocation().clone();
         p[item_index] = subset_index;
@@ -59,13 +61,13 @@ impl PriorLogWeight for FRPParameters {
     }
 }
 
-impl PartitionSampler for FRPParameters {
+impl PartitionSampler for TRPParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine(self, None, Some(rng)).0
     }
 }
 
-impl PartitionLogProbability for FRPParameters {
+impl PartitionLogProbability for TRPParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
         engine::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
@@ -74,12 +76,13 @@ impl PartitionLogProbability for FRPParameters {
     }
 }
 
-fn engine<T: Rng>(
-    parameters: &FRPParameters,
-    target: Option<&[usize]>,
-    mut rng: Option<&mut T>,
+fn engine<'a, T: Rng>(
+    parameters: &'a TRPParameters,
+    _target: Option<&[usize]>,
+    mut _rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let ni = parameters.focal.n_items();
+    /*
+    let ni = parameters.target.n_items();
     let mass = parameters.mass.unwrap();
     let discount = parameters.discount.unwrap();
     let power = parameters.power.unwrap();
@@ -142,12 +145,16 @@ fn engine<T: Rng>(
         total_counter[focal_subset_index] += 1.0;
         clustering.allocate(ii, subset_index);
     }
+    */
+    let clustering = parameters.target.clone();
+    let log_probability = 0.0;
     (clustering, log_probability)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::*;
 
     #[test]
     fn test_goodness_of_fit_constructive() {
@@ -155,18 +162,26 @@ mod tests {
         let discount = 0.1;
         let mass = Mass::new_with_variable_constraint(2.0, discount);
         let discount = Discount::new(discount);
-        let power = Power::new(0.5);
+        let loss_function = LossFunction::VI(1.0);
         let mut rng = thread_rng();
-        for focal in Clustering::iter(n_items) {
-            let focal = Clustering::from_vector(focal);
-            let mut vec = Vec::with_capacity(focal.n_clusters());
-            for _ in 0..focal.n_items() {
+        for target in Clustering::iter(n_items) {
+            let target = Clustering::from_vector(target);
+            let mut vec = Vec::with_capacity(target.n_clusters());
+            for _ in 0..target.n_items() {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters =
-                FRPParameters::new(focal, weights, permutation, mass, discount, power).unwrap();
+            let parameters = TRPParameters::new(
+                target,
+                weights,
+                permutation,
+                Box::new(CRPParameters::new_with_mass_and_discount(
+                    mass, discount, n_items,
+                )),
+                loss_function,
+            )
+            .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
@@ -187,18 +202,26 @@ mod tests {
         let discount = 0.1;
         let mass = Mass::new_with_variable_constraint(2.0, discount);
         let discount = Discount::new(discount);
-        let power = Power::new(0.5);
+        let loss_function = LossFunction::VI(1.0);
         let mut rng = thread_rng();
-        for focal in Clustering::iter(n_items) {
-            let focal = Clustering::from_vector(focal);
-            let mut vec = Vec::with_capacity(focal.n_clusters());
-            for _ in 0..focal.n_items() {
+        for target in Clustering::iter(n_items) {
+            let target = Clustering::from_vector(target);
+            let mut vec = Vec::with_capacity(target.n_clusters());
+            for _ in 0..target.n_items() {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters =
-                FRPParameters::new(focal, weights, permutation, mass, discount, power).unwrap();
+            let parameters = TRPParameters::new(
+                target,
+                weights,
+                permutation,
+                Box::new(CRPParameters::new_with_mass_and_discount(
+                    mass, discount, n_items,
+                )),
+                loss_function,
+            )
+            .unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
@@ -207,16 +230,17 @@ mod tests {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
+pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     n_items: i32,
     focal_ptr: *const i32,
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
-    mass: f64,
-    discount: f64,
-    power: f64,
-) -> *mut FRPParameters {
+    base_id: i32,
+    base_ptr: *const c_void,
+    loss: i32,
+    a: f64,
+) -> *mut TRPParameters {
     let ni = n_items as usize;
     let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
@@ -228,11 +252,39 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
-    let d = Discount::new(discount);
-    let m = Mass::new_with_variable_constraint(mass, discount);
-    let p = Power::new(power);
+    let base_distribution: Box<dyn PartitionLogProbability> = match base_id {
+        1 => {
+            let p = std::ptr::NonNull::new(base_ptr as *mut CRPParameters).unwrap();
+            Box::new(p.as_ref().clone())
+        }
+        2 => {
+            let p = std::ptr::NonNull::new(base_ptr as *mut FRPParameters).unwrap();
+            Box::new(p.as_ref().clone())
+        }
+        3 => {
+            let p = std::ptr::NonNull::new(base_ptr as *mut LSPParameters).unwrap();
+            Box::new(p.as_ref().clone())
+        }
+        4 => {
+            let p = std::ptr::NonNull::new(base_ptr as *mut CPPParameters).unwrap();
+            Box::new(p.as_ref().clone())
+        }
+        5 => {
+            let p = std::ptr::NonNull::new(base_ptr as *mut EPAParameters).unwrap();
+            Box::new(p.as_ref().clone())
+        }
+        _ => panic!("Unsupported prior ID: {}", base_id),
+    };
+    let loss_function = LossFunction::from_code(loss, a).unwrap();
     // First we create a new object.
-    let obj = FRPParameters::new(focal, weights, permutation, m, d, p).unwrap();
+    let obj = TRPParameters::new(
+        focal,
+        weights,
+        permutation,
+        base_distribution,
+        loss_function,
+    )
+    .unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
@@ -240,7 +292,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__frpparameters_free(obj: *mut FRPParameters) {
+pub unsafe extern "C" fn dahl_randompartition__trpparameters_free(obj: *mut TRPParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;

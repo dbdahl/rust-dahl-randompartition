@@ -12,6 +12,7 @@ use dahl_salso::log2cache::Log2Cache;
 use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputer};
 use std::slice;
 
+#[derive(Debug, Clone)]
 pub struct CPPParameters {
     center: Clustering,
     rate: Rate,

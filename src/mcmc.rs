@@ -1,4 +1,5 @@
-use crate::clust::{Clustering, Permutation};
+use crate::clust::Clustering;
+use crate::perm::Permutation;
 use crate::push_into_slice_i32;
 
 //use crate::frp;

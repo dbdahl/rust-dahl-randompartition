@@ -1,6 +1,7 @@
 // Ewens Pitman attraction partition distribution
 
-use crate::clust::{Clustering, Permutation};
+use crate::clust::Clustering;
+use crate::perm::Permutation;
 use crate::prelude::*;
 
 use crate::mcmc::PriorLogWeight;
@@ -11,7 +12,7 @@ use std::slice;
 
 type SimilarityBorrower<'a> = SquareMatrixBorrower<'a>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EPAParameters<'a> {
     similarity: SimilarityBorrower<'a>,
     permutation: Permutation,
@@ -95,9 +96,9 @@ impl SquareMatrix {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SquareMatrixBorrower<'a> {
-    data: &'a mut [f64],
+    data: &'a [f64],
     n_items: usize,
 }
 
@@ -105,12 +106,6 @@ impl std::ops::Index<(usize, usize)> for SquareMatrixBorrower<'_> {
     type Output = f64;
     fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
         &self.data[self.n_items * j + i]
-    }
-}
-
-impl std::ops::IndexMut<(usize, usize)> for SquareMatrixBorrower<'_> {
-    fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
-        &mut self.data[self.n_items * j + i]
     }
 }
 
@@ -133,15 +128,7 @@ impl<'a> SquareMatrixBorrower<'a> {
         self.data.get_unchecked(self.n_items * j + i)
     }
 
-    pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut f64 {
-        self.data.get_unchecked_mut(self.n_items * j + i)
-    }
-
     pub fn data(&self) -> &[f64] {
-        self.data
-    }
-
-    pub fn data_mut(&mut self) -> &mut [f64] {
         self.data
     }
 
@@ -356,62 +343,3 @@ pub unsafe extern "C" fn dahl_randompartition__epaparameters_free(obj: *mut EPAP
     // Then explicitly drop it (optional)
     drop(boxed);
 }
-
-/*
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__epa_partition(
-    do_sampling: i32,
-    n_partitions: i32,
-    n_items: i32,
-    partition_labels_ptr: *mut i32,
-    partition_probs_ptr: *mut f64,
-    seed_ptr: *const i32, // Assumed length is 32
-    similarity_ptr: *mut f64,
-    permutation_ptr: *const i32,
-    mass: f64,
-    discount: f64,
-    use_random_permutation: i32,
-) -> () {
-    let np = n_partitions as usize;
-    let ni = n_items as usize;
-    let similarity = SimilarityBorrower(SquareMatrixBorrower::from_ptr(similarity_ptr, ni));
-    let mut permutation = if use_random_permutation != 0 {
-        Permutation::natural(ni)
-    } else {
-        let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
-        let permutation_vector: Vec<usize> =
-            permutation_slice.iter().map(|x| *x as usize).collect();
-        Permutation::from_vector(permutation_vector).unwrap()
-    };
-    let mass = Mass::new_with_variable_constraint(mass, discount);
-    let discount = Discount::new(discount);
-    let matrix: &mut [i32] = slice::from_raw_parts_mut(partition_labels_ptr, np * ni);
-    let probs: &mut [f64] = slice::from_raw_parts_mut(partition_probs_ptr, np);
-    if do_sampling != 0 {
-        let mut rng = &mut mk_rng_isaac(seed_ptr);
-        for i in 0..np {
-            if use_random_permutation != 0 {
-                permutation.shuffle(&mut rng);
-            }
-            let parameters = EPAParameters::new(&similarity, &permutation, mass, discount).unwrap();
-            let p = engine(&parameters, TargetOrRandom::Random(rng));
-            let labels = p.0.labels();
-            for j in 0..ni {
-                matrix[np * j + i] = i32::try_from(labels[j].unwrap() + 1).unwrap();
-            }
-            probs[i] = p.1;
-        }
-    } else {
-        for i in 0..np {
-            let mut target_labels = Vec::with_capacity(ni);
-            for j in 0..ni {
-                target_labels.push(matrix[np * j + i]);
-            }
-            let mut target = Partition::from(&target_labels[..]);
-            let parameters = EPAParameters::new(&similarity, &permutation, mass, discount).unwrap();
-            let p = engine::<IsaacRng>(&parameters, TargetOrRandom::Target(&mut target));
-            probs[i] = p.1;
-        }
-    }
-}
-*/

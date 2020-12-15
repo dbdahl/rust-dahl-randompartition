@@ -1,7 +1,8 @@
 // Location scale partition distribution
 
-use crate::clust::{Clustering, Permutation};
+use crate::clust::Clustering;
 use crate::mcmc::PriorLogWeight;
+use crate::perm::Permutation;
 use crate::prelude::*;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
 
@@ -9,7 +10,7 @@ use rand::prelude::*;
 use rand_isaac::IsaacRng;
 use std::slice;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LSPParameters {
     pub location: Clustering,
     pub scale: Scale,
