@@ -149,8 +149,8 @@ constrained_f64!(
 
 constrained_f64!(
     Power,
-    (|x| x >= 0.0),
-    "Power must be greater than or equal to zero.",
+    (|x: f64| !x.is_nan()),
+    "Power may not be NaN.",
     (|_x, _y| false),
     "Not supported."
 );

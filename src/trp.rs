@@ -1,19 +1,23 @@
 // Focal random partition distribution
 
 use crate::clust::Clustering;
+use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
+use crate::epa::EPAParameters;
+use crate::frp::FRPParameters;
+use crate::lsp::LSPParameters;
 use crate::mcmc::PriorLogWeight;
 use crate::perm::Permutation;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
 use crate::wgt::Weights;
-use crate::cpp::CPPParameters;
-use crate::epa::EPAParameters;
-use crate::frp::FRPParameters;
-use crate::lsp::LSPParameters;
 
 use dahl_salso::clustering::{Clusterings, WorkingClustering};
 use dahl_salso::log2cache::Log2Cache;
-use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputerOwned};
+use dahl_salso::optimize::{
+    BinderCMLossComputer, CMLossComputer, GeneralInformationBasedCMLossComputer,
+    IDInformationBasedLoss, NIDInformationBasedLoss, NVIInformationBasedLoss, OMARICMLossComputer,
+    VICMLossComputer,
+};
 use dahl_salso::LossFunction;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
@@ -24,7 +28,7 @@ pub struct TRPParameters {
     pub target: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
-    pub base_distribution: Box<dyn PartitionLogProbability>,
+    pub baseline_distribution: Box<dyn PartitionLogProbability>,
     pub loss_function: LossFunction,
 }
 
@@ -33,7 +37,7 @@ impl TRPParameters {
         target: Clustering,
         weights: Weights,
         permutation: Permutation,
-        base_distribution: Box<dyn PartitionLogProbability>,
+        baseline_distribution: Box<dyn PartitionLogProbability>,
         loss_function: LossFunction,
     ) -> Option<Self> {
         if weights.len() != target.n_items() {
@@ -45,7 +49,7 @@ impl TRPParameters {
                 target: target.standardize(),
                 weights,
                 permutation,
-                base_distribution,
+                baseline_distribution,
                 loss_function,
             })
         }
@@ -91,12 +95,31 @@ fn compute_loss<'a>(x: &Clustering, parameters: &'a TRPParameters) -> f64 {
         y.iter().map(|x| x.0).collect(),
         (x.max_label() + 1) as dahl_salso::LabelType,
     );
+    let cache = Log2Cache::new(match parameters.loss_function {
+        LossFunction::VI(_) | LossFunction::NVI | LossFunction::ID | LossFunction::NID => {
+            parameters.target.n_items()
+        }
+        _ => 0,
+    });
     let loss_computer: Box<dyn CMLossComputer> = match parameters.loss_function {
-        LossFunction::VI(a) => Box::new(VICMLossComputerOwned::new(
-            a,
-            Log2Cache::new(parameters.target.n_items()),
-        )),
         LossFunction::BinderDraws(a) => Box::new(BinderCMLossComputer::new(a)),
+        LossFunction::OneMinusARI => Box::new(OMARICMLossComputer::new(1)),
+        LossFunction::VI(a) => Box::new(VICMLossComputer::new(a, &cache)),
+        LossFunction::NVI => Box::new(GeneralInformationBasedCMLossComputer::new(
+            1,
+            &cache,
+            NVIInformationBasedLoss {},
+        )),
+        LossFunction::ID => Box::new(GeneralInformationBasedCMLossComputer::new(
+            1,
+            &cache,
+            IDInformationBasedLoss {},
+        )),
+        LossFunction::NID => Box::new(GeneralInformationBasedCMLossComputer::new(
+            1,
+            &cache,
+            NIDInformationBasedLoss {},
+        )),
         _ => panic!("Unsupported loss function."),
     };
     let labels: Vec<_> = y.iter().map(|x| x.1).collect();
@@ -125,7 +148,7 @@ fn engine<'a, T: Rng>(
                 candidate.allocate(ii, label);
                 // This could be more efficient, since compute_loss does things every loop that could be done just once.
                 let loss_value = compute_loss(&candidate, parameters);
-                let weight = parameters.base_distribution.log_probability(&candidate)
+                let weight = parameters.baseline_distribution.log_probability(&candidate)
                     - scaled_weight * loss_value;
                 (label, weight)
             });
@@ -230,8 +253,8 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
-    base_id: i32,
-    base_ptr: *const c_void,
+    baseline_id: i32,
+    baseline_ptr: *const c_void,
     loss: i32,
     a: f64,
 ) -> *mut TRPParameters {
@@ -246,28 +269,28 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
-    let base_distribution: Box<dyn PartitionLogProbability> = match base_id {
+    let baseline_distribution: Box<dyn PartitionLogProbability> = match baseline_id {
         1 => {
-            let p = std::ptr::NonNull::new(base_ptr as *mut CRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_ptr as *mut CRPParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         2 => {
-            let p = std::ptr::NonNull::new(base_ptr as *mut FRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_ptr as *mut FRPParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         3 => {
-            let p = std::ptr::NonNull::new(base_ptr as *mut LSPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_ptr as *mut LSPParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         4 => {
-            let p = std::ptr::NonNull::new(base_ptr as *mut CPPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_ptr as *mut CPPParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         5 => {
-            let p = std::ptr::NonNull::new(base_ptr as *mut EPAParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_ptr as *mut EPAParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
-        _ => panic!("Unsupported prior ID: {}", base_id),
+        _ => panic!("Unsupported prior ID: {}", baseline_id),
     };
     let loss_function = LossFunction::from_code(loss, a).unwrap();
     // First we create a new object.
@@ -275,7 +298,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
         focal,
         weights,
         permutation,
-        base_distribution,
+        baseline_distribution,
         loss_function,
     )
     .unwrap();
