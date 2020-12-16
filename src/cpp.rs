@@ -14,50 +14,50 @@ use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct CPPParameters {
-    opined: Clustering,
+    baseline: Clustering,
     rate: Rate,
     mass: Mass,
     discount: Discount,
     use_vi: bool,
     a: f64,
     log2cache: Log2Cache,
-    opined_as_clusterings: Clusterings,
+    baseline_as_clusterings: Clusterings,
 }
 
 impl CPPParameters {
-    pub fn use_vi(opined: Clustering, rate: Rate, mass: Mass, discount: Discount) -> Option<Self> {
-        Self::new(opined, rate, mass, discount, true, 1.0)
+    pub fn use_vi(baseline: Clustering, rate: Rate, mass: Mass, discount: Discount) -> Option<Self> {
+        Self::new(baseline, rate, mass, discount, true, 1.0)
     }
 
     pub fn use_binder(
-        opined: Clustering,
+        baseline: Clustering,
         rate: Rate,
         mass: Mass,
         discount: Discount,
     ) -> Option<Self> {
-        Self::new(opined, rate, mass, discount, false, 1.0)
+        Self::new(baseline, rate, mass, discount, false, 1.0)
     }
 
     pub fn new(
-        opined: Clustering,
+        baseline: Clustering,
         rate: Rate,
         mass: Mass,
         discount: Discount,
         use_vi: bool,
         a: f64,
     ) -> Option<Self> {
-        let labels: Vec<_> = opined.allocation().iter().map(|x| *x as i32).collect();
-        let n_items = opined.n_items();
-        let opined_as_clusterings = Clusterings::from_i32_column_major_order(&labels[..], n_items);
+        let labels: Vec<_> = baseline.allocation().iter().map(|x| *x as i32).collect();
+        let n_items = baseline.n_items();
+        let baseline_as_clusterings = Clusterings::from_i32_column_major_order(&labels[..], n_items);
         Some(Self {
-            opined,
+            baseline,
             rate,
             mass,
             discount,
             use_vi,
             a,
             log2cache: Log2Cache::new(n_items),
-            opined_as_clusterings,
+            baseline_as_clusterings,
         })
     }
 }
@@ -97,13 +97,13 @@ fn log_pmf(target: &Clustering, parameters: &CPPParameters) -> f64 {
     let distance = computer.compute_loss(
         &target_as_working,
         &parameters
-            .opined_as_clusterings
+            .baseline_as_clusterings
             .make_confusion_matrices(&target_as_working),
     );
     let crp_parameters = CRPParameters::new_with_mass_and_discount(
         parameters.mass,
         parameters.discount,
-        parameters.opined.n_items(),
+        parameters.baseline.n_items(),
     );
     crp_parameters.log_probability(target) - parameters.rate.unwrap() * distance
 }
@@ -121,11 +121,11 @@ mod tests {
         let mass = Mass::new_with_variable_constraint(2.0, discount);
         let discount = Discount::new(discount);
         let mut rng = thread_rng();
-        for opined in Clustering::iter(n_items) {
-            let opined = Clustering::from_vector(opined);
+        for baseline in Clustering::iter(n_items) {
+            let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0, 10.0));
             //let rate = Rate::new(0.0);
-            let parameters = CPPParameters::use_vi(opined, rate, mass, discount).unwrap();
+            let parameters = CPPParameters::use_vi(baseline, rate, mass, discount).unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.
@@ -137,7 +137,7 @@ mod tests {
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__cppparameters_new(
     n_items: i32,
-    opined_ptr: *const i32,
+    baseline_ptr: *const i32,
     rate: f64,
     mass: f64,
     discount: f64,
@@ -145,12 +145,12 @@ pub unsafe extern "C" fn dahl_randompartition__cppparameters_new(
     a: f64,
 ) -> *mut CPPParameters {
     let ni = n_items as usize;
-    let opined = Clustering::from_slice(slice::from_raw_parts(opined_ptr, ni));
+    let baseline = Clustering::from_slice(slice::from_raw_parts(baseline_ptr, ni));
     let r = Rate::new(rate);
     let d = Discount::new(discount);
     let m = Mass::new_with_variable_constraint(mass, discount);
     // First we create a new object.
-    let obj = CPPParameters::new(opined, r, m, d, use_vi, a).unwrap();
+    let obj = CPPParameters::new(baseline, r, m, d, use_vi, a).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer

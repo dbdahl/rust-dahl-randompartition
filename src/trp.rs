@@ -249,17 +249,17 @@ mod tests {
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     n_items: i32,
-    opined_ptr: *const i32,
+    baseline_partition_ptr: *const i32,
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
-    baseline_id: i32,
-    baseline_ptr: *const c_void,
+    baseline_distr_id: i32,
+    baseline_distr_ptr: *const c_void,
     loss: i32,
     a: f64,
 ) -> *mut TRPParameters {
     let ni = n_items as usize;
-    let opined = Clustering::from_slice(slice::from_raw_parts(opined_ptr, ni));
+    let opined = Clustering::from_slice(slice::from_raw_parts(baseline_partition_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
     let permutation = if use_natural_permutation != 0 {
         Permutation::natural_and_fixed(ni)
@@ -269,28 +269,28 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
-    let baseline_distribution: Box<dyn PartitionLogProbability> = match baseline_id {
+    let baseline_distribution: Box<dyn PartitionLogProbability> = match baseline_distr_id {
         1 => {
-            let p = std::ptr::NonNull::new(baseline_ptr as *mut CRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CRPParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         2 => {
-            let p = std::ptr::NonNull::new(baseline_ptr as *mut FRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut FRPParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         3 => {
-            let p = std::ptr::NonNull::new(baseline_ptr as *mut LSPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut LSPParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         4 => {
-            let p = std::ptr::NonNull::new(baseline_ptr as *mut CPPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CPPParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         5 => {
-            let p = std::ptr::NonNull::new(baseline_ptr as *mut EPAParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut EPAParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
-        _ => panic!("Unsupported prior ID: {}", baseline_id),
+        _ => panic!("Unsupported prior ID: {}", baseline_distr_id),
     };
     let loss_function = LossFunction::from_code(loss, a).unwrap();
     // First we create a new object.

@@ -13,7 +13,7 @@ use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct FRPParameters {
-    pub opined: Clustering,
+    pub baseline: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
     pub mass: Mass,
@@ -23,20 +23,20 @@ pub struct FRPParameters {
 
 impl FRPParameters {
     pub fn new(
-        opined: Clustering,
+        baseline: Clustering,
         weights: Weights,
         permutation: Permutation,
         mass: Mass,
         discount: Discount,
         power: Power,
     ) -> Option<Self> {
-        if weights.len() != opined.n_items() {
+        if weights.len() != baseline.n_items() {
             None
-        } else if opined.n_items() != permutation.len() {
+        } else if baseline.n_items() != permutation.len() {
             None
         } else {
             Some(Self {
-                opined: opined.standardize(),
+                baseline: baseline.standardize(),
                 weights,
                 permutation,
                 mass,
@@ -79,25 +79,25 @@ fn engine<T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let ni = parameters.opined.n_items();
+    let ni = parameters.baseline.n_items();
     let mass = parameters.mass.unwrap();
     let discount = parameters.discount.unwrap();
     let power = parameters.power.unwrap();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut total_counter = vec![0.0; parameters.opined.max_label() + 1];
+    let mut total_counter = vec![0.0; parameters.baseline.max_label() + 1];
     let mut intersection_counter = Vec::with_capacity(total_counter.len());
     for _ in 0..total_counter.len() {
         intersection_counter.push(Vec::new())
     }
     for i in 0..clustering.n_items() {
         let ii = parameters.permutation.get(i);
-        let opined_subset_index = parameters.opined[ii];
+        let baseline_subset_index = parameters.baseline[ii];
         let scaled_weight = (i as f64) * parameters.weights[ii];
-        let normalized_scaled_weight = if total_counter[opined_subset_index] == 0.0 {
+        let normalized_scaled_weight = if total_counter[baseline_subset_index] == 0.0 {
             0.0
         } else {
-            scaled_weight / total_counter[opined_subset_index]
+            scaled_weight / total_counter[baseline_subset_index]
         };
         let n_occupied_subsets = clustering.n_clusters() as f64;
         let labels_and_weights = clustering
@@ -109,7 +109,7 @@ fn engine<T: Rng>(
                         1.0
                     } else {
                         mass + discount * n_occupied_subsets + {
-                            if total_counter[opined_subset_index] == 0.0 {
+                            if total_counter[baseline_subset_index] == 0.0 {
                                 scaled_weight
                             } else {
                                 0.0
@@ -118,7 +118,7 @@ fn engine<T: Rng>(
                     }
                 } else {
                     ((n_items_in_cluster as f64) - discount).powf(power)
-                        + normalized_scaled_weight * intersection_counter[opined_subset_index][label]
+                        + normalized_scaled_weight * intersection_counter[baseline_subset_index][label]
                 };
                 (label, weight)
             });
@@ -138,8 +138,8 @@ fn engine<T: Rng>(
                 counter.resize(subset_index + 1, 0.0);
             }
         }
-        intersection_counter[opined_subset_index][subset_index] += 1.0;
-        total_counter[opined_subset_index] += 1.0;
+        intersection_counter[baseline_subset_index][subset_index] += 1.0;
+        total_counter[baseline_subset_index] += 1.0;
         clustering.allocate(ii, subset_index);
     }
     (clustering, log_probability)
@@ -157,16 +157,16 @@ mod tests {
         let discount = Discount::new(discount);
         let power = Power::new(0.5);
         let mut rng = thread_rng();
-        for opined in Clustering::iter(n_items) {
-            let opined = Clustering::from_vector(opined);
-            let mut vec = Vec::with_capacity(opined.n_clusters());
-            for _ in 0..opined.n_items() {
+        for baseline in Clustering::iter(n_items) {
+            let baseline = Clustering::from_vector(baseline);
+            let mut vec = Vec::with_capacity(baseline.n_clusters());
+            for _ in 0..baseline.n_items() {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
-                FRPParameters::new(opined, weights, permutation, mass, discount, power).unwrap();
+                FRPParameters::new(baseline, weights, permutation, mass, discount, power).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
@@ -189,16 +189,16 @@ mod tests {
         let discount = Discount::new(discount);
         let power = Power::new(0.5);
         let mut rng = thread_rng();
-        for opined in Clustering::iter(n_items) {
-            let opined = Clustering::from_vector(opined);
-            let mut vec = Vec::with_capacity(opined.n_clusters());
-            for _ in 0..opined.n_items() {
+        for baseline in Clustering::iter(n_items) {
+            let baseline = Clustering::from_vector(baseline);
+            let mut vec = Vec::with_capacity(baseline.n_clusters());
+            for _ in 0..baseline.n_items() {
                 vec.push(rng.gen_range(0.0, 10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
-                FRPParameters::new(opined, weights, permutation, mass, discount, power).unwrap();
+                FRPParameters::new(baseline, weights, permutation, mass, discount, power).unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
@@ -209,7 +209,7 @@ mod tests {
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     n_items: i32,
-    opined_ptr: *const i32,
+    baseline_ptr: *const i32,
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
@@ -218,7 +218,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     power: f64,
 ) -> *mut FRPParameters {
     let ni = n_items as usize;
-    let opined = Clustering::from_slice(slice::from_raw_parts(opined_ptr, ni));
+    let baseline = Clustering::from_slice(slice::from_raw_parts(baseline_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
     let permutation = if use_natural_permutation != 0 {
         Permutation::natural_and_fixed(ni)
@@ -232,7 +232,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     let m = Mass::new_with_variable_constraint(mass, discount);
     let p = Power::new(power);
     // First we create a new object.
-    let obj = FRPParameters::new(opined, weights, permutation, m, d, p).unwrap();
+    let obj = FRPParameters::new(baseline, weights, permutation, m, d, p).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer

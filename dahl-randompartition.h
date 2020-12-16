@@ -28,7 +28,7 @@ typedef struct {
 } RR_SEXP;
 
 CPPParameters *dahl_randompartition__cppparameters_new(int32_t n_items,
-                                                       const int32_t *opined_ptr,
+                                                       const int32_t *baseline_ptr,
                                                        double rate,
                                                        double mass,
                                                        double discount,
@@ -53,7 +53,7 @@ EPAParameters *dahl_randompartition__epaparameters_new(int32_t n_items,
 void dahl_randompartition__epaparameters_free(EPAParameters *obj);
 
 FRPParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
-                                                       const int32_t *opined_ptr,
+                                                       const int32_t *baseline_ptr,
                                                        const double *weights_ptr,
                                                        const int32_t *permutation_ptr,
                                                        int32_t use_natural_permutation,
@@ -64,7 +64,7 @@ FRPParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
 void dahl_randompartition__frpparameters_free(FRPParameters *obj);
 
 LSPParameters *dahl_randompartition__lspparameters_new(int32_t n_items,
-                                                       const int32_t *opined_ptr,
+                                                       const int32_t *baseline_ptr,
                                                        double rate,
                                                        const int32_t *permutation_ptr,
                                                        int32_t use_natural_permutation);
@@ -130,12 +130,12 @@ void dahl_randompartition__log_probability_of_partition(int32_t n_partitions,
                                                         const void *prior_ptr);
 
 TRPParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
-                                                       const int32_t *opined_ptr,
+                                                       const int32_t *baseline_partition_ptr,
                                                        const double *weights_ptr,
                                                        const int32_t *permutation_ptr,
                                                        int32_t use_natural_permutation,
-                                                       int32_t baseline_id,
-                                                       const void *baseline_ptr,
+                                                       int32_t baseline_distr_id,
+                                                       const void *baseline_distr_ptr,
                                                        int32_t loss,
                                                        double a);
 

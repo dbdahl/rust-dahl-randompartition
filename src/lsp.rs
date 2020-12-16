@@ -12,7 +12,7 @@ use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct LSPParameters {
-    pub opined: Clustering,
+    pub baseline: Clustering,
     pub scale: Scale,
     pub rate: Rate,
     pub permutation: Permutation,
@@ -20,27 +20,27 @@ pub struct LSPParameters {
 
 impl LSPParameters {
     pub fn new_with_scale(
-        opined: Clustering,
+        baseline: Clustering,
         scale: Scale,
         permutation: Permutation,
     ) -> Option<Self> {
-        if opined.n_items() != permutation.len() {
+        if baseline.n_items() != permutation.len() {
             None
         } else {
             Some(Self {
-                opined,
+                baseline,
                 scale,
                 rate: Rate::new(1.0 / scale.unwrap()),
                 permutation,
             })
         }
     }
-    pub fn new_with_rate(opined: Clustering, rate: Rate, permutation: Permutation) -> Option<Self> {
-        if opined.n_items() != permutation.len() {
+    pub fn new_with_rate(baseline: Clustering, rate: Rate, permutation: Permutation) -> Option<Self> {
+        if baseline.n_items() != permutation.len() {
             None
         } else {
             Some(Self {
-                opined,
+                baseline,
                 scale: Scale::new(1.0 / rate.unwrap()),
                 rate,
                 permutation,
@@ -81,10 +81,10 @@ fn engine<T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let ni = parameters.opined.n_items();
+    let ni = parameters.baseline.n_items();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut total_counter = vec![0.0; parameters.opined.max_label() + 1];
+    let mut total_counter = vec![0.0; parameters.baseline.max_label() + 1];
     let mut intersection_counter = Vec::with_capacity(total_counter.len());
     for _ in 0..total_counter.len() {
         intersection_counter.push(Vec::new())
@@ -93,7 +93,7 @@ fn engine<T: Rng>(
     let mut visited_subsets_indicator = vec![false; total_counter.len()];
     for i in 0..clustering.n_items() {
         let ii = parameters.permutation.get(i);
-        let opined_subset_index = parameters.opined[ii];
+        let baseline_subset_index = parameters.baseline[ii];
         let n_occupied_subsets = clustering.n_clusters() as f64;
         let labels_and_weights = clustering
             .available_labels_for_allocation_with_target(target, ii)
@@ -104,7 +104,7 @@ fn engine<T: Rng>(
                         1.0
                     } else {
                         {
-                            if total_counter[opined_subset_index] == 0.0 {
+                            if total_counter[baseline_subset_index] == 0.0 {
                                 (1.0 + parameters.rate)
                                     / (1.0 + (n_visited_subsets as f64) + parameters.rate)
                             } else {
@@ -113,7 +113,7 @@ fn engine<T: Rng>(
                         }
                     }
                 } else {
-                    (1.0 + parameters.rate * intersection_counter[opined_subset_index][label])
+                    (1.0 + parameters.rate * intersection_counter[baseline_subset_index][label])
                         / (1.0
                             + (n_visited_subsets as f64)
                             + parameters.rate * (n_items_in_cluster as f64))
@@ -136,12 +136,12 @@ fn engine<T: Rng>(
                 counter.resize(subset_index + 1, 0.0);
             }
         }
-        intersection_counter[opined_subset_index][subset_index] += 1.0;
-        total_counter[opined_subset_index] += 1.0;
+        intersection_counter[baseline_subset_index][subset_index] += 1.0;
+        total_counter[baseline_subset_index] += 1.0;
         clustering.allocate(ii, subset_index);
-        if !visited_subsets_indicator[opined_subset_index] {
+        if !visited_subsets_indicator[baseline_subset_index] {
             n_visited_subsets += 1;
-            visited_subsets_indicator[opined_subset_index] = true;
+            visited_subsets_indicator[baseline_subset_index] = true;
         }
     }
     (clustering, log_probability)
@@ -155,11 +155,11 @@ mod tests {
     fn test_goodness_of_fit_constructive() {
         let n_items = 4;
         let mut rng = thread_rng();
-        for opined in Clustering::iter(n_items) {
-            let opined = Clustering::from_vector(opined);
+        for baseline in Clustering::iter(n_items) {
+            let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0, 10.0));
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters = LSPParameters::new_with_rate(opined, rate, permutation).unwrap();
+            let parameters = LSPParameters::new_with_rate(baseline, rate, permutation).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
@@ -178,11 +178,11 @@ mod tests {
     fn test_pmf() {
         let n_items = 5;
         let mut rng = thread_rng();
-        for opined in Clustering::iter(n_items) {
-            let opined = Clustering::from_vector(opined);
+        for baseline in Clustering::iter(n_items) {
+            let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0, 10.0));
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters = LSPParameters::new_with_rate(opined, rate, permutation).unwrap();
+            let parameters = LSPParameters::new_with_rate(baseline, rate, permutation).unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
@@ -193,13 +193,13 @@ mod tests {
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
     n_items: i32,
-    opined_ptr: *const i32,
+    baseline_ptr: *const i32,
     rate: f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
 ) -> *mut LSPParameters {
     let ni = n_items as usize;
-    let opined = Clustering::from_slice(slice::from_raw_parts(opined_ptr, ni));
+    let baseline = Clustering::from_slice(slice::from_raw_parts(baseline_ptr, ni));
     let permutation = if use_natural_permutation != 0 {
         Permutation::natural_and_fixed(ni)
     } else {
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
     };
     let r = Rate::new(rate);
     // First we create a new object.
-    let obj = LSPParameters::new_with_rate(opined, r, permutation).unwrap();
+    let obj = LSPParameters::new_with_rate(baseline, r, permutation).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
