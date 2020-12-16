@@ -15,6 +15,8 @@ typedef struct FixedPartitionParameters FixedPartitionParameters;
 
 typedef struct LSPParameters LSPParameters;
 
+typedef struct TRPParameters TRPParameters;
+
 typedef struct {
   const void *sexp_ptr;
   int32_t *data_ptr;
@@ -126,3 +128,15 @@ void dahl_randompartition__log_probability_of_partition(int32_t n_partitions,
                                                         double *log_probabilities_ptr,
                                                         int32_t prior_id,
                                                         const void *prior_ptr);
+
+TRPParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
+                                                       const int32_t *focal_ptr,
+                                                       const double *weights_ptr,
+                                                       const int32_t *permutation_ptr,
+                                                       int32_t use_natural_permutation,
+                                                       int32_t base_id,
+                                                       const void *base_ptr,
+                                                       int32_t loss,
+                                                       double a);
+
+void dahl_randompartition__trpparameters_free(TRPParameters *obj);

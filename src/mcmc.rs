@@ -5,10 +5,10 @@ use crate::push_into_slice_i32;
 //use crate::frp;
 use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
-//use crate::epa::{EPAParameters, SimilarityBorrower};
 use crate::epa::EPAParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
+use crate::trp::TRPParameters;
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use std::ffi::c_void;
@@ -228,6 +228,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
         }
         5 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
+            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        6 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

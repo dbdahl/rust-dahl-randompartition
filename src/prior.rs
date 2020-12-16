@@ -5,6 +5,7 @@ use crate::epa::EPAParameters;
 use crate::fixed::FixedPartitionParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
+use crate::trp::TRPParameters;
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
@@ -120,6 +121,18 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
                 sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
             }
         }
+        6 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
+            if randomize_permutation {
+                let callback = |p: &mut TRPParameters, rng: &mut IsaacRng| {
+                    p.shuffle_permutation(rng);
+                };
+                sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
+            } else {
+                let callback = |_p: &mut TRPParameters, _rng: &mut IsaacRng| {};
+                sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
+            }
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
 }
@@ -160,6 +173,10 @@ pub unsafe extern "C" fn dahl_randompartition__log_probability_of_partition(
         }
         5 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
+        }
+        6 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

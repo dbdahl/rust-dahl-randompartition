@@ -128,6 +128,10 @@ impl Clustering {
         self.allocation.len()
     }
 
+    pub fn n_items_allocated(&self) -> usize {
+        self.sizes.iter().sum()
+    }
+
     pub fn n_clusters(&self) -> usize {
         self.active_labels.len()
     }

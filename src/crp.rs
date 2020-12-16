@@ -71,7 +71,8 @@ impl PartitionSampler for CRPParameters {
 
 impl PartitionLogProbability for CRPParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
-        let ni = partition.n_items() as f64;
+        //let ni = partition.n_items() as f64;
+        let ni = partition.n_items_allocated() as f64;
         let ns = partition.n_clusters() as f64;
         let m = self.mass.unwrap();
         let d = self.discount.unwrap();

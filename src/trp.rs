@@ -6,11 +6,14 @@ use crate::mcmc::PriorLogWeight;
 use crate::perm::Permutation;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
 use crate::wgt::Weights;
-
 use crate::cpp::CPPParameters;
 use crate::epa::EPAParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
+
+use dahl_salso::clustering::{Clusterings, WorkingClustering};
+use dahl_salso::log2cache::Log2Cache;
+use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputerOwned};
 use dahl_salso::LossFunction;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
@@ -76,78 +79,69 @@ impl PartitionLogProbability for TRPParameters {
     }
 }
 
+fn compute_loss<'a>(x: &Clustering, parameters: &'a TRPParameters) -> f64 {
+    let y: Vec<_> = x
+        .allocation()
+        .iter()
+        .zip(parameters.target.allocation().iter())
+        .filter(|&x| *x.0 != usize::max_value())
+        .map(|x| (*x.0 as dahl_salso::LabelType, *x.1 as i32))
+        .collect();
+    let target_as_working = WorkingClustering::from_vector(
+        y.iter().map(|x| x.0).collect(),
+        (x.max_label() + 1) as dahl_salso::LabelType,
+    );
+    let loss_computer: Box<dyn CMLossComputer> = match parameters.loss_function {
+        LossFunction::VI(a) => Box::new(VICMLossComputerOwned::new(
+            a,
+            Log2Cache::new(parameters.target.n_items()),
+        )),
+        LossFunction::BinderDraws(a) => Box::new(BinderCMLossComputer::new(a)),
+        _ => panic!("Unsupported loss function."),
+    };
+    let labels: Vec<_> = y.iter().map(|x| x.1).collect();
+    let center_as_clusterings = Clusterings::from_i32_column_major_order(&labels[..], labels.len());
+    loss_computer.compute_loss(
+        &target_as_working,
+        &center_as_clusterings.make_confusion_matrices(&target_as_working),
+    )
+}
+
 fn engine<'a, T: Rng>(
     parameters: &'a TRPParameters,
-    _target: Option<&[usize]>,
-    mut _rng: Option<&mut T>,
+    target: Option<&[usize]>,
+    mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    /*
     let ni = parameters.target.n_items();
-    let mass = parameters.mass.unwrap();
-    let discount = parameters.discount.unwrap();
-    let power = parameters.power.unwrap();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut total_counter = vec![0.0; parameters.focal.max_label() + 1];
-    let mut intersection_counter = Vec::with_capacity(total_counter.len());
-    for _ in 0..total_counter.len() {
-        intersection_counter.push(Vec::new())
-    }
     for i in 0..clustering.n_items() {
         let ii = parameters.permutation.get(i);
-        let focal_subset_index = parameters.focal[ii];
         let scaled_weight = (i as f64) * parameters.weights[ii];
-        let normalized_scaled_weight = if total_counter[focal_subset_index] == 0.0 {
-            0.0
-        } else {
-            scaled_weight / total_counter[focal_subset_index]
-        };
-        let n_occupied_subsets = clustering.n_clusters() as f64;
         let labels_and_weights = clustering
             .available_labels_for_allocation_with_target(target, ii)
             .map(|label| {
-                let n_items_in_cluster = clustering.size_of(label);
-                let weight = if n_items_in_cluster == 0 {
-                    if n_occupied_subsets == 0.0 {
-                        1.0
-                    } else {
-                        mass + discount * n_occupied_subsets + {
-                            if total_counter[focal_subset_index] == 0.0 {
-                                scaled_weight
-                            } else {
-                                0.0
-                            }
-                        }
-                    }
-                } else {
-                    ((n_items_in_cluster as f64) - discount).powf(power)
-                        + normalized_scaled_weight * intersection_counter[focal_subset_index][label]
-                };
+                let mut candidate = clustering.clone();
+                candidate.allocate(ii, label);
+                // This could be more efficient, since compute_loss does things every loop that could be done just once.
+                let loss_value = compute_loss(&candidate, parameters);
+                let weight = parameters.base_distribution.log_probability(&candidate)
+                    - scaled_weight * loss_value;
                 (label, weight)
             });
         let (subset_index, log_probability_contribution) = match &mut rng {
-            Some(r) => clustering.select(labels_and_weights, false, 0, Some(r), true),
+            Some(r) => clustering.select(labels_and_weights, true, 0, Some(r), true),
             None => clustering.select::<IsaacRng, _>(
                 labels_and_weights,
-                false,
+                true,
                 target.unwrap()[ii],
                 None,
                 true,
             ),
         };
         log_probability += log_probability_contribution;
-        if subset_index >= intersection_counter[0].len() {
-            for counter in intersection_counter.iter_mut() {
-                counter.resize(subset_index + 1, 0.0);
-            }
-        }
-        intersection_counter[focal_subset_index][subset_index] += 1.0;
-        total_counter[focal_subset_index] += 1.0;
         clustering.allocate(ii, subset_index);
     }
-    */
-    let clustering = parameters.target.clone();
-    let log_probability = 0.0;
     (clustering, log_probability)
 }
 
