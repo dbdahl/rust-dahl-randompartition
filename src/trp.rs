@@ -1,4 +1,4 @@
-// Focal random partition distribution
+// Tilted random partition distribution
 
 use crate::clust::Clustering;
 use crate::cpp::CPPParameters;
@@ -123,10 +123,10 @@ fn compute_loss<'a>(x: &Clustering, parameters: &'a TRPParameters) -> f64 {
         _ => panic!("Unsupported loss function."),
     };
     let labels: Vec<_> = y.iter().map(|x| x.1).collect();
-    let center_as_clusterings = Clusterings::from_i32_column_major_order(&labels[..], labels.len());
+    let opined_as_clusterings = Clusterings::from_i32_column_major_order(&labels[..], labels.len());
     loss_computer.compute_loss(
         &target_as_working,
-        &center_as_clusterings.make_confusion_matrices(&target_as_working),
+        &opined_as_clusterings.make_confusion_matrices(&target_as_working),
     )
 }
 
@@ -249,7 +249,7 @@ mod tests {
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     n_items: i32,
-    focal_ptr: *const i32,
+    opined_ptr: *const i32,
     weights_ptr: *const f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
@@ -259,7 +259,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     a: f64,
 ) -> *mut TRPParameters {
     let ni = n_items as usize;
-    let focal = Clustering::from_slice(slice::from_raw_parts(focal_ptr, ni));
+    let opined = Clustering::from_slice(slice::from_raw_parts(opined_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
     let permutation = if use_natural_permutation != 0 {
         Permutation::natural_and_fixed(ni)
@@ -295,7 +295,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     let loss_function = LossFunction::from_code(loss, a).unwrap();
     // First we create a new object.
     let obj = TRPParameters::new(
-        focal,
+        opined,
         weights,
         permutation,
         baseline_distribution,
