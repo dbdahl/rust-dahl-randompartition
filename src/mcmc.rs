@@ -295,6 +295,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
             let p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
+        6 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
+            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
     let (clustering, map) = current.relabel(1, None, true);
