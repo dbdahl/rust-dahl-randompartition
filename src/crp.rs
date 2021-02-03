@@ -71,27 +71,31 @@ impl PartitionSampler for CRPParameters {
 
 impl PartitionLogProbability for CRPParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
-        //let ni = partition.n_items() as f64;
-        let ni = partition.n_items_allocated() as f64;
-        let ns = partition.n_clusters() as f64;
         let m = self.mass.unwrap();
         let d = self.discount.unwrap();
-        let mut result = ln_gamma(m) - ln_gamma(m + ni);
+        let mut result = 0.0;
+        if m > 0.0 {
+            result -= ln_gamma(m + (partition.n_items_allocated() as f64)) - ln_gamma(m + 1.0)
+        } else {
+            for j in 1..partition.n_items_allocated() {
+                result -= (m + j as f64).ln()
+            }
+        }
         if d == 0.0 {
-            result += ns * m.ln();
+            result += ((partition.n_clusters() - 1) as f64) * m.ln();
             for label in partition.active_labels() {
                 result += ln_gamma(partition.size_of(*label) as f64);
             }
         } else {
-            let mut cum_d = 0.0;
-            for label in partition.active_labels() {
+            let mut cum_d = d;
+            for _ in 1..partition.n_clusters() {
                 result += (m + cum_d).ln();
                 cum_d += d;
-                let mut cum = 1.0;
+            }
+            for label in partition.active_labels() {
                 for i in 1..partition.size_of(*label) {
-                    cum *= i as f64 - d;
+                    result += (i as f64 - d).ln();
                 }
-                result += cum.ln();
             }
         }
         result
