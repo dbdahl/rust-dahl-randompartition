@@ -140,7 +140,7 @@ fn engine<'a, T: Rng>(
     let mut clustering = Clustering::unallocated(ni);
     for i in 0..clustering.n_items() {
         let ii = parameters.permutation.get(i);
-        let scaled_weight = parameters.weights[ii];
+        let scaled_weight = (i as f64) * parameters.weights[ii];
         let labels_and_weights = clustering
             .available_labels_for_allocation_with_target(target, ii)
             .map(|label| {
