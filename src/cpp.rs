@@ -16,6 +16,7 @@ use std::slice;
 pub struct CPPParameters {
     baseline: Clustering,
     rate: Rate,
+    uniform: bool,
     mass: Mass,
     discount: Discount,
     use_vi: bool,
@@ -25,22 +26,30 @@ pub struct CPPParameters {
 }
 
 impl CPPParameters {
-    pub fn use_vi(baseline: Clustering, rate: Rate, mass: Mass, discount: Discount) -> Option<Self> {
-        Self::new(baseline, rate, mass, discount, true, 1.0)
+    pub fn use_vi(
+        baseline: Clustering,
+        rate: Rate,
+        uniform: bool,
+        mass: Mass,
+        discount: Discount,
+    ) -> Option<Self> {
+        Self::new(baseline, rate, uniform, mass, discount, true, 1.0)
     }
 
     pub fn use_binder(
         baseline: Clustering,
         rate: Rate,
+        uniform: bool,
         mass: Mass,
         discount: Discount,
     ) -> Option<Self> {
-        Self::new(baseline, rate, mass, discount, false, 1.0)
+        Self::new(baseline, rate, uniform, mass, discount, false, 1.0)
     }
 
     pub fn new(
         baseline: Clustering,
         rate: Rate,
+        uniform: bool,
         mass: Mass,
         discount: Discount,
         use_vi: bool,
@@ -48,10 +57,12 @@ impl CPPParameters {
     ) -> Option<Self> {
         let labels: Vec<_> = baseline.allocation().iter().map(|x| *x as i32).collect();
         let n_items = baseline.n_items();
-        let baseline_as_clusterings = Clusterings::from_i32_column_major_order(&labels[..], n_items);
+        let baseline_as_clusterings =
+            Clusterings::from_i32_column_major_order(&labels[..], n_items);
         Some(Self {
             baseline,
             rate,
+            uniform,
             mass,
             discount,
             use_vi,
@@ -100,12 +111,17 @@ fn log_pmf(target: &Clustering, parameters: &CPPParameters) -> f64 {
             .baseline_as_clusterings
             .make_confusion_matrices(&target_as_working),
     );
-    let crp_parameters = CRPParameters::new_with_mass_and_discount(
-        parameters.mass,
-        parameters.discount,
-        parameters.baseline.n_items(),
-    );
-    crp_parameters.log_probability(target) - parameters.rate.unwrap() * distance
+    let log_multiplier = -parameters.rate.unwrap() * distance;
+    if parameters.uniform {
+        log_multiplier
+    } else {
+        let crp_parameters = CRPParameters::new_with_mass_and_discount(
+            parameters.mass,
+            parameters.discount,
+            parameters.baseline.n_items(),
+        );
+        crp_parameters.log_probability(target) + log_multiplier
+    }
 }
 
 #[cfg(test)]
@@ -125,7 +141,7 @@ mod tests {
             let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0, 10.0));
             //let rate = Rate::new(0.0);
-            let parameters = CPPParameters::use_vi(baseline, rate, mass, discount).unwrap();
+            let parameters = CPPParameters::use_vi(baseline, rate, false, mass, discount).unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.
@@ -139,6 +155,7 @@ pub unsafe extern "C" fn dahl_randompartition__cppparameters_new(
     n_items: i32,
     baseline_ptr: *const i32,
     rate: f64,
+    uniform: bool,
     mass: f64,
     discount: f64,
     use_vi: bool,
@@ -150,7 +167,7 @@ pub unsafe extern "C" fn dahl_randompartition__cppparameters_new(
     let d = Discount::new(discount);
     let m = Mass::new_with_variable_constraint(mass, discount);
     // First we create a new object.
-    let obj = CPPParameters::new(baseline, r, m, d, use_vi, a).unwrap();
+    let obj = CPPParameters::new(baseline, r, uniform, m, d, use_vi, a).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
