@@ -8,12 +8,16 @@ homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+
 dahl-roxido = { git="https://dahl-git.byu.edu/dahl/rust-dahl-roxido.git" }
 # dahl-roxido = { path="/home/dahl/docs/devel/rust-dahl-roxido" }
+
 dahl-salso = { git="https://dahl-git.byu.edu/dahl/rust-dahl-salso.git" }
 # dahl-salso = { path="/home/dahl/docs/devel/rust-dahl-salso" }
-rand = "0.7.2"
-rand_distr = "0.3.0"
-rand_isaac = "0.2.0"
-statrs = "0.12.0"
+
+rand = "0.8.3"
+rand_distr = "0.4.0"
+rand_isaac = "0.3.0"
+statrs = "0.13.0"
 quadrature = "0.1.2"
+

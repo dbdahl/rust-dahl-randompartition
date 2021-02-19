@@ -114,7 +114,7 @@ impl Clustering {
             panic!("Cluster with label {} does not already exists.", label);
         }
         if self.sizes[label] != 0 {
-            panic!("Cluster with label {} is not empty.");
+            panic!("Cluster with label {} is not empty.", label);
         }
         self.available_labels.swap_remove(
             self.available_labels

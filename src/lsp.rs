@@ -35,7 +35,11 @@ impl LSPParameters {
             })
         }
     }
-    pub fn new_with_rate(baseline: Clustering, rate: Rate, permutation: Permutation) -> Option<Self> {
+    pub fn new_with_rate(
+        baseline: Clustering,
+        rate: Rate,
+        permutation: Permutation,
+    ) -> Option<Self> {
         if baseline.n_items() != permutation.len() {
             None
         } else {
@@ -157,7 +161,7 @@ mod tests {
         let mut rng = thread_rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
-            let rate = Rate::new(rng.gen_range(0.0, 10.0));
+            let rate = Rate::new(rng.gen_range(0.0..10.0));
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters = LSPParameters::new_with_rate(baseline, rate, permutation).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
@@ -180,7 +184,7 @@ mod tests {
         let mut rng = thread_rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
-            let rate = Rate::new(rng.gen_range(0.0, 10.0));
+            let rate = Rate::new(rng.gen_range(0.0..10.0));
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters = LSPParameters::new_with_rate(baseline, rate, permutation).unwrap();
             let log_prob_closure =

@@ -139,7 +139,7 @@ mod tests {
         let mut rng = thread_rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
-            let rate = Rate::new(rng.gen_range(0.0, 10.0));
+            let rate = Rate::new(rng.gen_range(0.0..10.0));
             //let rate = Rate::new(0.0);
             let parameters = CPPParameters::use_vi(baseline, rate, false, mass, discount).unwrap();
             let log_prob_closure =

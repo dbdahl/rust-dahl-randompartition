@@ -118,7 +118,8 @@ fn engine<T: Rng>(
                     }
                 } else {
                     ((n_items_in_cluster as f64) - discount).powf(power)
-                        + normalized_scaled_weight * intersection_counter[baseline_subset_index][label]
+                        + normalized_scaled_weight
+                            * intersection_counter[baseline_subset_index][label]
                 };
                 (label, weight)
             });
@@ -161,7 +162,7 @@ mod tests {
             let baseline = Clustering::from_vector(baseline);
             let mut vec = Vec::with_capacity(baseline.n_clusters());
             for _ in 0..baseline.n_items() {
-                vec.push(rng.gen_range(0.0, 10.0));
+                vec.push(rng.gen_range(0.0..10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
@@ -193,7 +194,7 @@ mod tests {
             let baseline = Clustering::from_vector(baseline);
             let mut vec = Vec::with_capacity(baseline.n_clusters());
             for _ in 0..baseline.n_items() {
-                vec.push(rng.gen_range(0.0, 10.0));
+                vec.push(rng.gen_range(0.0..10.0));
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
