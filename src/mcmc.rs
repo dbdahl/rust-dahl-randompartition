@@ -9,6 +9,7 @@ use crate::epa::EPAParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
 use crate::trp::TRPParameters;
+use crate::urp::URPParameters;
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use std::ffi::c_void;
@@ -234,6 +235,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
             let p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
+        7 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut URPParameters).unwrap();
+            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
     clustering = clustering.relabel(1, None, false).0;
@@ -297,6 +302,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
         }
         6 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
+            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        7 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut URPParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

@@ -32,7 +32,7 @@ impl FRPParameters {
     ) -> Option<Self> {
         if weights.len() != baseline.n_items() {
             None
-        } else if baseline.n_items() != permutation.len() {
+        } else if baseline.n_items() != permutation.n_items() {
             None
         } else {
             Some(Self {

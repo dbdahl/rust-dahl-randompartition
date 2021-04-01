@@ -44,10 +44,10 @@ pub fn assert_goodness_of_fit(
         1.0
     };
     if p_value <= alpha {
-        panic!(format!(
+        panic!(
             "Rejected goodness of fit test... p-value: {:.8}, chisq: {:.2}, df: {}",
             p_value, chisq, df
-        ));
+        );
     }
 }
 
@@ -61,6 +61,7 @@ pub fn assert_pmf_sums_to_one(
         .sum();
     assert!(
         1.0 - epsilon <= sum && sum <= 1.0 + epsilon,
-        format!("Total probability should be one, but is {}.", sum)
+        "Total probability should be one, but is {}.",
+        sum
     );
 }

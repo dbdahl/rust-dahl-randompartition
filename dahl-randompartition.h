@@ -17,6 +17,8 @@ typedef struct LSPParameters LSPParameters;
 
 typedef struct TRPParameters TRPParameters;
 
+typedef struct URPParameters URPParameters;
+
 typedef struct RR_SEXP_vector_INTSXP {
   const void *sexp_ptr;
   int32_t *data_ptr;
@@ -141,3 +143,7 @@ struct TRPParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
                                                               double a);
 
 void dahl_randompartition__trpparameters_free(struct TRPParameters *obj);
+
+struct URPParameters *dahl_randompartition__urpparameters_new(int32_t n_items);
+
+void dahl_randompartition__urpparameters_free(struct URPParameters *obj);

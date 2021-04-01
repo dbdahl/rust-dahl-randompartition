@@ -27,7 +27,7 @@ impl<'a> EPAParameters<'a> {
         mass: Mass,
         discount: Discount,
     ) -> Option<Self> {
-        if similarity.n_items() != permutation.len() {
+        if similarity.n_items() != permutation.n_items() {
             None
         } else {
             Some(Self {

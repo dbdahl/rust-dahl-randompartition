@@ -42,12 +42,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "const_fn"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b9d6de7f49e22cf97ad17fc4036ece69300032f45f78f30b4a4482cdc3f4a6"
-
-[[package]]
 name = "crossbeam"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -84,12 +78,11 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.1"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1aaa739f95311c2c7887a76863f500026092fb1dce0161dab577e559ef3569d"
+checksum = "2584f639eb95fea8c798496315b297cf81b9b58b6d30ab066a75455333cf4b12"
 dependencies = [
  "cfg-if",
- "const_fn",
  "crossbeam-utils",
  "lazy_static",
  "memoffset",
@@ -108,9 +101,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.1"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02d96d1e189ef58269ebe5b97953da3274d83a93af647c2ddd6f9dab28cedb8d"
+checksum = "e7e9d99fa91428effe99c5c6d4634cdeba32b8cf784fc428a2a687f61a952c49"
 dependencies = [
  "autocfg",
  "cfg-if",
@@ -118,9 +111,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "dahl-bellnumber"
+version = "0.1.1"
+source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-bellnumber.git#405586d21b1c1425cd19e85559c3d1ef9b842ede"
+dependencies = [
+ "approx 0.4.0",
+ "num-bigint",
+ "num-rational 0.4.0",
+ "num-traits",
+]
+
+[[package]]
 name = "dahl-partition"
 version = "0.5.2"
-source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-partition.git#232beeefebfbb9de25cd146f617941796e5fd92f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92708a2c2d369d94f831f1a432ac330dec4b8636e27ec8ff0aaff3ea33376e1b"
 dependencies = [
  "rand 0.8.3",
 ]
@@ -129,7 +134,8 @@ dependencies = [
 name = "dahl-randompartition"
 version = "0.1.0"
 dependencies = [
- "dahl-roxido",
+ "dahl-bellnumber",
+ "dahl-roxido 0.3.2 (git+https://dahl-git.byu.edu/dahl/rust-dahl-roxido.git)",
  "dahl-salso",
  "quadrature",
  "rand 0.8.3",
@@ -140,8 +146,18 @@ dependencies = [
 
 [[package]]
 name = "dahl-roxido"
-version = "0.3.0"
-source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-roxido.git#d7b65605d4c55c837be0be7a7626e8f7834e6027"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41d8643b8c06f3a3cb9cabb7f6701a241320a8e25cbe87d0041e59b3f4ced59b"
+dependencies = [
+ "rand 0.8.3",
+ "rand_isaac",
+]
+
+[[package]]
+name = "dahl-roxido"
+version = "0.3.2"
+source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-roxido.git#10818ebbe4ab752472a9884b75daca11f54e54d7"
 dependencies = [
  "rand 0.8.3",
  "rand_isaac",
@@ -150,12 +166,12 @@ dependencies = [
 [[package]]
 name = "dahl-salso"
 version = "0.5.3"
-source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-salso.git#adf0a543f1a8ecbf4fd2f14cff7799f93daa1f52"
+source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-salso.git#56850d416607b5046e8941d77cbe04edafd42ebf"
 dependencies = [
  "approx 0.4.0",
  "crossbeam",
  "dahl-partition",
- "dahl-roxido",
+ "dahl-roxido 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ndarray",
  "num_cpus",
  "rand 0.8.3",
@@ -164,9 +180,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "0.13.2"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ed1e761351b56f54eb9dcd0cfaca9fd0daecf93918e1cfc01c8a3d26ee7adcd"
+checksum = "f797e67af32588215eaaab8327027ee8e71b9dd0b2b26996aedf20c030fce309"
 dependencies = [
  "typenum",
 ]
@@ -210,9 +226,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.86"
+version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
+checksum = "56d855069fafbb9b344c0f962150cd2c1187975cb1c22c1522c240d8c4986714"
 
 [[package]]
 name = "libm"
@@ -231,9 +247,9 @@ dependencies = [
 
 [[package]]
 name = "memoffset"
-version = "0.6.1"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "157b4208e3059a8f9e78d559edc658e13df41410cb3ae03979c83130067fdd87"
+checksum = "f83fb6581e8ed1f85fd45c116db8405483899489e38406156c25eb743554361d"
 dependencies = [
  "autocfg",
 ]
@@ -249,7 +265,7 @@ dependencies = [
  "generic-array",
  "matrixmultiply",
  "num-complex 0.2.4",
- "num-rational",
+ "num-rational 0.2.4",
  "num-traits",
  "rand 0.7.3",
  "rand_distr 0.2.2",
@@ -267,6 +283,17 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rawpointer",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e0d047c1062aa51e256408c560894e5251f08925980e53cf1aa5bd00eec6512"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -305,6 +332,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c000134b5dbf44adc5cb772486d335293351644b801551abe8f75c84cfa4aef"
 dependencies = [
  "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d41702bd167c2df5520b384281bc111a4b5efcf7fbc4c9c222c815b07e0a6a6a"
+dependencies = [
+ "autocfg",
+ "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -474,9 +513,9 @@ dependencies = [
 
 [[package]]
 name = "typenum"
-version = "1.12.0"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
+checksum = "879f6906492a7cd215bfa4cf595b600146ccfac0c79bcbd1f3000162af5e8b06"
 
 [[package]]
 name = "wasi"

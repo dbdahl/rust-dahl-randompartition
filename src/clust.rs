@@ -21,6 +21,8 @@ impl Index<usize> for Clustering {
 }
 
 impl Clustering {
+    const UNALLOCATED: usize = usize::MAX;
+
     /// An iterator over all possible partitions for the specified number of items.
     ///
     pub fn iter(n_items: usize) -> ClusteringIterator {
@@ -55,7 +57,7 @@ impl Clustering {
 
     pub fn unallocated(n_items: usize) -> Self {
         Self {
-            allocation: vec![usize::max_value(); n_items],
+            allocation: vec![Clustering::UNALLOCATED; n_items],
             sizes: Vec::new(),
             active_labels: Vec::new(),
             available_labels: Vec::new(),
@@ -132,12 +134,22 @@ impl Clustering {
         self.sizes.iter().sum()
     }
 
+    pub fn n_items_allocated_without(&self, item: usize) -> usize {
+        self.n_items_allocated()
+            - (if self.allocation[item] == Clustering::UNALLOCATED {
+                0
+            } else {
+                1
+            })
+    }
+
     pub fn n_clusters(&self) -> usize {
         self.active_labels.len()
     }
 
     pub fn n_clusters_without(&self, item: usize) -> usize {
-        if self.size_of(self.allocation[item]) > 1 {
+        let label = self.allocation[item];
+        if label == Clustering::UNALLOCATED || self.size_of(label) > 1 {
             self.active_labels.len()
         } else {
             self.active_labels.len() - 1
@@ -353,7 +365,7 @@ impl Clustering {
     ) -> (Self, Option<Vec<usize>>) {
         let n_items = self.n_items();
         if let Some(p) = permutation {
-            assert_eq!(n_items, p.len());
+            assert_eq!(n_items, p.n_items());
         };
         let mut labels = Vec::with_capacity(n_items);
         let mut sizes = Vec::with_capacity(first_label + self.active_labels.len() + 1);

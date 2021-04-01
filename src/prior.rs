@@ -6,6 +6,7 @@ use crate::fixed::FixedPartitionParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
 use crate::trp::TRPParameters;
+use crate::urp::URPParameters;
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
@@ -23,6 +24,28 @@ pub trait PartitionLogProbability {
 }
 
 pub fn sample_into_slice<S: PartitionSampler, T: Rng, F: Fn(&mut S, &mut T) -> ()>(
+    n_partitions: usize,
+    n_items: usize,
+    matrix: &mut [i32],
+    rng: &mut T,
+    distr: &mut S,
+    callback: F,
+) {
+    for i in 0..n_partitions {
+        callback(distr, rng);
+        let p = distr.sample(rng).standardize();
+        let labels = p.allocation();
+        for j in 0..n_items {
+            matrix[n_partitions * j + i] = i32::try_from(labels[j] + 1).unwrap();
+        }
+    }
+}
+
+pub fn sample_into_slice2<
+    S: crate::distr::PartitionSampler,
+    T: Rng,
+    F: Fn(&mut S, &mut T) -> (),
+>(
     n_partitions: usize,
     n_items: usize,
     matrix: &mut [i32],
@@ -133,6 +156,11 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
                 sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
             }
         }
+        7 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut URPParameters).unwrap();
+            let callback = |_p: &mut URPParameters, _rng: &mut IsaacRng| {};
+            sample_into_slice2(np, ni, matrix, rng, p.as_mut(), callback);
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
 }
@@ -177,6 +205,10 @@ pub unsafe extern "C" fn dahl_randompartition__log_probability_of_partition(
         }
         6 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
+        }
+        7 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut URPParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

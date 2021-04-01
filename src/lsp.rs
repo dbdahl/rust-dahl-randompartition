@@ -24,7 +24,7 @@ impl LSPParameters {
         scale: Scale,
         permutation: Permutation,
     ) -> Option<Self> {
-        if baseline.n_items() != permutation.len() {
+        if baseline.n_items() != permutation.n_items() {
             None
         } else {
             Some(Self {
@@ -40,7 +40,7 @@ impl LSPParameters {
         rate: Rate,
         permutation: Permutation,
     ) -> Option<Self> {
-        if baseline.n_items() != permutation.len() {
+        if baseline.n_items() != permutation.n_items() {
             None
         } else {
             Some(Self {

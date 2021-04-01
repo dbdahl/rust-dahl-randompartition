@@ -77,7 +77,7 @@ impl Permutation {
         self.x.shuffle(rng)
     }
 
-    pub fn len(&self) -> usize {
+    pub fn n_items(&self) -> usize {
         self.n_items
     }
 

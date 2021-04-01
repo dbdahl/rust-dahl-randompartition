@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+extern crate dahl_bellnumber;
 extern crate dahl_salso;
 extern crate rand;
 extern crate statrs;
@@ -12,12 +13,14 @@ pub mod frp;
 pub mod lsp;
 pub mod mcmc;
 //pub mod nggp;
+pub mod distr;
 pub mod fixed;
 pub mod perm;
 pub mod prelude;
 pub mod prior;
 pub mod testing;
 pub mod trp;
+pub mod urp;
 pub mod wgt;
 
 pub unsafe fn push_into_slice_i32(from_slice: &[usize], to_slice: &mut [i32]) {

@@ -1,6 +1,7 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
+use crate::distr::PredictiveProbabilityFunction;
 use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
@@ -26,6 +27,24 @@ impl CRPParameters {
             discount,
             n_items,
         }
+    }
+}
+
+impl PredictiveProbabilityFunction for CRPParameters {
+    fn log_predictive_probability(
+        &self,
+        item: usize,
+        label: usize,
+        clustering: &Clustering,
+    ) -> f64 {
+        let size = clustering.size_of_without(label, item);
+        if size == 0 {
+            self.mass.unwrap()
+                + (clustering.n_clusters_without(item) as f64) * self.discount.unwrap()
+        } else {
+            size as f64 - self.discount.unwrap()
+        }
+        .ln()
     }
 }
 
