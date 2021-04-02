@@ -1,10 +1,10 @@
 // Location scale partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::PredictiveProbabilityFunction;
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
 use crate::perm::Permutation;
 use crate::prelude::*;
-use crate::prior::{PartitionLogProbability, PartitionSampler};
+use crate::prior::PartitionLogProbability;
 
 use rand::prelude::*;
 use rand_isaac::IsaacRng;

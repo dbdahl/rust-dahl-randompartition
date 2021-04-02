@@ -122,16 +122,16 @@ mod tests_mcmc {
 }
 
 extern "C" {
-    fn rrAllocVectorINTSXP(len: i32) -> Rr_Sexp_vector_IntSxp;
+    fn rrAllocVectorINTSXP(len: i32) -> Rr_Sexp_Vector_Intsxp;
     fn callRFunction_logIntegratedLikelihoodItem(
         fn_ptr: *const c_void,
         i: i32,
-        indices: Rr_Sexp_vector_IntSxp,
+        indices: Rr_Sexp_Vector_Intsxp,
         env_ptr: *const c_void,
     ) -> f64;
     fn callRFunction_logIntegratedLikelihoodSubset(
         fn_ptr: *const c_void,
-        indices: Rr_Sexp_vector_IntSxp,
+        indices: Rr_Sexp_Vector_Intsxp,
         env_ptr: *const c_void,
     ) -> f64;
     fn callRFunction_logLikelihoodItem(
@@ -149,13 +149,13 @@ pub struct Rr_Sexp {
 }
 
 #[repr(C)]
-pub struct Rr_Sexp_vector_IntSxp {
+pub struct Rr_Sexp_Vector_Intsxp {
     pub sexp_ptr: *const c_void,
     pub data_ptr: *mut i32,
     pub len: i32,
 }
 
-impl Rr_Sexp_vector_IntSxp {
+impl Rr_Sexp_Vector_Intsxp {
     fn from_slice_offset_by_1(slice: &[usize]) -> Self {
         let result = unsafe { rrAllocVectorINTSXP(slice.len() as i32) };
         let into_slice: &mut [i32] =
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
             callRFunction_logIntegratedLikelihoodItem(
                 log_posterior_predictive_function_ptr,
                 (i as i32) + 1,
-                Rr_Sexp_vector_IntSxp::from_slice_offset_by_1(indices),
+                Rr_Sexp_Vector_Intsxp::from_slice_offset_by_1(indices),
                 env_ptr,
             )
         })
@@ -309,5 +309,5 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
     };
     let (clustering, map) = current.relabel(1, None, true);
     push_into_slice_i32(&clustering.allocation()[..], clustering_slice);
-    map_ptr.sexp_ptr = Rr_Sexp_vector_IntSxp::from_slice(&map.unwrap()[1..]).sexp_ptr;
+    map_ptr.sexp_ptr = Rr_Sexp_Vector_Intsxp::from_slice(&map.unwrap()[1..]).sexp_ptr;
 }

@@ -19,15 +19,15 @@ typedef struct TrpParameters TrpParameters;
 
 typedef struct UrpParameters UrpParameters;
 
-typedef struct RR_SEXP_vector_INTSXP {
+typedef struct Rr_Sexp_Vector_Intsxp {
   const void *sexp_ptr;
   int32_t *data_ptr;
   int32_t len;
-} RR_SEXP_vector_INTSXP;
+} Rr_Sexp_Vector_Intsxp;
 
-typedef struct RR_SEXP {
+typedef struct Rr_Sexp {
   const void *sexp_ptr;
-} RR_SEXP;
+} Rr_Sexp;
 
 struct CppParameters *dahl_randompartition__cppparameters_new(int32_t n_items,
                                                               const int32_t *baseline_ptr,
@@ -74,15 +74,15 @@ struct LspParameters *dahl_randompartition__lspparameters_new(int32_t n_items,
 
 void dahl_randompartition__lspparameters_free(struct LspParameters *obj);
 
-extern struct RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);
+extern struct Rr_Sexp_Vector_Intsxp rrAllocVectorINTSXP(int32_t len);
 
 extern double callRFunction_logIntegratedLikelihoodItem(const void *fn_ptr,
                                                         int32_t i,
-                                                        struct RR_SEXP_vector_INTSXP indices,
+                                                        struct Rr_Sexp_Vector_Intsxp indices,
                                                         const void *env_ptr);
 
 extern double callRFunction_logIntegratedLikelihoodSubset(const void *fn_ptr,
-                                                          struct RR_SEXP_vector_INTSXP indices,
+                                                          struct Rr_Sexp_Vector_Intsxp indices,
                                                           const void *env_ptr);
 
 extern double callRFunction_logLikelihoodItem(const void *fn_ptr,
@@ -110,7 +110,7 @@ void dahl_randompartition__neal_algorithm8(int32_t n_updates_for_partition,
                                            const int32_t *seed_ptr,
                                            int32_t prior_id,
                                            const void *prior_ptr,
-                                           struct RR_SEXP *map_ptr);
+                                           struct Rr_Sexp *map_ptr);
 
 struct FixedPartitionParameters *dahl_randompartition__fixedpartitionparameters_new(int32_t n_items,
                                                                                     const int32_t *clustering_ptr);

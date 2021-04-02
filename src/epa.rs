@@ -1,11 +1,11 @@
 // Ewens Pitman attraction partition distribution
 
 use crate::clust::Clustering;
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
 use crate::perm::Permutation;
 use crate::prelude::*;
+use crate::prior::PartitionLogProbability;
 
-use crate::distr::PredictiveProbabilityFunction;
-use crate::prior::{PartitionLogProbability, PartitionSampler};
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
 use std::slice;

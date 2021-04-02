@@ -1,7 +1,8 @@
 // Fixed partition
 
 use crate::clust::Clustering;
-use crate::prior::{PartitionLogProbability, PartitionSampler};
+use crate::distr::PartitionSampler;
+use crate::prior::PartitionLogProbability;
 
 use rand::Rng;
 use std::slice;

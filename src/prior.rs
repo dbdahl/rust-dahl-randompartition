@@ -1,22 +1,20 @@
 use crate::clust::Clustering;
 use crate::cpp::CppParameters;
 use crate::crp::CrpParameters;
+use crate::distr::PartitionSampler;
 use crate::epa::EpaParameters;
 use crate::fixed::FixedPartitionParameters;
 use crate::frp::FrpParameters;
 use crate::lsp::LspParameters;
 use crate::trp::TrpParameters;
 use crate::urp::UrpParameters;
+
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
 use std::convert::TryFrom;
 use std::ffi::c_void;
 use std::slice;
-
-pub trait PartitionSampler {
-    fn sample<T: Rng>(&self, rng: &mut T) -> Clustering;
-}
 
 pub trait PartitionLogProbability {
     fn log_probability(&self, partition: &Clustering) -> f64;

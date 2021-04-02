@@ -3,12 +3,12 @@
 use crate::clust::Clustering;
 use crate::cpp::CppParameters;
 use crate::crp::CrpParameters;
-use crate::distr::PredictiveProbabilityFunction;
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
 use crate::epa::EpaParameters;
 use crate::frp::FrpParameters;
 use crate::lsp::LspParameters;
 use crate::perm::Permutation;
-use crate::prior::{PartitionLogProbability, PartitionSampler};
+use crate::prior::PartitionLogProbability;
 use crate::urp::UrpParameters;
 use crate::wgt::Weights;
 

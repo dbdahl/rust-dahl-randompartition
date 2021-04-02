@@ -1,10 +1,10 @@
 // Focal random partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::PredictiveProbabilityFunction;
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
 use crate::perm::Permutation;
 use crate::prelude::*;
-use crate::prior::{PartitionLogProbability, PartitionSampler};
+use crate::prior::PartitionLogProbability;
 use crate::wgt::Weights;
 
 use rand::prelude::*;

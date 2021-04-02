@@ -1,9 +1,9 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::PredictiveProbabilityFunction;
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
 use crate::prelude::*;
-use crate::prior::{PartitionLogProbability, PartitionSampler};
+use crate::prior::PartitionLogProbability;
 
 use rand::Rng;
 use statrs::function::gamma::ln_gamma;
@@ -49,6 +49,13 @@ impl PredictiveProbabilityFunction for CrpParameters {
 
 impl PartitionSampler for CrpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
+        crate::distr::default_partition_sampler_sample_without_permutation(self, self.n_items, rng)
+    }
+}
+
+/*
+impl PartitionSampler for CrpParameters {
+    fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         let mass = self.mass.unwrap();
         let discount = self.discount.unwrap();
         let mut clustering = Clustering::unallocated(self.n_items);
@@ -73,6 +80,7 @@ impl PartitionSampler for CrpParameters {
         clustering
     }
 }
+*/
 
 impl PartitionLogProbability for CrpParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
