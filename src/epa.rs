@@ -4,7 +4,7 @@ use crate::clust::Clustering;
 use crate::perm::Permutation;
 use crate::prelude::*;
 
-use crate::mcmc::PriorLogWeight;
+use crate::distr::PredictiveProbabilityFunction;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
@@ -151,8 +151,13 @@ impl<'a> SquareMatrixBorrower<'a> {
     }
 }
 
-impl<'a> PriorLogWeight for EPAParameters<'a> {
-    fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
+impl<'a> PredictiveProbabilityFunction for EPAParameters<'a> {
+    fn log_predictive_probability(
+        &self,
+        item_index: usize,
+        subset_index: usize,
+        clustering: &Clustering,
+    ) -> f64 {
         let mut p = clustering.allocation().clone();
         p[item_index] = subset_index;
         engine::<IsaacRng>(self, Some(&p[..]), None).1

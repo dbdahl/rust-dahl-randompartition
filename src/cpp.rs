@@ -2,7 +2,7 @@
 
 use crate::clust::Clustering;
 use crate::crp::CRPParameters;
-use crate::mcmc::PriorLogWeight;
+use crate::distr::PredictiveProbabilityFunction;
 use crate::prelude::*;
 
 use crate::prior::PartitionLogProbability;
@@ -73,8 +73,13 @@ impl CPPParameters {
     }
 }
 
-impl PriorLogWeight for CPPParameters {
-    fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
+impl PredictiveProbabilityFunction for CPPParameters {
+    fn log_predictive_probability(
+        &self,
+        item_index: usize,
+        subset_index: usize,
+        clustering: &Clustering,
+    ) -> f64 {
         let mut p = clustering.clone();
         p.reallocate(item_index, subset_index);
         log_pmf(&p, self)

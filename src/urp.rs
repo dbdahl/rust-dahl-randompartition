@@ -2,7 +2,6 @@
 
 use crate::clust::Clustering;
 use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
-use crate::mcmc::PriorLogWeight;
 use crate::prior::PartitionLogProbability;
 
 use dahl_bellnumber::UniformDistributionCache;
@@ -44,12 +43,6 @@ impl PredictiveProbabilityFunction for URPParameters {
 impl PartitionSampler for URPParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         crate::distr::default_partition_sampler_sample_without_permutation(self, self.n_items, rng)
-    }
-}
-
-impl PriorLogWeight for URPParameters {
-    fn log_weight(&self, item: usize, label: usize, clustering: &Clustering) -> f64 {
-        self.log_predictive_probability(item, label, clustering)
     }
 }
 

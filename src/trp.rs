@@ -3,10 +3,10 @@
 use crate::clust::Clustering;
 use crate::cpp::CPPParameters;
 use crate::crp::CRPParameters;
+use crate::distr::PredictiveProbabilityFunction;
 use crate::epa::EPAParameters;
 use crate::frp::FRPParameters;
 use crate::lsp::LSPParameters;
-use crate::mcmc::PriorLogWeight;
 use crate::perm::Permutation;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
 use crate::urp::URPParameters;
@@ -29,7 +29,7 @@ pub struct TRPParameters {
     pub target: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
-    pub baseline_distribution: Box<dyn PriorLogWeight>,
+    pub baseline_distribution: Box<dyn PredictiveProbabilityFunction>,
     pub loss_function: LossFunction,
     cache: Log2Cache,
 }
@@ -39,7 +39,7 @@ impl TRPParameters {
         target: Clustering,
         weights: Weights,
         permutation: Permutation,
-        baseline_distribution: Box<dyn PriorLogWeight>,
+        baseline_distribution: Box<dyn PredictiveProbabilityFunction>,
         loss_function: LossFunction,
     ) -> Option<Self> {
         if weights.len() != target.n_items() {
@@ -69,8 +69,13 @@ impl TRPParameters {
     }
 }
 
-impl PriorLogWeight for TRPParameters {
-    fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
+impl PredictiveProbabilityFunction for TRPParameters {
+    fn log_predictive_probability(
+        &self,
+        item_index: usize,
+        subset_index: usize,
+        clustering: &Clustering,
+    ) -> f64 {
         let mut p = clustering.allocation().clone();
         p[item_index] = subset_index;
         engine::<IsaacRng>(self, Some(&p[..]), None).1
@@ -204,10 +209,11 @@ fn engine<'a, T: Rng>(
             .map(|label| {
                 clustering.reallocate(ii, label);
                 let loss_value = compute_loss2(&clustering, parameters, &loss_computer);
-                let weight = parameters
-                    .baseline_distribution
-                    .log_weight(ii, label, &clustering)
-                    - scaled_weight * loss_value;
+                let weight = parameters.baseline_distribution.log_predictive_probability(
+                    ii,
+                    label,
+                    &clustering,
+                ) - scaled_weight * loss_value;
                 (label, weight)
             })
             .collect::<Vec<_>>()
@@ -413,7 +419,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
-    let baseline_distribution: Box<dyn PriorLogWeight> = match baseline_distr_id {
+    let baseline_distribution: Box<dyn PredictiveProbabilityFunction> = match baseline_distr_id {
         1 => {
             let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CRPParameters).unwrap();
             Box::new(p.as_ref().clone())

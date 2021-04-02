@@ -1,7 +1,7 @@
 // Location scale partition distribution
 
 use crate::clust::Clustering;
-use crate::mcmc::PriorLogWeight;
+use crate::distr::PredictiveProbabilityFunction;
 use crate::perm::Permutation;
 use crate::prelude::*;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
@@ -57,8 +57,13 @@ impl LSPParameters {
     }
 }
 
-impl PriorLogWeight for LSPParameters {
-    fn log_weight(&self, item_index: usize, subset_index: usize, clustering: &Clustering) -> f64 {
+impl PredictiveProbabilityFunction for LSPParameters {
+    fn log_predictive_probability(
+        &self,
+        item_index: usize,
+        subset_index: usize,
+        clustering: &Clustering,
+    ) -> f64 {
         let mut p = clustering.allocation().clone();
         p[item_index] = subset_index;
         engine::<IsaacRng>(self, Some(&p[..]), None).1

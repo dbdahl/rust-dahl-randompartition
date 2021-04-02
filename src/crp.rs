@@ -2,7 +2,6 @@
 
 use crate::clust::Clustering;
 use crate::distr::PredictiveProbabilityFunction;
-use crate::mcmc::PriorLogWeight;
 use crate::prelude::*;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
 
@@ -37,19 +36,6 @@ impl PredictiveProbabilityFunction for CRPParameters {
         label: usize,
         clustering: &Clustering,
     ) -> f64 {
-        let size = clustering.size_of_without(label, item);
-        if size == 0 {
-            self.mass.unwrap()
-                + (clustering.n_clusters_without(item) as f64) * self.discount.unwrap()
-        } else {
-            size as f64 - self.discount.unwrap()
-        }
-        .ln()
-    }
-}
-
-impl PriorLogWeight for CRPParameters {
-    fn log_weight(&self, item: usize, label: usize, clustering: &Clustering) -> f64 {
         let size = clustering.size_of_without(label, item);
         if size == 0 {
             self.mass.unwrap()

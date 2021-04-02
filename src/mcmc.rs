@@ -1,4 +1,5 @@
 use crate::clust::Clustering;
+use crate::distr::PredictiveProbabilityFunction;
 use crate::perm::Permutation;
 use crate::push_into_slice_i32;
 
@@ -15,10 +16,6 @@ use rand::prelude::*;
 use std::ffi::c_void;
 use std::slice;
 
-pub trait PriorLogWeight {
-    fn log_weight(&self, index_index: usize, subset_index: usize, partition: &Clustering) -> f64;
-}
-
 pub fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     current: &Clustering,
@@ -28,7 +25,7 @@ pub fn update_neal_algorithm3<T, U, V>(
     rng: &mut V,
 ) -> Clustering
 where
-    T: PriorLogWeight,
+    T: PredictiveProbabilityFunction,
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
@@ -38,8 +35,8 @@ where
             let ii = permutation.get(i);
             let labels_and_weights = state.available_labels_for_reallocation(ii).map(|label| {
                 let indices = &state.items_of_without(label, ii)[..];
-                let log_weight =
-                    log_posterior_predictive(ii, indices) + prior.log_weight(ii, label, &state);
+                let log_weight = log_posterior_predictive(ii, indices)
+                    + prior.log_predictive_probability(ii, label, &state);
                 (label, log_weight)
             });
             let pair = state.select(labels_and_weights, true, 0, Some(rng), false);
@@ -58,7 +55,7 @@ pub fn update_neal_algorithm8<T, U, V>(
     rng: &mut V,
 ) -> Clustering
 where
-    T: PriorLogWeight,
+    T: PredictiveProbabilityFunction,
     U: Fn(usize, usize, bool) -> f64,
     V: Rng,
 {
@@ -69,7 +66,7 @@ where
             let labels_and_weights = state.available_labels_for_reallocation(ii).map(|label| {
                 let log_weight =
                     log_likelihood_contribution_fn(ii, label, state.size_of(label) == 0)
-                        + prior.log_weight(ii, label, &state);
+                        + prior.log_predictive_probability(ii, label, &state);
                 (label, log_weight)
             });
             let pair = state.select(labels_and_weights, true, 0, Some(rng), false);
