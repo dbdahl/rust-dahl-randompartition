@@ -1,0 +1,4 @@
+#!/bin/bash
+
+exec cargo clippy -- --allow clippy::missing_safety_doc
+
