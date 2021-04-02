@@ -30,9 +30,9 @@ impl FrpParameters {
         discount: Discount,
         power: Power,
     ) -> Option<Self> {
-        if weights.len() != baseline.n_items() {
-            None
-        } else if baseline.n_items() != permutation.n_items() {
+        if (weights.n_items() != baseline.n_items())
+            || (baseline.n_items() != permutation.n_items())
+        {
             None
         } else {
             Some(Self {

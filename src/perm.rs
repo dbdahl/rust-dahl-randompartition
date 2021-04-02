@@ -12,7 +12,7 @@ pub struct Permutation {
 impl Permutation {
     pub fn from_slice(x: &[usize]) -> Option<Self> {
         let mut y = Vec::from(x);
-        y.sort();
+        y.sort_unstable();
         if y.iter().enumerate().all(|(i, x)| *x == i) {
             Some(Self {
                 x: Vec::from(x),
@@ -26,7 +26,7 @@ impl Permutation {
 
     pub fn from_vector(x: Vec<usize>) -> Option<Self> {
         let mut y = x.clone();
-        y.sort();
+        y.sort_unstable();
         if y.iter().enumerate().all(|(i, x)| *x == i) {
             Some(Self {
                 x,

@@ -282,16 +282,14 @@ impl Clustering {
             }
             self.sizes.resize(label + 1, 0);
             self.active_labels.push(label);
-        } else {
-            if self.sizes[label] == 0 {
-                self.available_labels.swap_remove(
-                    self.available_labels
-                        .iter()
-                        .rposition(|x| *x == label)
-                        .unwrap(),
-                );
-                self.active_labels.push(label);
-            }
+        } else if self.sizes[label] == 0 {
+            self.available_labels.swap_remove(
+                self.available_labels
+                    .iter()
+                    .rposition(|x| *x == label)
+                    .unwrap(),
+            );
+            self.active_labels.push(label);
         }
         self.sizes[label] += 1;
     }

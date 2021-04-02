@@ -28,7 +28,7 @@ impl Weights {
         Some(Weights(Vec::from(w)))
     }
 
-    pub fn len(&self) -> usize {
+    pub fn n_items(&self) -> usize {
         self.0.len()
     }
 }

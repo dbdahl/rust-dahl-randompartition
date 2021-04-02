@@ -42,9 +42,7 @@ impl TrpParameters {
         baseline_distribution: Box<dyn PredictiveProbabilityFunction>,
         loss_function: LossFunction,
     ) -> Option<Self> {
-        if weights.len() != target.n_items() {
-            None
-        } else if target.n_items() != permutation.n_items() {
+        if (weights.n_items() != target.n_items()) || (target.n_items() != permutation.n_items()) {
             None
         } else {
             let cache = Log2Cache::new(match loss_function {
@@ -97,7 +95,7 @@ impl PartitionLogProbability for TrpParameters {
     }
 }
 
-fn compute_loss<'a>(x: &Clustering, parameters: &'a TrpParameters) -> f64 {
+fn compute_loss(x: &Clustering, parameters: &TrpParameters) -> f64 {
     let y: Vec<_> = x
         .allocation()
         .iter()

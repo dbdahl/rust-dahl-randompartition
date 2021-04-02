@@ -7,12 +7,12 @@ macro_rules! constrained_f64 {
 
         impl $name {
             pub fn new(x: f64) -> Self {
-                assert!($closure(x), $msg);
+                assert!((($closure))(x), $msg);
                 Self(x)
             }
 
             pub fn new_with_variable_constraint(x: f64, y: f64) -> Self {
-                assert!($closure2(x, y), $msg2);
+                assert!((($closure2))(x, y), $msg2);
                 Self(x)
             }
 
@@ -108,14 +108,6 @@ constrained_f64!(
 );
 
 constrained_f64!(
-    UinNGGP,
-    (|x| x >= 0.0),
-    "Temperature must be greater than or equal to zero.",
-    (|_x, _y| false),
-    "Not supported."
-);
-
-constrained_f64!(
     Rate,
     (|x| x >= 0.0),
     "Rate must be greater than or equal to zero.",
@@ -133,7 +125,7 @@ constrained_f64!(
 
 constrained_f64!(
     Reinforcement,
-    (|x| 0.0 <= x && x < 1.0),
+    (|x| (0.0..1.0).contains(&x)),
     "Reinforcement must be in [0,1).",
     (|_x, _y| false),
     "Not supported."
@@ -141,7 +133,7 @@ constrained_f64!(
 
 constrained_f64!(
     Discount,
-    (|x| 0.0 <= x && x < 1.0),
+    (|x| (0.0..1.0).contains(&x)),
     "Discount must be in [0,1).",
     (|_x, _y| false),
     "Not supported."

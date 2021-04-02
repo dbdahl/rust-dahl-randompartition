@@ -187,7 +187,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
     seed_ptr: *const i32, // Assumed length is 32
     prior_id: i32,
     prior_ptr: *const c_void,
-) -> () {
+) {
     let nup = n_updates_for_partition as u32;
     let ni = n_items as usize;
     let clustering_slice = slice::from_raw_parts_mut(partition_ptr, ni);
@@ -254,7 +254,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
     prior_id: i32,
     prior_ptr: *const c_void,
     map_ptr: &mut RR_SEXP,
-) -> () {
+) {
     let nup = n_updates_for_partition as u32;
     let ni = n_items as usize;
     let clustering_slice = slice::from_raw_parts_mut(partition_ptr, ni);
