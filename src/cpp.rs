@@ -1,7 +1,7 @@
 // Centered partition process
 
 use crate::clust::Clustering;
-use crate::crp::CRPParameters;
+use crate::crp::CrpParameters;
 use crate::distr::PredictiveProbabilityFunction;
 use crate::prelude::*;
 
@@ -13,7 +13,7 @@ use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossCompute
 use std::slice;
 
 #[derive(Debug, Clone)]
-pub struct CPPParameters {
+pub struct CppParameters {
     baseline: Clustering,
     rate: Rate,
     uniform: bool,
@@ -25,7 +25,7 @@ pub struct CPPParameters {
     baseline_as_clusterings: Clusterings,
 }
 
-impl CPPParameters {
+impl CppParameters {
     pub fn use_vi(
         baseline: Clustering,
         rate: Rate,
@@ -73,7 +73,7 @@ impl CPPParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for CPPParameters {
+impl PredictiveProbabilityFunction for CppParameters {
     fn log_predictive_probability(
         &self,
         item_index: usize,
@@ -86,7 +86,7 @@ impl PredictiveProbabilityFunction for CPPParameters {
     }
 }
 
-impl PartitionLogProbability for CPPParameters {
+impl PartitionLogProbability for CppParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
         log_pmf(partition, self)
     }
@@ -95,7 +95,7 @@ impl PartitionLogProbability for CPPParameters {
     }
 }
 
-fn log_pmf(target: &Clustering, parameters: &CPPParameters) -> f64 {
+fn log_pmf(target: &Clustering, parameters: &CppParameters) -> f64 {
     let computer: Box<dyn CMLossComputer> = if parameters.use_vi {
         Box::new(VICMLossComputer::new(parameters.a, &parameters.log2cache))
     } else {
@@ -120,7 +120,7 @@ fn log_pmf(target: &Clustering, parameters: &CPPParameters) -> f64 {
     if parameters.uniform {
         log_multiplier
     } else {
-        let crp_parameters = CRPParameters::new_with_mass_and_discount(
+        let crp_parameters = CrpParameters::new_with_mass_and_discount(
             parameters.mass,
             parameters.discount,
             parameters.baseline.n_items(),
@@ -146,7 +146,7 @@ mod tests {
             let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0..10.0));
             //let rate = Rate::new(0.0);
-            let parameters = CPPParameters::use_vi(baseline, rate, false, mass, discount).unwrap();
+            let parameters = CppParameters::use_vi(baseline, rate, false, mass, discount).unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.
@@ -165,14 +165,14 @@ pub unsafe extern "C" fn dahl_randompartition__cppparameters_new(
     discount: f64,
     use_vi: bool,
     a: f64,
-) -> *mut CPPParameters {
+) -> *mut CppParameters {
     let ni = n_items as usize;
     let baseline = Clustering::from_slice(slice::from_raw_parts(baseline_ptr, ni));
     let r = Rate::new(rate);
     let d = Discount::new(discount);
     let m = Mass::new_with_variable_constraint(mass, discount);
     // First we create a new object.
-    let obj = CPPParameters::new(baseline, r, uniform, m, d, use_vi, a).unwrap();
+    let obj = CppParameters::new(baseline, r, uniform, m, d, use_vi, a).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
@@ -180,7 +180,7 @@ pub unsafe extern "C" fn dahl_randompartition__cppparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__cppparameters_free(obj: *mut CPPParameters) {
+pub unsafe extern "C" fn dahl_randompartition__cppparameters_free(obj: *mut CppParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;

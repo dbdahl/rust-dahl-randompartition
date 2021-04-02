@@ -12,7 +12,7 @@ use rand_isaac::IsaacRng;
 use std::slice;
 
 #[derive(Debug, Clone)]
-pub struct FRPParameters {
+pub struct FrpParameters {
     pub baseline: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
@@ -21,7 +21,7 @@ pub struct FRPParameters {
     pub power: Power,
 }
 
-impl FRPParameters {
+impl FrpParameters {
     pub fn new(
         baseline: Clustering,
         weights: Weights,
@@ -51,7 +51,7 @@ impl FRPParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for FRPParameters {
+impl PredictiveProbabilityFunction for FrpParameters {
     fn log_predictive_probability(
         &self,
         item_index: usize,
@@ -64,13 +64,13 @@ impl PredictiveProbabilityFunction for FRPParameters {
     }
 }
 
-impl PartitionSampler for FRPParameters {
+impl PartitionSampler for FrpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine(self, None, Some(rng)).0
     }
 }
 
-impl PartitionLogProbability for FRPParameters {
+impl PartitionLogProbability for FrpParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
         engine::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
@@ -80,7 +80,7 @@ impl PartitionLogProbability for FRPParameters {
 }
 
 fn engine<T: Rng>(
-    parameters: &FRPParameters,
+    parameters: &FrpParameters,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -172,7 +172,7 @@ mod tests {
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
-                FRPParameters::new(baseline, weights, permutation, mass, discount, power).unwrap();
+                FrpParameters::new(baseline, weights, permutation, mass, discount, power).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
@@ -204,7 +204,7 @@ mod tests {
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
-                FRPParameters::new(baseline, weights, permutation, mass, discount, power).unwrap();
+                FrpParameters::new(baseline, weights, permutation, mass, discount, power).unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
@@ -222,7 +222,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     mass: f64,
     discount: f64,
     power: f64,
-) -> *mut FRPParameters {
+) -> *mut FrpParameters {
     let ni = n_items as usize;
     let baseline = Clustering::from_slice(slice::from_raw_parts(baseline_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
@@ -238,7 +238,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     let m = Mass::new_with_variable_constraint(mass, discount);
     let p = Power::new(power);
     // First we create a new object.
-    let obj = FRPParameters::new(baseline, weights, permutation, m, d, p).unwrap();
+    let obj = FrpParameters::new(baseline, weights, permutation, m, d, p).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
@@ -246,7 +246,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__frpparameters_free(obj: *mut FRPParameters) {
+pub unsafe extern "C" fn dahl_randompartition__frpparameters_free(obj: *mut FrpParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;

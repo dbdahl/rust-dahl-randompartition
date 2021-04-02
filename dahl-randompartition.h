@@ -3,21 +3,21 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef struct CPPParameters CPPParameters;
+typedef struct CppParameters CppParameters;
 
-typedef struct CRPParameters CRPParameters;
+typedef struct CrpParameters CrpParameters;
 
-typedef struct EPAParameters EPAParameters;
-
-typedef struct FRPParameters FRPParameters;
+typedef struct EpaParameters EpaParameters;
 
 typedef struct FixedPartitionParameters FixedPartitionParameters;
 
-typedef struct LSPParameters LSPParameters;
+typedef struct FrpParameters FrpParameters;
 
-typedef struct TRPParameters TRPParameters;
+typedef struct LspParameters LspParameters;
 
-typedef struct URPParameters URPParameters;
+typedef struct TrpParameters TrpParameters;
+
+typedef struct UrpParameters UrpParameters;
 
 typedef struct RR_SEXP_vector_INTSXP {
   const void *sexp_ptr;
@@ -29,7 +29,7 @@ typedef struct RR_SEXP {
   const void *sexp_ptr;
 } RR_SEXP;
 
-struct CPPParameters *dahl_randompartition__cppparameters_new(int32_t n_items,
+struct CppParameters *dahl_randompartition__cppparameters_new(int32_t n_items,
                                                               const int32_t *baseline_ptr,
                                                               double rate,
                                                               bool uniform,
@@ -38,24 +38,24 @@ struct CPPParameters *dahl_randompartition__cppparameters_new(int32_t n_items,
                                                               bool use_vi,
                                                               double a);
 
-void dahl_randompartition__cppparameters_free(struct CPPParameters *obj);
+void dahl_randompartition__cppparameters_free(struct CppParameters *obj);
 
-struct CRPParameters *dahl_randompartition__crpparameters_new(int32_t n_items,
+struct CrpParameters *dahl_randompartition__crpparameters_new(int32_t n_items,
                                                               double mass,
                                                               double discount);
 
-void dahl_randompartition__crpparameters_free(struct CRPParameters *obj);
+void dahl_randompartition__crpparameters_free(struct CrpParameters *obj);
 
-struct EPAParameters *dahl_randompartition__epaparameters_new(int32_t n_items,
+struct EpaParameters *dahl_randompartition__epaparameters_new(int32_t n_items,
                                                               double *similarity_ptr,
                                                               const int32_t *permutation_ptr,
                                                               int32_t use_natural_permutation,
                                                               double mass,
                                                               double discount);
 
-void dahl_randompartition__epaparameters_free(struct EPAParameters *obj);
+void dahl_randompartition__epaparameters_free(struct EpaParameters *obj);
 
-struct FRPParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
+struct FrpParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
                                                               const int32_t *baseline_ptr,
                                                               const double *weights_ptr,
                                                               const int32_t *permutation_ptr,
@@ -64,15 +64,15 @@ struct FRPParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
                                                               double discount,
                                                               double power);
 
-void dahl_randompartition__frpparameters_free(struct FRPParameters *obj);
+void dahl_randompartition__frpparameters_free(struct FrpParameters *obj);
 
-struct LSPParameters *dahl_randompartition__lspparameters_new(int32_t n_items,
+struct LspParameters *dahl_randompartition__lspparameters_new(int32_t n_items,
                                                               const int32_t *baseline_ptr,
                                                               double rate,
                                                               const int32_t *permutation_ptr,
                                                               int32_t use_natural_permutation);
 
-void dahl_randompartition__lspparameters_free(struct LSPParameters *obj);
+void dahl_randompartition__lspparameters_free(struct LspParameters *obj);
 
 extern struct RR_SEXP_vector_INTSXP rrAllocVectorINTSXP(int32_t len);
 
@@ -132,7 +132,7 @@ void dahl_randompartition__log_probability_of_partition(int32_t n_partitions,
                                                         int32_t prior_id,
                                                         const void *prior_ptr);
 
-struct TRPParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
+struct TrpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
                                                               const int32_t *baseline_partition_ptr,
                                                               const double *weights_ptr,
                                                               const int32_t *permutation_ptr,
@@ -142,8 +142,8 @@ struct TRPParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
                                                               int32_t loss,
                                                               double a);
 
-void dahl_randompartition__trpparameters_free(struct TRPParameters *obj);
+void dahl_randompartition__trpparameters_free(struct TrpParameters *obj);
 
-struct URPParameters *dahl_randompartition__urpparameters_new(int32_t n_items);
+struct UrpParameters *dahl_randompartition__urpparameters_new(int32_t n_items);
 
-void dahl_randompartition__urpparameters_free(struct URPParameters *obj);
+void dahl_randompartition__urpparameters_free(struct UrpParameters *obj);

@@ -13,14 +13,14 @@ use std::slice;
 type SimilarityBorrower<'a> = SquareMatrixBorrower<'a>;
 
 #[derive(Debug, Clone)]
-pub struct EPAParameters<'a> {
+pub struct EpaParameters<'a> {
     similarity: SimilarityBorrower<'a>,
     permutation: Permutation,
     mass: Mass,
     discount: Discount,
 }
 
-impl<'a> EPAParameters<'a> {
+impl<'a> EpaParameters<'a> {
     pub fn new(
         similarity: SimilarityBorrower<'a>,
         permutation: Permutation,
@@ -151,7 +151,7 @@ impl<'a> SquareMatrixBorrower<'a> {
     }
 }
 
-impl<'a> PredictiveProbabilityFunction for EPAParameters<'a> {
+impl<'a> PredictiveProbabilityFunction for EpaParameters<'a> {
     fn log_predictive_probability(
         &self,
         item_index: usize,
@@ -164,13 +164,13 @@ impl<'a> PredictiveProbabilityFunction for EPAParameters<'a> {
     }
 }
 
-impl<'a> PartitionSampler for EPAParameters<'a> {
+impl<'a> PartitionSampler for EpaParameters<'a> {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine(self, None, Some(rng)).0
     }
 }
 
-impl<'a> PartitionLogProbability for EPAParameters<'a> {
+impl<'a> PartitionLogProbability for EpaParameters<'a> {
     fn log_probability(&self, partition: &Clustering) -> f64 {
         engine::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
@@ -180,7 +180,7 @@ impl<'a> PartitionLogProbability for EPAParameters<'a> {
 }
 
 pub fn engine<T: Rng>(
-    parameters: &EPAParameters,
+    parameters: &EpaParameters,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -259,7 +259,7 @@ mod tests {
         }
         let similarity_borrower = similarity.view();
         let parameters =
-            EPAParameters::new(similarity_borrower, permutation, mass, discount).unwrap();
+            EpaParameters::new(similarity_borrower, permutation, mass, discount).unwrap();
         let sample_closure = || parameters.sample(&mut thread_rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_goodness_of_fit(
@@ -302,7 +302,7 @@ mod tests {
         }
         let similarity_borrower = similarity.view();
         let parameters =
-            EPAParameters::new(similarity_borrower, permutation, mass, discount).unwrap();
+            EpaParameters::new(similarity_borrower, permutation, mass, discount).unwrap();
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
     }
@@ -316,7 +316,7 @@ pub unsafe extern "C" fn dahl_randompartition__epaparameters_new(
     use_natural_permutation: i32,
     mass: f64,
     discount: f64,
-) -> *mut EPAParameters<'static> {
+) -> *mut EpaParameters<'static> {
     let ni = n_items as usize;
     let similarity = SquareMatrixBorrower::from_ptr(similarity_ptr, ni);
     let permutation = if use_natural_permutation != 0 {
@@ -330,7 +330,7 @@ pub unsafe extern "C" fn dahl_randompartition__epaparameters_new(
     let d = Discount::new(discount);
     let m = Mass::new_with_variable_constraint(mass, discount);
     // First we create a new object.
-    let obj = EPAParameters::new(similarity, permutation, m, d).unwrap();
+    let obj = EpaParameters::new(similarity, permutation, m, d).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
@@ -338,7 +338,7 @@ pub unsafe extern "C" fn dahl_randompartition__epaparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__epaparameters_free(obj: *mut EPAParameters) {
+pub unsafe extern "C" fn dahl_randompartition__epaparameters_free(obj: *mut EpaParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;

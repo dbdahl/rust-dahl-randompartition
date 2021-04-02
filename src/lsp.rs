@@ -11,14 +11,14 @@ use rand_isaac::IsaacRng;
 use std::slice;
 
 #[derive(Debug, Clone)]
-pub struct LSPParameters {
+pub struct LspParameters {
     pub baseline: Clustering,
     pub scale: Scale,
     pub rate: Rate,
     pub permutation: Permutation,
 }
 
-impl LSPParameters {
+impl LspParameters {
     pub fn new_with_scale(
         baseline: Clustering,
         scale: Scale,
@@ -57,7 +57,7 @@ impl LSPParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for LSPParameters {
+impl PredictiveProbabilityFunction for LspParameters {
     fn log_predictive_probability(
         &self,
         item_index: usize,
@@ -70,13 +70,13 @@ impl PredictiveProbabilityFunction for LSPParameters {
     }
 }
 
-impl PartitionSampler for LSPParameters {
+impl PartitionSampler for LspParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine(self, None, Some(rng)).0
     }
 }
 
-impl PartitionLogProbability for LSPParameters {
+impl PartitionLogProbability for LspParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
         engine::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
@@ -86,7 +86,7 @@ impl PartitionLogProbability for LSPParameters {
 }
 
 fn engine<T: Rng>(
-    parameters: &LSPParameters,
+    parameters: &LspParameters,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -168,7 +168,7 @@ mod tests {
             let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0..10.0));
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters = LSPParameters::new_with_rate(baseline, rate, permutation).unwrap();
+            let parameters = LspParameters::new_with_rate(baseline, rate, permutation).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
@@ -191,7 +191,7 @@ mod tests {
             let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0..10.0));
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters = LSPParameters::new_with_rate(baseline, rate, permutation).unwrap();
+            let parameters = LspParameters::new_with_rate(baseline, rate, permutation).unwrap();
             let log_prob_closure =
                 |clustering: &mut Clustering| parameters.log_probability(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
@@ -206,7 +206,7 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
     rate: f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
-) -> *mut LSPParameters {
+) -> *mut LspParameters {
     let ni = n_items as usize;
     let baseline = Clustering::from_slice(slice::from_raw_parts(baseline_ptr, ni));
     let permutation = if use_natural_permutation != 0 {
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
     };
     let r = Rate::new(rate);
     // First we create a new object.
-    let obj = LSPParameters::new_with_rate(baseline, r, permutation).unwrap();
+    let obj = LspParameters::new_with_rate(baseline, r, permutation).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
@@ -227,7 +227,7 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__lspparameters_free(obj: *mut LSPParameters) {
+pub unsafe extern "C" fn dahl_randompartition__lspparameters_free(obj: *mut LspParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;

@@ -15,13 +15,13 @@ use std::convert::TryFrom;
 use std::slice;
 
 #[derive(Debug)]
-pub struct NGGPParameters {
+pub struct NggpParameters {
     u: UinNGGP,
     mass: Mass,
     reinforcement: Reinforcement,
 }
 
-impl NGGPParameters {
+impl NggpParameters {
     pub fn new(u: UinNGGP, mass: Mass, reinforcement: Reinforcement) -> Self {
         Self {
             u,
@@ -31,7 +31,7 @@ impl NGGPParameters {
     }
 }
 
-impl PriorLogWeight for NGGPParameters {
+impl PriorLogWeight for NggpParameters {
     fn log_weight(&self, _item_index: usize, subset_index: usize, partition: &Partition) -> f64 {
         let subset = &partition.subsets()[subset_index];
         if subset.n_items() == 0 {
@@ -44,7 +44,7 @@ impl PriorLogWeight for NGGPParameters {
 
 pub fn engine<T: Rng>(
     n_items: usize,
-    parameters: &NGGPParameters,
+    parameters: &NggpParameters,
     mut target_or_rng: TargetOrRandom<T>,
 ) -> (Partition, f64) {
     if let TargetOrRandom::Target(t) = &mut target_or_rng {
@@ -95,13 +95,13 @@ pub fn engine<T: Rng>(
 
 pub fn sample_partition_given_u<T: Rng>(
     n_items: usize,
-    parameters: &NGGPParameters,
+    parameters: &NggpParameters,
     rng: &mut T,
 ) -> Partition {
     engine(n_items, parameters, TargetOrRandom::Random(rng)).0
 }
 
-pub fn log_pmf_of_partition_given_u(partition: &mut Partition, parameters: &NGGPParameters) -> f64 {
+pub fn log_pmf_of_partition_given_u(partition: &mut Partition, parameters: &NggpParameters) -> f64 {
     partition.canonicalize();
     engine::<IsaacRng>(
         partition.n_items(),
@@ -148,7 +148,7 @@ pub fn update_u<T: Rng>(
     UinNGGP::new(current.exp())
 }
 
-pub fn log_density_of_u(n_items: usize, parameters: &NGGPParameters) -> f64 {
+pub fn log_density_of_u(n_items: usize, parameters: &NggpParameters) -> f64 {
     // This should work in theory, but seems to be very unstable in practice.
     let mut partition = Partition::singleton_subsets(n_items);
     let lower = log_joint_density(&partition, parameters)
@@ -159,7 +159,7 @@ pub fn log_density_of_u(n_items: usize, parameters: &NGGPParameters) -> f64 {
     (lower + upper) / 2.0
 }
 
-pub fn log_joint_density(partition: &Partition, parameters: &NGGPParameters) -> f64 {
+pub fn log_joint_density(partition: &Partition, parameters: &NggpParameters) -> f64 {
     let ni = partition.n_items() as f64;
     let ns = partition.n_subsets() as f64;
     let u = parameters.u.unwrap();
@@ -202,7 +202,7 @@ mod tests {
     fn test_goodness_of_fit_constructive() {
         let n_items = 5;
         let parameters =
-            NGGPParameters::new(UinNGGP::new(300.0), Mass::new(2.0), Reinforcement::new(0.2));
+            NggpParameters::new(UinNGGP::new(300.0), Mass::new(2.0), Reinforcement::new(0.2));
         let sample_closure = || sample_partition_given_u(n_items, &parameters, &mut thread_rng());
         let log_prob_closure =
             |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
@@ -222,7 +222,7 @@ mod tests {
     fn test_goodness_of_fit_neal_algorithm3() {
         let n_items = 5;
         let parameters =
-            NGGPParameters::new(UinNGGP::new(300.0), Mass::new(2.0), Reinforcement::new(0.2));
+            NggpParameters::new(UinNGGP::new(300.0), Mass::new(2.0), Reinforcement::new(0.2));
         let l = |_i: usize, _indices: &[usize]| 0.0;
         let mut p = Partition::one_subset(n_items);
         let permutation = Permutation::natural(p.n_items());
@@ -248,7 +248,7 @@ mod tests {
     fn test_goodness_of_fit_rwmh() {
         let n_items = 5;
         let parameters =
-            NGGPParameters::new(UinNGGP::new(1.0), Mass::new(1.0), Reinforcement::new(0.1));
+            NggpParameters::new(UinNGGP::new(1.0), Mass::new(1.0), Reinforcement::new(0.1));
         let log_prob_closure =
             |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
         let log_prob_closure2 = |partition: &Partition| {
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn test_pmf() {
         let parameters =
-            NGGPParameters::new(UinNGGP::new(400.0), Mass::new(2.0), Reinforcement::new(0.1));
+            NggpParameters::new(UinNGGP::new(400.0), Mass::new(2.0), Reinforcement::new(0.1));
         let log_prob_closure =
             |partition: &mut Partition| log_pmf_of_partition_given_u(partition, &parameters);
         crate::testing::assert_pmf_sums_to_one(5, log_prob_closure, 0.0000001);
@@ -303,7 +303,7 @@ mod tests {
         // u in the outer integral
         let integrand = |u: f64| {
             let u = UinNGGP::new(u);
-            let parameters = NGGPParameters::new(u, mass, reinforcement);
+            let parameters = NggpParameters::new(u, mass, reinforcement);
             Partition::iter(n_items)
                 .map(|p| log_joint_density(&mut Partition::from(&p[..]), &parameters).exp())
                 .sum()
@@ -316,7 +316,7 @@ mod tests {
             .map(|p| {
                 let integrand = |u: f64| {
                     let u = UinNGGP::new(u);
-                    let parameters = NGGPParameters::new(u, mass, reinforcement);
+                    let parameters = NggpParameters::new(u, mass, reinforcement);
                     log_joint_density(&mut Partition::from(&p[..]), &parameters).exp()
                 };
                 integrate(integrand, 0.0, 1000.0, 1e-6).integral
@@ -372,7 +372,7 @@ pub unsafe extern "C" fn dahl_randompartition__nggp_partition(
         // let mut p = Partition::one_subset(ni);
         // let l = |_i: usize, _indices: &[usize]| 0.0;
         for i in 0..np {
-            let parameters = NGGPParameters::new(u, mass, reinforcement);
+            let parameters = NggpParameters::new(u, mass, reinforcement);
             let p = engine(ni, &parameters, TargetOrRandom::Random(&mut rng));
             // p = crate::mcmc::update_neal_algorithm3(1, &p, &parameters, &l, &mut rng);
             let labels = p.0.labels();
@@ -399,7 +399,7 @@ pub unsafe extern "C" fn dahl_randompartition__nggp_partition(
                 target_labels.push(matrix[np * j + i]);
             }
             let mut target = Partition::from(&target_labels[..]);
-            let parameters = NGGPParameters::new(u, mass, reinforcement);
+            let parameters = NggpParameters::new(u, mass, reinforcement);
             let p = engine::<IsaacRng>(ni, &parameters, TargetOrRandom::Target(&mut target));
             probs[i] = p.1;
         }

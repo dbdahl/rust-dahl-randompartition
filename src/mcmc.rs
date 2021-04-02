@@ -4,13 +4,13 @@ use crate::perm::Permutation;
 use crate::push_into_slice_i32;
 
 //use crate::frp;
-use crate::cpp::CPPParameters;
-use crate::crp::CRPParameters;
-use crate::epa::EPAParameters;
-use crate::frp::FRPParameters;
-use crate::lsp::LSPParameters;
-use crate::trp::TRPParameters;
-use crate::urp::URPParameters;
+use crate::cpp::CppParameters;
+use crate::crp::CrpParameters;
+use crate::epa::EpaParameters;
+use crate::frp::FrpParameters;
+use crate::lsp::LspParameters;
+use crate::trp::TrpParameters;
+use crate::urp::UrpParameters;
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use std::ffi::c_void;
@@ -99,7 +99,7 @@ mod tests_mcmc {
     #[test]
     fn test_crp_neal_algorithm3() {
         let mut current = Clustering::one_cluster(5);
-        let neal_functions = CRPParameters::new_with_mass(Mass::new(1.0), current.n_items());
+        let neal_functions = CrpParameters::new_with_mass(Mass::new(1.0), current.n_items());
         let permutation = Permutation::natural_and_fixed(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
@@ -209,31 +209,31 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
     let mut clustering = match prior_id {
         0 => current,
         1 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CrpParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         2 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut FrpParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         3 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut LspParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         4 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CppParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         5 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut EpaParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         6 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut TrpParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         7 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut URPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut UrpParameters).unwrap();
             update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
@@ -278,31 +278,31 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
     current = match prior_id {
         0 => current,
         1 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut CRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CrpParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         2 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut FRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut FrpParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         3 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut LSPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut LspParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         4 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut CPPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut CppParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         5 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut EPAParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut EpaParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         6 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut TRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut TrpParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         7 => {
-            let p = std::ptr::NonNull::new(prior_ptr as *mut URPParameters).unwrap();
+            let p = std::ptr::NonNull::new(prior_ptr as *mut UrpParameters).unwrap();
             update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

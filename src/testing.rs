@@ -55,7 +55,7 @@ pub fn assert_pmf_sums_to_one(
     n_items: usize,
     log_pmf: impl Fn(&mut Clustering) -> f64,
     epsilon: f64,
-) -> () {
+) {
     let sum = Clustering::iter(n_items)
         .map(|p| log_pmf(&mut Clustering::from_vector(p)).exp())
         .sum();

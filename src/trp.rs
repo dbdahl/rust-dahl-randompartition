@@ -1,15 +1,15 @@
 // Tilted random partition distribution
 
 use crate::clust::Clustering;
-use crate::cpp::CPPParameters;
-use crate::crp::CRPParameters;
+use crate::cpp::CppParameters;
+use crate::crp::CrpParameters;
 use crate::distr::PredictiveProbabilityFunction;
-use crate::epa::EPAParameters;
-use crate::frp::FRPParameters;
-use crate::lsp::LSPParameters;
+use crate::epa::EpaParameters;
+use crate::frp::FrpParameters;
+use crate::lsp::LspParameters;
 use crate::perm::Permutation;
 use crate::prior::{PartitionLogProbability, PartitionSampler};
-use crate::urp::URPParameters;
+use crate::urp::UrpParameters;
 use crate::wgt::Weights;
 
 use dahl_salso::clustering::{Clusterings, WorkingClustering};
@@ -25,7 +25,7 @@ use rand_isaac::IsaacRng;
 use std::ffi::c_void;
 use std::slice;
 
-pub struct TRPParameters {
+pub struct TrpParameters {
     pub target: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
@@ -34,7 +34,7 @@ pub struct TRPParameters {
     cache: Log2Cache,
 }
 
-impl TRPParameters {
+impl TrpParameters {
     pub fn new(
         target: Clustering,
         weights: Weights,
@@ -69,7 +69,7 @@ impl TRPParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for TRPParameters {
+impl PredictiveProbabilityFunction for TrpParameters {
     fn log_predictive_probability(
         &self,
         item_index: usize,
@@ -82,13 +82,13 @@ impl PredictiveProbabilityFunction for TRPParameters {
     }
 }
 
-impl PartitionSampler for TRPParameters {
+impl PartitionSampler for TrpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine(self, None, Some(rng)).0
     }
 }
 
-impl PartitionLogProbability for TRPParameters {
+impl PartitionLogProbability for TrpParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
         engine::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
@@ -97,7 +97,7 @@ impl PartitionLogProbability for TRPParameters {
     }
 }
 
-fn compute_loss<'a>(x: &Clustering, parameters: &'a TRPParameters) -> f64 {
+fn compute_loss<'a>(x: &Clustering, parameters: &'a TrpParameters) -> f64 {
     let y: Vec<_> = x
         .allocation()
         .iter()
@@ -146,7 +146,7 @@ fn compute_loss<'a>(x: &Clustering, parameters: &'a TRPParameters) -> f64 {
 
 fn compute_loss2<'a, 'b>(
     x: &Clustering,
-    parameters: &'a TRPParameters,
+    parameters: &'a TrpParameters,
     loss_computer: &Box<dyn CMLossComputer + 'b>,
 ) -> f64 {
     let y: Vec<_> = x
@@ -169,7 +169,7 @@ fn compute_loss2<'a, 'b>(
 }
 
 fn engine<'a, T: Rng>(
-    parameters: &'a TRPParameters,
+    parameters: &'a TrpParameters,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -339,11 +339,11 @@ mod tests {
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters = TRPParameters::new(
+            let parameters = TrpParameters::new(
                 target,
                 weights,
                 permutation,
-                Box::new(CRPParameters::new_with_mass_and_discount(
+                Box::new(CrpParameters::new_with_mass_and_discount(
                     mass, discount, n_items,
                 )),
                 loss_function,
@@ -379,11 +379,11 @@ mod tests {
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters = TRPParameters::new(
+            let parameters = TrpParameters::new(
                 target,
                 weights,
                 permutation,
-                Box::new(CRPParameters::new_with_mass_and_discount(
+                Box::new(CrpParameters::new_with_mass_and_discount(
                     mass, discount, n_items,
                 )),
                 loss_function,
@@ -407,7 +407,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     baseline_distr_ptr: *const c_void,
     loss: i32,
     a: f64,
-) -> *mut TRPParameters {
+) -> *mut TrpParameters {
     let ni = n_items as usize;
     let opined = Clustering::from_slice(slice::from_raw_parts(baseline_partition_ptr, ni));
     let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
@@ -421,23 +421,23 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     };
     let baseline_distribution: Box<dyn PredictiveProbabilityFunction> = match baseline_distr_id {
         1 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CrpParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         2 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut FRPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut FrpParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         3 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut LSPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut LspParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         4 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CPPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CppParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         5 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut EPAParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut EpaParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         //        6 => {
@@ -445,14 +445,14 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
         //            Box::new(p.as_ref().clone())
         //        }
         7 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut URPParameters).unwrap();
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut UrpParameters).unwrap();
             Box::new(p.as_ref().clone())
         }
         _ => panic!("Unsupported prior ID: {}", baseline_distr_id),
     };
     let loss_function = LossFunction::from_code(loss, a).unwrap();
     // First we create a new object.
-    let obj = TRPParameters::new(
+    let obj = TrpParameters::new(
         opined,
         weights,
         permutation,
@@ -467,7 +467,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__trpparameters_free(obj: *mut TRPParameters) {
+pub unsafe extern "C" fn dahl_randompartition__trpparameters_free(obj: *mut TrpParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;

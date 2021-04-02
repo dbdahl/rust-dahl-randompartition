@@ -9,13 +9,13 @@ use rand::Rng;
 use statrs::function::gamma::ln_gamma;
 
 #[derive(Debug, Clone)]
-pub struct CRPParameters {
+pub struct CrpParameters {
     mass: Mass,
     discount: Discount,
     n_items: usize,
 }
 
-impl CRPParameters {
+impl CrpParameters {
     pub fn new_with_mass(mass: Mass, n_items: usize) -> Self {
         Self::new_with_mass_and_discount(mass, Discount::new(0.0), n_items)
     }
@@ -29,7 +29,7 @@ impl CRPParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for CRPParameters {
+impl PredictiveProbabilityFunction for CrpParameters {
     fn log_predictive_probability(
         &self,
         item: usize,
@@ -47,7 +47,7 @@ impl PredictiveProbabilityFunction for CRPParameters {
     }
 }
 
-impl PartitionSampler for CRPParameters {
+impl PartitionSampler for CrpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         let mass = self.mass.unwrap();
         let discount = self.discount.unwrap();
@@ -74,7 +74,7 @@ impl PartitionSampler for CRPParameters {
     }
 }
 
-impl PartitionLogProbability for CRPParameters {
+impl PartitionLogProbability for CrpParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
         let m = self.mass.unwrap();
         let d = self.discount.unwrap();
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_constructive() {
-        let parameters = CRPParameters::new_with_mass(Mass::new(2.0), 5);
+        let parameters = CrpParameters::new_with_mass(Mass::new(2.0), 5);
         let sample_closure = || parameters.sample(&mut thread_rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_goodness_of_fit(
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn test_goodness_of_fit_neal_algorithm3() {
         let parameters =
-            CRPParameters::new_with_mass_and_discount(Mass::new(2.0), Discount::new(0.1), 5);
+            CrpParameters::new_with_mass_and_discount(Mass::new(2.0), Discount::new(0.1), 5);
         let l = |_i: usize, _indices: &[usize]| 0.0;
         let mut clustering = Clustering::one_cluster(parameters.n_items);
         let rng = &mut thread_rng();
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_pmf_without_discount() {
-        let parameters = CRPParameters::new_with_mass(Mass::new(1.5), 5);
+        let parameters = CrpParameters::new_with_mass(Mass::new(1.5), 5);
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
@@ -172,7 +172,7 @@ mod tests {
     #[test]
     fn test_pmf_with_discount() {
         let parameters =
-            CRPParameters::new_with_mass_and_discount(Mass::new(1.5), Discount::new(0.1), 5);
+            CrpParameters::new_with_mass_and_discount(Mass::new(1.5), Discount::new(0.1), 5);
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
@@ -183,11 +183,11 @@ pub unsafe extern "C" fn dahl_randompartition__crpparameters_new(
     n_items: i32,
     mass: f64,
     discount: f64,
-) -> *mut CRPParameters {
+) -> *mut CrpParameters {
     let d = Discount::new(discount);
     let m = Mass::new_with_variable_constraint(mass, discount);
     // First we create a new object.
-    let obj = CRPParameters::new_with_mass_and_discount(m, d, n_items as usize);
+    let obj = CrpParameters::new_with_mass_and_discount(m, d, n_items as usize);
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
@@ -195,7 +195,7 @@ pub unsafe extern "C" fn dahl_randompartition__crpparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__crpparameters_free(obj: *mut CRPParameters) {
+pub unsafe extern "C" fn dahl_randompartition__crpparameters_free(obj: *mut CrpParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;
