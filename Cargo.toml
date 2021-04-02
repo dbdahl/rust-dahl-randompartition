@@ -15,6 +15,7 @@ statrs = "0.13.0"
 quadrature = "0.1.2"
 
 dahl-bellnumber = { git="https://dahl-git.byu.edu/dahl/rust-dahl-bellnumber.git" }
+# dahl-bellnumber = { path="/home/dahl/docs/devel/rust-dahl-bellnumber" }
 
 dahl-roxido = { git="https://dahl-git.byu.edu/dahl/rust-dahl-roxido.git" }
 # dahl-roxido = { path="/home/dahl/docs/devel/rust-dahl-roxido" }

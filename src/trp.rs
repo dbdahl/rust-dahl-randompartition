@@ -151,7 +151,7 @@ fn compute_loss2<'a, 'b>(
         .allocation()
         .iter()
         .zip(parameters.target.allocation().iter())
-        .filter(|&x| *x.0 != usize::max_value())
+        .filter(|&x| *x.0 != usize::MAX)
         .map(|x| (*x.0 as dahl_salso::LabelType, *x.1 as i32))
         .collect();
     let target_as_working = WorkingClustering::from_vector(

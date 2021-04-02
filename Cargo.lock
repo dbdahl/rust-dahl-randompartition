@@ -113,7 +113,7 @@ dependencies = [
 [[package]]
 name = "dahl-bellnumber"
 version = "0.1.1"
-source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-bellnumber.git#405586d21b1c1425cd19e85559c3d1ef9b842ede"
+source = "git+https://dahl-git.byu.edu/dahl/rust-dahl-bellnumber.git#941c6d28a545f8fb2d8ef4b645112364d154cfdb"
 dependencies = [
  "approx 0.4.0",
  "num-bigint",
