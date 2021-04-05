@@ -95,54 +95,7 @@ impl PartitionLogProbability for TrpParameters {
     }
 }
 
-fn compute_loss(x: &Clustering, parameters: &TrpParameters) -> f64 {
-    let y: Vec<_> = x
-        .allocation()
-        .iter()
-        .zip(parameters.target.allocation().iter())
-        .filter(|&x| *x.0 != usize::MAX)
-        .map(|x| (*x.0 as dahl_salso::LabelType, *x.1 as i32))
-        .collect();
-    let target_as_working = WorkingClustering::from_vector(
-        y.iter().map(|x| x.0).collect(),
-        (x.max_label() + 1) as dahl_salso::LabelType,
-    );
-    let cache = Log2Cache::new(match parameters.loss_function {
-        LossFunction::VI(_) | LossFunction::NVI | LossFunction::ID | LossFunction::NID => {
-            parameters.target.n_items()
-        }
-        _ => 0,
-    });
-    let loss_computer: Box<dyn CMLossComputer> = match parameters.loss_function {
-        LossFunction::BinderDraws(a) => Box::new(BinderCMLossComputer::new(a)),
-        LossFunction::OneMinusARI => Box::new(OMARICMLossComputer::new(1)),
-        LossFunction::VI(a) => Box::new(VICMLossComputer::new(a, &cache)),
-        LossFunction::NVI => Box::new(GeneralInformationBasedCMLossComputer::new(
-            1,
-            &cache,
-            NVIInformationBasedLoss {},
-        )),
-        LossFunction::ID => Box::new(GeneralInformationBasedCMLossComputer::new(
-            1,
-            &cache,
-            IDInformationBasedLoss {},
-        )),
-        LossFunction::NID => Box::new(GeneralInformationBasedCMLossComputer::new(
-            1,
-            &cache,
-            NIDInformationBasedLoss {},
-        )),
-        _ => panic!("Unsupported loss function."),
-    };
-    let labels: Vec<_> = y.iter().map(|x| x.1).collect();
-    let opined_as_clusterings = Clusterings::from_i32_column_major_order(&labels[..], labels.len());
-    loss_computer.compute_loss(
-        &target_as_working,
-        &opined_as_clusterings.make_confusion_matrices(&target_as_working),
-    )
-}
-
-fn compute_loss2<'a, 'b>(
+fn compute_loss<'a, 'b>(
     x: &Clustering,
     parameters: &'a TrpParameters,
     loss_computer: &Box<dyn CMLossComputer + 'b>,
@@ -206,7 +159,7 @@ fn engine<'a, T: Rng>(
             .into_iter()
             .map(|label| {
                 clustering.reallocate(ii, label);
-                let loss_value = compute_loss2(&clustering, parameters, &loss_computer);
+                let loss_value = compute_loss(&clustering, parameters, &loss_computer);
                 let weight = parameters.baseline_distribution.log_predictive_probability(
                     ii,
                     label,
@@ -231,90 +184,6 @@ fn engine<'a, T: Rng>(
     }
     (clustering, log_probability)
 }
-
-/*
-fn engine2<'a, T: Rng>(
-    parameters: &'a TRPParameters,
-    target: Option<&[usize]>,
-    mut rng: Option<&mut T>,
-) -> (Clustering, f64) {
-    let ni = parameters.target.n_items();
-    let mut log_probability = 0.0;
-    let mut clustering = Clustering::unallocated(ni);
-    for i in 0..clustering.n_items() {
-        let ii = parameters.permutation.get(i);
-        let scaled_weight = ((i + 1) as f64) * parameters.weights[ii];
-        let available_labels = clustering
-            .available_labels_for_allocation_with_target(target, ii)
-            .collect::<Vec<_>>();
-        clustering.allocate(ii, clustering.new_label());
-        let labels_and_weights = available_labels
-            .into_iter()
-            .map(|label| {
-                clustering.reallocate(ii, label);
-                let loss_value = compute_loss(&clustering, parameters);
-                let weight = parameters
-                    .baseline_distribution
-                    .log_probability(&clustering)
-                    - scaled_weight * loss_value;
-                (label, weight)
-            })
-            .collect::<Vec<_>>()
-            .into_iter();
-        let (subset_index, log_probability_contribution) = match &mut rng {
-            Some(r) => clustering.select(labels_and_weights, true, 0, Some(r), true),
-            None => clustering.select::<IsaacRng, _>(
-                labels_and_weights,
-                true,
-                target.unwrap()[ii],
-                None,
-                true,
-            ),
-        };
-        log_probability += log_probability_contribution;
-        clustering.reallocate(ii, subset_index);
-    }
-    (clustering, log_probability)
-}
-
-fn engine3<'a, T: Rng>(
-    parameters: &'a TRPParameters,
-    target: Option<&[usize]>,
-    mut rng: Option<&mut T>,
-) -> (Clustering, f64) {
-    let ni = parameters.target.n_items();
-    let mut log_probability = 0.0;
-    let mut clustering = Clustering::unallocated(ni);
-    for i in 0..clustering.n_items() {
-        let ii = parameters.permutation.get(i);
-        let scaled_weight = ((i + 1) as f64) * parameters.weights[ii];
-        let labels_and_weights = clustering
-            .available_labels_for_allocation_with_target(target, ii)
-            .map(|label| {
-                let mut candidate = clustering.clone();
-                candidate.allocate(ii, label);
-                // This could be more efficient, since compute_loss does things every loop that could be done just once.
-                let loss_value = compute_loss(&candidate, parameters);
-                let weight = parameters.baseline_distribution.log_probability(&candidate)
-                    - scaled_weight * loss_value;
-                (label, weight)
-            });
-        let (subset_index, log_probability_contribution) = match &mut rng {
-            Some(r) => clustering.select(labels_and_weights, true, 0, Some(r), true),
-            None => clustering.select::<IsaacRng, _>(
-                labels_and_weights,
-                true,
-                target.unwrap()[ii],
-                None,
-                true,
-            ),
-        };
-        log_probability += log_probability_contribution;
-        clustering.allocate(ii, subset_index);
-    }
-    (clustering, log_probability)
-}
-*/
 
 #[cfg(test)]
 mod tests {
