@@ -26,7 +26,7 @@ use std::ffi::c_void;
 use std::slice;
 
 pub struct TrpParameters {
-    pub target: Clustering,
+    pub baseline_partition: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
     pub baseline_distribution: Box<dyn PredictiveProbabilityFunction>,
@@ -52,7 +52,7 @@ impl TrpParameters {
                 _ => 0,
             });
             Some(Self {
-                target: target.standardize(),
+                baseline_partition: target.standardize(),
                 weights,
                 permutation,
                 baseline_distribution,
@@ -103,7 +103,7 @@ fn compute_loss<'a, 'b>(
     let y: Vec<_> = x
         .allocation()
         .iter()
-        .zip(parameters.target.allocation().iter())
+        .zip(parameters.baseline_partition.allocation().iter())
         .filter(|&x| *x.0 != usize::MAX)
         .map(|x| (*x.0 as dahl_salso::LabelType, *x.1 as i32))
         .collect();
@@ -124,7 +124,7 @@ fn engine<'a, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let ni = parameters.target.n_items();
+    let ni = parameters.baseline_partition.n_items();
     let loss_computer: Box<dyn CMLossComputer> = match parameters.loss_function {
         LossFunction::BinderDraws(a) => Box::new(BinderCMLossComputer::new(a)),
         LossFunction::OneMinusARI => Box::new(OMARICMLossComputer::new(1)),

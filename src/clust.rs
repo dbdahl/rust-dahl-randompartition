@@ -203,16 +203,16 @@ impl Clustering {
             Some(target) => {
                 let what = target[item];
                 if self.active_labels.contains(&what) {
-                    Some(self.new_label())
+                    self.new_label()
                 } else {
-                    Some(what)
+                    what
                 }
             }
-            None => Some(self.new_label()),
+            None => self.new_label(),
         };
         ClusterLabelsIterator {
             iter: self.active_labels.iter(),
-            new_label,
+            new_label: Some(new_label),
             done: false,
         }
     }
