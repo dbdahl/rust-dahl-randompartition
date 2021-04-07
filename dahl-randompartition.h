@@ -15,9 +15,9 @@ typedef struct FrpParameters FrpParameters;
 
 typedef struct LspParameters LspParameters;
 
-typedef struct TrpParameters TrpParameters;
+typedef struct SpParameters SpParameters;
 
-typedef struct UrpParameters UrpParameters;
+typedef struct UpParameters UpParameters;
 
 typedef struct Rr_Sexp_Vector_Intsxp {
   const void *sexp_ptr;
@@ -132,18 +132,18 @@ void dahl_randompartition__log_probability_of_partition(int32_t n_partitions,
                                                         int32_t prior_id,
                                                         const void *prior_ptr);
 
-struct TrpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
-                                                              const int32_t *baseline_partition_ptr,
-                                                              const double *weights_ptr,
-                                                              const int32_t *permutation_ptr,
-                                                              int32_t use_natural_permutation,
-                                                              int32_t baseline_distr_id,
-                                                              const void *baseline_distr_ptr,
-                                                              int32_t loss,
-                                                              double a);
+struct SpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
+                                                             const int32_t *baseline_partition_ptr,
+                                                             const double *weights_ptr,
+                                                             const int32_t *permutation_ptr,
+                                                             int32_t use_natural_permutation,
+                                                             int32_t baseline_distr_id,
+                                                             const void *baseline_distr_ptr,
+                                                             int32_t loss,
+                                                             double a);
 
-void dahl_randompartition__trpparameters_free(struct TrpParameters *obj);
+void dahl_randompartition__trpparameters_free(struct SpParameters *obj);
 
-struct UrpParameters *dahl_randompartition__urpparameters_new(int32_t n_items);
+struct UpParameters *dahl_randompartition__urpparameters_new(int32_t n_items);
 
-void dahl_randompartition__urpparameters_free(struct UrpParameters *obj);
+void dahl_randompartition__urpparameters_free(struct UpParameters *obj);
