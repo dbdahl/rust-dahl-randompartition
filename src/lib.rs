@@ -18,9 +18,9 @@ pub mod fixed;
 pub mod perm;
 pub mod prelude;
 pub mod prior;
+pub mod sp;
 pub mod testing;
-pub mod trp;
-pub mod urp;
+pub mod up;
 pub mod wgt;
 
 pub unsafe fn push_into_slice_i32(from_slice: &[usize], to_slice: &mut [i32]) {

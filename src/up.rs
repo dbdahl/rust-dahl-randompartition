@@ -8,12 +8,12 @@ use dahl_bellnumber::UniformDistributionCache;
 use rand::Rng;
 
 #[derive(Debug, Clone)]
-pub struct UrpParameters {
+pub struct UpParameters {
     pub n_items: usize,
     cache: UniformDistributionCache,
 }
 
-impl UrpParameters {
+impl UpParameters {
     pub fn new(n_items: usize) -> Self {
         Self {
             n_items,
@@ -22,7 +22,7 @@ impl UrpParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for UrpParameters {
+impl PredictiveProbabilityFunction for UpParameters {
     fn log_predictive_probability(
         &self,
         item: usize,
@@ -40,13 +40,13 @@ impl PredictiveProbabilityFunction for UrpParameters {
     }
 }
 
-impl PartitionSampler for UrpParameters {
+impl PartitionSampler for UpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         crate::distr::default_partition_sampler_sample_without_permutation(self, self.n_items, rng)
     }
 }
 
-impl PartitionLogProbability for UrpParameters {
+impl PartitionLogProbability for UpParameters {
     fn log_probability(&self, _partition: &Clustering) -> f64 {
         -self.cache.lbell(self.n_items)
     }
@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_constructive() {
-        let parameters = UrpParameters::new(5);
+        let parameters = UpParameters::new(5);
         let sample_closure = || parameters.sample(&mut thread_rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_goodness_of_fit(
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_neal_algorithm3() {
-        let parameters = UrpParameters::new(5);
+        let parameters = UpParameters::new(5);
         let l = |_i: usize, _indices: &[usize]| 0.0;
         let mut clustering = Clustering::one_cluster(parameters.n_items);
         let rng = &mut thread_rng();
@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn test_pmf() {
-        let parameters = UrpParameters::new(5);
+        let parameters = UpParameters::new(5);
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
@@ -117,9 +117,9 @@ mod tests {
 #[no_mangle]
 pub unsafe extern "C" fn dahl_randompartition__urpparameters_new(
     n_items: i32,
-) -> *mut UrpParameters {
+) -> *mut UpParameters {
     // First we create a new object.
-    let obj = UrpParameters::new(n_items as usize);
+    let obj = UpParameters::new(n_items as usize);
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
@@ -127,7 +127,7 @@ pub unsafe extern "C" fn dahl_randompartition__urpparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__urpparameters_free(obj: *mut UrpParameters) {
+pub unsafe extern "C" fn dahl_randompartition__urpparameters_free(obj: *mut UpParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;

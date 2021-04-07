@@ -6,8 +6,8 @@ use crate::epa::EpaParameters;
 use crate::fixed::FixedPartitionParameters;
 use crate::frp::FrpParameters;
 use crate::lsp::LspParameters;
-use crate::trp::TrpParameters;
-use crate::urp::UrpParameters;
+use crate::sp::SpParameters;
+use crate::up::UpParameters;
 
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
@@ -121,20 +121,20 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
             }
         }
         6 => {
-            let mut p = std::ptr::NonNull::new(prior_ptr as *mut TrpParameters).unwrap();
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut SpParameters).unwrap();
             if randomize_permutation {
-                let callback = |p: &mut TrpParameters, rng: &mut IsaacRng| {
+                let callback = |p: &mut SpParameters, rng: &mut IsaacRng| {
                     p.shuffle_permutation(rng);
                 };
                 sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
             } else {
-                let callback = |_p: &mut TrpParameters, _rng: &mut IsaacRng| {};
+                let callback = |_p: &mut SpParameters, _rng: &mut IsaacRng| {};
                 sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
             }
         }
         7 => {
-            let mut p = std::ptr::NonNull::new(prior_ptr as *mut UrpParameters).unwrap();
-            let callback = |_p: &mut UrpParameters, _rng: &mut IsaacRng| {};
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();
+            let callback = |_p: &mut UpParameters, _rng: &mut IsaacRng| {};
             sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
@@ -180,11 +180,11 @@ pub unsafe extern "C" fn dahl_randompartition__log_probability_of_partition(
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         6 => {
-            let mut p = std::ptr::NonNull::new(prior_ptr as *mut TrpParameters).unwrap();
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut SpParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         7 => {
-            let mut p = std::ptr::NonNull::new(prior_ptr as *mut UrpParameters).unwrap();
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
