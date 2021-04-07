@@ -17,7 +17,7 @@ pub trait FullConditional {
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)>;
 }
 
-pub(crate) fn full_conditional_log_full_conditional_exchangeable_default<T>(
+pub(crate) fn default_full_conditional_log_full_conditional_exchangeable<T>(
     ppf: &T,
     item: usize,
     clustering: &Clustering,

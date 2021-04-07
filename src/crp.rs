@@ -59,7 +59,7 @@ impl FullConditional for CrpParameters {
         item: usize,
         clustering: &'a Clustering,
     ) -> Vec<(usize, f64)> {
-        crate::distr::full_conditional_log_full_conditional_exchangeable_default(
+        crate::distr::default_full_conditional_log_full_conditional_exchangeable(
             self, item, clustering,
         )
     }
