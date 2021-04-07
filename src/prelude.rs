@@ -7,12 +7,12 @@ macro_rules! constrained_f64 {
 
         impl $name {
             pub fn new(x: f64) -> Self {
-                assert!((($closure))(x), $msg);
+                assert!(($closure)(x), $msg);
                 Self(x)
             }
 
             pub fn new_with_variable_constraint(x: f64, y: f64) -> Self {
-                assert!((($closure2))(x, y), $msg2);
+                assert!(($closure2)(x, y), $msg2);
                 Self(x)
             }
 
