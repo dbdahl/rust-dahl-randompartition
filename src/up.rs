@@ -1,7 +1,7 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
 use crate::prior::PartitionLogProbability;
 
 use dahl_bellnumber::UniformDistributionCache;
@@ -37,6 +37,19 @@ impl PredictiveProbabilityFunction for UpParameters {
         let size = clustering.size_of_without(label, item);
         let predictive_probability = if size == 0 { right } else { left };
         predictive_probability.ln()
+    }
+}
+
+impl FullConditional for UpParameters {
+    fn log_full_conditional<'a>(
+        &'a self,
+        item: usize,
+        clustering: &'a Clustering,
+    ) -> Vec<(usize, f64)> {
+        clustering
+            .available_labels_for_reallocation(item)
+            .map(|label| (label, 0.0))
+            .collect()
     }
 }
 

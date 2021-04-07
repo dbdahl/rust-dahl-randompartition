@@ -12,6 +12,32 @@ pub trait PredictiveProbabilityFunction {
 
 //
 
+pub trait FullConditional {
+    // Clustering if fully allocated.
+    fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)>;
+}
+
+pub(crate) fn full_conditional_log_full_conditional_exchangeable_default<T>(
+    ppf: &T,
+    item: usize,
+    clustering: &Clustering,
+) -> Vec<(usize, f64)>
+where
+    T: PredictiveProbabilityFunction,
+{
+    clustering
+        .available_labels_for_reallocation(item)
+        .map(|label| {
+            (
+                label,
+                ppf.log_predictive_probability(item, label, clustering),
+            )
+        })
+        .collect()
+}
+
+//
+
 pub trait PartitionSampler {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering;
 }

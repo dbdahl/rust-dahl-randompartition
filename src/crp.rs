@@ -1,7 +1,7 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
 use crate::prelude::*;
 use crate::prior::PartitionLogProbability;
 
@@ -50,6 +50,18 @@ impl PredictiveProbabilityFunction for CrpParameters {
 impl PartitionSampler for CrpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         crate::distr::default_partition_sampler_sample_without_permutation(self, self.n_items, rng)
+    }
+}
+
+impl FullConditional for CrpParameters {
+    fn log_full_conditional<'a>(
+        &'a self,
+        item: usize,
+        clustering: &'a Clustering,
+    ) -> Vec<(usize, f64)> {
+        crate::distr::full_conditional_log_full_conditional_exchangeable_default(
+            self, item, clustering,
+        )
     }
 }
 
