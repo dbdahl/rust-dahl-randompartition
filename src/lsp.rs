@@ -1,7 +1,7 @@
 // Location scale partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunctionOld};
 use crate::perm::Permutation;
 use crate::prelude::*;
 use crate::prior::PartitionLogProbability;
@@ -57,7 +57,7 @@ impl LspParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for LspParameters {
+impl PredictiveProbabilityFunctionOld for LspParameters {
     fn log_predictive_probability(
         &self,
         item_index: usize,

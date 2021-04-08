@@ -1,9 +1,13 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{
+    FullConditional, PartitionSampler, PredictiveProbabilityFunction,
+    PredictiveProbabilityFunctionOld,
+};
 use crate::prior::PartitionLogProbability;
 
+use crate::perm::Permutation;
 use dahl_bellnumber::UniformDistributionCache;
 use rand::Rng;
 
@@ -22,7 +26,7 @@ impl UpParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for UpParameters {
+impl PredictiveProbabilityFunctionOld for UpParameters {
     fn log_predictive_probability(
         &self,
         item: usize,
@@ -37,6 +41,32 @@ impl PredictiveProbabilityFunction for UpParameters {
         let size = clustering.size_of_without(label, item);
         let predictive_probability = if size == 0 { right } else { left };
         predictive_probability.ln()
+    }
+}
+
+impl PredictiveProbabilityFunction for UpParameters {
+    fn log_predictive(&self, _item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
+        let n_allocated = clustering.n_items_allocated();
+        let n_clusters = clustering.n_clusters();
+        let (left, right) = {
+            let x = self
+                .cache
+                .probs_for_uniform(self.n_items - n_allocated, n_clusters);
+            (x.0.ln(), x.1.ln())
+        };
+        clustering
+            .available_labels_for_allocation()
+            .map(|label| {
+                (
+                    label,
+                    if clustering.size_of(label) == 0 {
+                        right
+                    } else {
+                        left
+                    },
+                )
+            })
+            .collect()
     }
 }
 
@@ -55,7 +85,11 @@ impl FullConditional for UpParameters {
 
 impl PartitionSampler for UpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
-        crate::distr::default_partition_sampler_sample_without_permutation(self, self.n_items, rng)
+        crate::distr::default_partition_sampler_sample(
+            self,
+            &Permutation::natural_and_fixed(self.n_items),
+            rng,
+        )
     }
 }
 

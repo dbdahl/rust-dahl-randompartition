@@ -3,7 +3,7 @@
 use crate::clust::Clustering;
 use crate::cpp::CppParameters;
 use crate::crp::CrpParameters;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunctionOld};
 use crate::epa::EpaParameters;
 use crate::frp::FrpParameters;
 use crate::lsp::LspParameters;
@@ -29,7 +29,7 @@ pub struct SpParameters {
     pub baseline_partition: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
-    pub baseline_distribution: Box<dyn PredictiveProbabilityFunction>,
+    pub baseline_distribution: Box<dyn PredictiveProbabilityFunctionOld>,
     pub loss_function: LossFunction,
     cache: Log2Cache,
 }
@@ -39,7 +39,7 @@ impl SpParameters {
         target: Clustering,
         weights: Weights,
         permutation: Permutation,
-        baseline_distribution: Box<dyn PredictiveProbabilityFunction>,
+        baseline_distribution: Box<dyn PredictiveProbabilityFunctionOld>,
         loss_function: LossFunction,
     ) -> Option<Self> {
         if (weights.n_items() != target.n_items()) || (target.n_items() != permutation.n_items()) {
@@ -67,7 +67,7 @@ impl SpParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for SpParameters {
+impl PredictiveProbabilityFunctionOld for SpParameters {
     fn log_predictive_probability(
         &self,
         item_index: usize,
@@ -286,7 +286,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
-    let baseline_distribution: Box<dyn PredictiveProbabilityFunction> = match baseline_distr_id {
+    let baseline_distribution: Box<dyn PredictiveProbabilityFunctionOld> = match baseline_distr_id {
         1 => {
             let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CrpParameters).unwrap();
             Box::new(p.as_ref().clone())

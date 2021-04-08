@@ -4,7 +4,7 @@ use rand::Rng;
 
 //
 
-pub trait PredictiveProbabilityFunction {
+pub trait PredictiveProbabilityFunctionOld {
     // Item may already be allocated somewhere in clustering.
     fn log_predictive_probability(&self, item: usize, label: usize, clustering: &Clustering)
         -> f64;
@@ -12,28 +12,16 @@ pub trait PredictiveProbabilityFunction {
 
 //
 
-pub trait FullConditional {
-    // Clustering if fully allocated.
-    fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)>;
+pub trait PredictiveProbabilityFunction {
+    // Clustering is only partially allocated.
+    fn log_predictive(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)>;
 }
 
-pub(crate) fn default_full_conditional_log_full_conditional_exchangeable<T>(
-    ppf: &T,
-    item: usize,
-    clustering: &Clustering,
-) -> Vec<(usize, f64)>
-where
-    T: PredictiveProbabilityFunction,
-{
-    clustering
-        .available_labels_for_reallocation(item)
-        .map(|label| {
-            (
-                label,
-                ppf.log_predictive_probability(item, label, clustering),
-            )
-        })
-        .collect()
+//
+
+pub trait FullConditional {
+    // Clustering is fully allocated, including item.
+    fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)>;
 }
 
 //
@@ -42,46 +30,19 @@ pub trait PartitionSampler {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering;
 }
 
-pub(crate) fn default_partition_sampler_sample_without_permutation<
-    S: Rng,
-    T: PredictiveProbabilityFunction,
->(
-    ppf: &T,
-    n_items: usize,
-    rng: &mut S,
-) -> Clustering {
-    let mut clustering = Clustering::unallocated(n_items);
-    clustering.allocate(0, 0);
-    for i in 1..clustering.n_items() {
-        let labels_and_log_weights = clustering.available_labels_for_allocation().map(|label| {
-            let log_weight = ppf.log_predictive_probability(i, label, &clustering);
-            (label, log_weight)
-        });
-        let (label, _) = clustering.select(labels_and_log_weights, true, 0, Some(rng), false);
-        clustering.allocate(i, label);
-    }
-    clustering
-}
-
-pub(crate) fn default_partition_sampler_sample_with_permutation<
-    S: Rng,
-    T: PredictiveProbabilityFunction,
->(
+pub(crate) fn default_partition_sampler_sample<S: Rng, T: PredictiveProbabilityFunction>(
     ppf: &T,
     permutation: &Permutation,
     rng: &mut S,
 ) -> Clustering {
     let n_items = permutation.n_items();
     let mut clustering = Clustering::unallocated(n_items);
-    clustering.allocate(permutation.get(0), 0);
-    for i in 1..n_items {
+    clustering.allocate(0, 0);
+    for i in 1..clustering.n_items() {
         let ii = permutation.get(i);
-        let labels_and_log_weights = clustering.available_labels_for_allocation().map(|label| {
-            let log_weight = ppf.log_predictive_probability(ii, label, &clustering);
-            (label, log_weight)
-        });
+        let labels_and_log_weights = ppf.log_predictive(ii, &clustering).into_iter();
         let (label, _) = clustering.select(labels_and_log_weights, true, 0, Some(rng), false);
-        clustering.allocate(i, label);
+        clustering.allocate(ii, label);
     }
     clustering
 }

@@ -2,7 +2,7 @@
 
 use crate::clust::Clustering;
 use crate::crp::CrpParameters;
-use crate::distr::PredictiveProbabilityFunction;
+use crate::distr::PredictiveProbabilityFunctionOld;
 use crate::prelude::*;
 
 use crate::prior::PartitionLogProbability;
@@ -73,7 +73,7 @@ impl CppParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for CppParameters {
+impl PredictiveProbabilityFunctionOld for CppParameters {
     fn log_predictive_probability(
         &self,
         item_index: usize,

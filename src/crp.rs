@@ -1,10 +1,14 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{
+    FullConditional, PartitionSampler, PredictiveProbabilityFunction,
+    PredictiveProbabilityFunctionOld,
+};
 use crate::prelude::*;
 use crate::prior::PartitionLogProbability;
 
+use crate::perm::Permutation;
 use rand::Rng;
 use statrs::function::gamma::ln_gamma;
 
@@ -29,7 +33,7 @@ impl CrpParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for CrpParameters {
+impl PredictiveProbabilityFunctionOld for CrpParameters {
     fn log_predictive_probability(
         &self,
         item: usize,
@@ -47,20 +51,50 @@ impl PredictiveProbabilityFunction for CrpParameters {
     }
 }
 
-impl PartitionSampler for CrpParameters {
-    fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
-        crate::distr::default_partition_sampler_sample_without_permutation(self, self.n_items, rng)
+impl PredictiveProbabilityFunction for CrpParameters {
+    fn log_predictive(&self, _item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
+        let discount = self.discount.unwrap();
+        clustering
+            .available_labels_for_allocation()
+            .map(|label| {
+                let size = clustering.size_of(label);
+                let value = if size == 0 {
+                    self.mass.unwrap() + (clustering.n_clusters() as f64) * discount
+                } else {
+                    size as f64 - discount
+                }
+                .ln();
+                (label, value)
+            })
+            .collect()
     }
 }
 
 impl FullConditional for CrpParameters {
-    fn log_full_conditional<'a>(
-        &'a self,
-        item: usize,
-        clustering: &'a Clustering,
-    ) -> Vec<(usize, f64)> {
-        crate::distr::default_full_conditional_log_full_conditional_exchangeable(
-            self, item, clustering,
+    fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
+        let discount = self.discount.unwrap();
+        clustering
+            .available_labels_for_reallocation(item)
+            .map(|label| {
+                let size = clustering.size_of_without(label, item);
+                let value = if size == 0 {
+                    self.mass.unwrap() + (clustering.n_clusters_without(item) as f64) * discount
+                } else {
+                    size as f64 - discount
+                }
+                .ln();
+                (label, value)
+            })
+            .collect()
+    }
+}
+
+impl PartitionSampler for CrpParameters {
+    fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
+        crate::distr::default_partition_sampler_sample(
+            self,
+            &Permutation::natural_and_fixed(self.n_items),
+            rng,
         )
     }
 }
@@ -161,7 +195,7 @@ mod tests {
         let rng = &mut thread_rng();
         let permutation = Permutation::random(clustering.n_items(), rng);
         let sample_closure = || {
-            clustering = crate::mcmc::update_neal_algorithm3(
+            clustering = crate::mcmc::update_neal_algorithm3_v2(
                 1,
                 &clustering,
                 &permutation,

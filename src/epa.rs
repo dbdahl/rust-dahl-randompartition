@@ -1,7 +1,7 @@
 // Ewens Pitman attraction partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunctionOld};
 use crate::perm::Permutation;
 use crate::prelude::*;
 use crate::prior::PartitionLogProbability;
@@ -151,7 +151,7 @@ impl<'a> SquareMatrixBorrower<'a> {
     }
 }
 
-impl<'a> PredictiveProbabilityFunction for EpaParameters<'a> {
+impl<'a> PredictiveProbabilityFunctionOld for EpaParameters<'a> {
     fn log_predictive_probability(
         &self,
         item_index: usize,

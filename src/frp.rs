@@ -1,7 +1,7 @@
 // Focal random partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{PartitionSampler, PredictiveProbabilityFunctionOld};
 use crate::perm::Permutation;
 use crate::prelude::*;
 use crate::prior::PartitionLogProbability;
@@ -51,7 +51,7 @@ impl FrpParameters {
     }
 }
 
-impl PredictiveProbabilityFunction for FrpParameters {
+impl PredictiveProbabilityFunctionOld for FrpParameters {
     fn log_predictive_probability(
         &self,
         item_index: usize,
