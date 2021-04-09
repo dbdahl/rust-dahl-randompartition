@@ -211,12 +211,10 @@ fn engine2<'a, T: Rng>(
     };
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut counts_marginal = vec![0_usize; parameters.baseline_partition.max_label() + 1];
     let mut counts_joint = vec![vec![0_usize; 0]; parameters.baseline_partition.max_label() + 1];
     for i in 0..clustering.n_items() {
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
-        counts_marginal[label_in_baseline] += 1;
         let scaled_weight = ((i + 1) as f64) * parameters.weights[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
@@ -244,28 +242,23 @@ fn engine2<'a, T: Rng>(
                         clustering.size_of(*label2) + if *label2 == *label { 1 } else { 0 },
                         d,
                     )
-                }) + b * counts_marginal
-                    .iter()
-                    .enumerate()
-                    .fold(0.0, |sum, (_label, count)| sum + ratio_squared(*count, d))
-                    - (a + b)
-                        * counts_joint
-                            .iter()
-                            .enumerate()
-                            .fold(0.0, |sum, (label1, inner)| {
-                                sum + inner.iter().enumerate().fold(0.0, |sum, (label2, count)| {
-                                    sum + ratio_squared(
-                                        count
-                                            + if (label1 == label_in_baseline) && (label2 == *label)
-                                            {
-                                                1
-                                            } else {
-                                                0
-                                            },
-                                        d,
-                                    )
-                                })
+                }) - (a + b)
+                    * counts_joint
+                        .iter()
+                        .enumerate()
+                        .fold(0.0, |sum, (label1, inner)| {
+                            sum + inner.iter().enumerate().fold(0.0, |sum, (label2, count)| {
+                                sum + ratio_squared(
+                                    count
+                                        + if (label1 == label_in_baseline) && (label2 == *label) {
+                                            1
+                                        } else {
+                                            0
+                                        },
+                                    d,
+                                )
                             })
+                        })
             } else {
                 unimplemented!("No go, yet!")
             };
