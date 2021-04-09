@@ -13,7 +13,7 @@ use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct FrpParameters {
-    pub baseline: Clustering,
+    pub baseline_partition: Clustering,
     pub weights: Weights,
     pub permutation: Permutation,
     pub mass: Mass,
@@ -36,7 +36,7 @@ impl FrpParameters {
             None
         } else {
             Some(Self {
-                baseline: baseline.standardize(),
+                baseline_partition: baseline.standardize(),
                 weights,
                 permutation,
                 mass,
@@ -84,20 +84,20 @@ fn engine<T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let ni = parameters.baseline.n_items();
+    let ni = parameters.baseline_partition.n_items();
     let mass = parameters.mass.unwrap();
     let discount = parameters.discount.unwrap();
     let power = parameters.power.unwrap();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut total_counter = vec![0.0; parameters.baseline.max_label() + 1];
+    let mut total_counter = vec![0.0; parameters.baseline_partition.max_label() + 1];
     let mut intersection_counter = Vec::with_capacity(total_counter.len());
     for _ in 0..total_counter.len() {
         intersection_counter.push(Vec::new())
     }
     for i in 0..clustering.n_items() {
         let ii = parameters.permutation.get(i);
-        let baseline_subset_index = parameters.baseline[ii];
+        let baseline_subset_index = parameters.baseline_partition.get(ii);
         let scaled_weight = (i as f64) * parameters.weights[ii];
         let normalized_scaled_weight = if total_counter[baseline_subset_index] == 0.0 {
             0.0

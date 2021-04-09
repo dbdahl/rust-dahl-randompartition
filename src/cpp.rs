@@ -14,7 +14,7 @@ use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct CppParameters {
-    baseline: Clustering,
+    baseline_partition: Clustering,
     rate: Rate,
     uniform: bool,
     mass: Mass,
@@ -60,7 +60,7 @@ impl CppParameters {
         let baseline_as_clusterings =
             Clusterings::from_i32_column_major_order(&labels[..], n_items);
         Some(Self {
-            baseline,
+            baseline_partition: baseline,
             rate,
             uniform,
             mass,
@@ -81,7 +81,7 @@ impl PredictiveProbabilityFunctionOld for CppParameters {
         clustering: &Clustering,
     ) -> f64 {
         let mut p = clustering.clone();
-        p.reallocate(item_index, subset_index);
+        p.allocate(item_index, subset_index);
         log_pmf(&p, self)
     }
 }
@@ -123,7 +123,7 @@ fn log_pmf(target: &Clustering, parameters: &CppParameters) -> f64 {
         let crp_parameters = CrpParameters::new_with_mass_and_discount(
             parameters.mass,
             parameters.discount,
-            parameters.baseline.n_items(),
+            parameters.baseline_partition.n_items(),
         );
         crp_parameters.log_probability(target) + log_multiplier
     }

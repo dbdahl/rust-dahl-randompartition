@@ -40,7 +40,7 @@ where
                 (label, log_weight)
             });
             let pair = state.select(labels_and_weights, true, 0, Some(rng), false);
-            state.reallocate(ii, pair.0);
+            state.allocate(ii, pair.0);
         }
     }
     state
@@ -72,7 +72,7 @@ where
                         (label, log_posterior_predictive(ii, indices) + log_prior)
                     });
             let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
-            state.reallocate(ii, pair.0);
+            state.allocate(ii, pair.0);
         }
     }
     state
@@ -102,7 +102,7 @@ where
                 (label, log_weight)
             });
             let pair = state.select(labels_and_weights, true, 0, Some(rng), false);
-            state.reallocate(ii, pair.0);
+            state.allocate(ii, pair.0);
         }
     }
     state
@@ -136,7 +136,7 @@ where
                         )
                     });
             let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
-            state.reallocate(ii, pair.0);
+            state.allocate(ii, pair.0);
         }
     }
     state

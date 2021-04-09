@@ -12,7 +12,7 @@ use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct LspParameters {
-    pub baseline: Clustering,
+    pub baseline_partition: Clustering,
     pub scale: Scale,
     pub rate: Rate,
     pub permutation: Permutation,
@@ -28,7 +28,7 @@ impl LspParameters {
             None
         } else {
             Some(Self {
-                baseline,
+                baseline_partition: baseline,
                 scale,
                 rate: Rate::new(1.0 / scale.unwrap()),
                 permutation,
@@ -44,7 +44,7 @@ impl LspParameters {
             None
         } else {
             Some(Self {
-                baseline,
+                baseline_partition: baseline,
                 scale: Scale::new(1.0 / rate.unwrap()),
                 rate,
                 permutation,
@@ -90,10 +90,10 @@ fn engine<T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let ni = parameters.baseline.n_items();
+    let ni = parameters.baseline_partition.n_items();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut total_counter = vec![0.0; parameters.baseline.max_label() + 1];
+    let mut total_counter = vec![0.0; parameters.baseline_partition.max_label() + 1];
     let mut intersection_counter = Vec::with_capacity(total_counter.len());
     for _ in 0..total_counter.len() {
         intersection_counter.push(Vec::new())
@@ -102,7 +102,7 @@ fn engine<T: Rng>(
     let mut visited_subsets_indicator = vec![false; total_counter.len()];
     for i in 0..clustering.n_items() {
         let ii = parameters.permutation.get(i);
-        let baseline_subset_index = parameters.baseline[ii];
+        let baseline_subset_index = parameters.baseline_partition.get(ii);
         let n_occupied_subsets = clustering.n_clusters() as f64;
         let labels_and_weights = clustering
             .available_labels_for_allocation_with_target(target, ii)

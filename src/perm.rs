@@ -81,6 +81,16 @@ impl Permutation {
         self.n_items
     }
 
+    pub fn n_items_before(&self, item: usize) -> usize {
+        let mut i = 0;
+        loop {
+            if self.get(i) == item {
+                return i;
+            }
+            i += 1
+        }
+    }
+
     pub fn slice_until(&self, end: usize) -> &[usize] {
         if self.natural_and_fixed {
             panic!("Not supported.");

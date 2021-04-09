@@ -3,7 +3,6 @@ use crate::perm::Permutation;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
 use std::collections::HashMap;
-use std::ops::Index;
 
 #[derive(Debug, Clone)]
 pub struct Clustering {
@@ -11,13 +10,6 @@ pub struct Clustering {
     sizes: Vec<usize>,
     active_labels: Vec<usize>,
     available_labels: Vec<usize>,
-}
-
-impl Index<usize> for Clustering {
-    type Output = usize;
-    fn index(&self, item: usize) -> &Self::Output {
-        &self.allocation[item]
-    }
 }
 
 impl Clustering {
@@ -269,50 +261,58 @@ impl Clustering {
         }
     }
 
-    pub fn get(&mut self, item: usize) -> usize {
-        self.allocation[item]
+    pub fn get(&self, item: usize) -> usize {
+        let x = self.allocation[item];
+        if x == Clustering::UNALLOCATED {
+            panic!("Item is not allocated.");
+        }
+        x
     }
 
     pub fn allocate(&mut self, item: usize, label: usize) {
-        self.allocation[item] = label;
-        if label >= self.sizes.len() {
-            if label > self.sizes.len() {
-                self.available_labels.reserve(label - self.sizes.len());
-                self.available_labels.extend(self.sizes.len()..label);
-            }
-            self.sizes.resize(label + 1, 0);
-            self.active_labels.push(label);
-        } else if self.sizes[label] == 0 {
-            self.available_labels.swap_remove(
-                self.available_labels
-                    .iter()
-                    .rposition(|x| *x == label)
-                    .unwrap(),
-            );
-            self.active_labels.push(label);
-        }
-        self.sizes[label] += 1;
-    }
-
-    pub fn reallocate(&mut self, item: usize, label: usize) {
         let old_label = self.allocation[item];
         if old_label == label {
             return;
         }
-        self.allocate(item, label);
-        let old_label_size = &mut self.sizes[old_label];
-        *old_label_size -= 1;
-        if *old_label_size == 0 {
-            // Linear search is faster than binary search for integer arrays with less than, say,
-            // 150 elements, i.e., active clusters.
-            self.active_labels.swap_remove(
-                self.active_labels
-                    .iter()
-                    .rposition(|x| *x == old_label)
-                    .unwrap(),
-            );
-            self.available_labels.push(old_label)
+        self.allocation[item] = label;
+        if label != Clustering::UNALLOCATED {
+            if label >= self.sizes.len() {
+                if label > self.sizes.len() {
+                    self.available_labels.reserve(label - self.sizes.len());
+                    self.available_labels.extend(self.sizes.len()..label);
+                }
+                self.sizes.resize(label + 1, 0);
+                self.active_labels.push(label);
+            } else if self.sizes[label] == 0 {
+                self.available_labels.swap_remove(
+                    self.available_labels
+                        .iter()
+                        .rposition(|x| *x == label)
+                        .unwrap(),
+                );
+                self.active_labels.push(label);
+            }
+            self.sizes[label] += 1;
         }
+        if old_label != Clustering::UNALLOCATED {
+            let old_label_size = &mut self.sizes[old_label];
+            *old_label_size -= 1;
+            if *old_label_size == 0 {
+                // Linear search is faster than binary search for integer arrays with less than, say,
+                // 150 elements, i.e., active clusters.
+                self.active_labels.swap_remove(
+                    self.active_labels
+                        .iter()
+                        .rposition(|x| *x == old_label)
+                        .unwrap(),
+                );
+                self.available_labels.push(old_label);
+            }
+        }
+    }
+
+    pub fn remove(&mut self, item: usize) {
+        self.allocate(item, Clustering::UNALLOCATED);
     }
 
     // The functions below are somewhat expensive.
@@ -522,7 +522,7 @@ mod tests {
     fn test_add_to_unlisted_cluster() {
         let mut clustering = Clustering::singleton_clusters(5);
         let new_label = 6;
-        clustering.reallocate(1, new_label);
+        clustering.allocate(1, new_label);
         check_output(&clustering, "Clustering { allocation: [0, 6, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 0, 1], active_labels: [0, 6, 2, 3, 4], available_labels: [5, 1] }");
     }
 
@@ -530,16 +530,16 @@ mod tests {
     fn test_add_to_existing_cluster() {
         let mut clustering = Clustering::singleton_clusters(5);
         let new_label = clustering.new_label();
-        clustering.reallocate(1, new_label);
+        clustering.allocate(1, new_label);
         check_output(&clustering, "Clustering { allocation: [0, 5, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 1], active_labels: [0, 5, 2, 3, 4], available_labels: [1] }");
-        clustering.reallocate(3, 2);
+        clustering.allocate(3, 2);
         check_output(&clustering, "Clustering { allocation: [0, 5, 2, 2, 4], sizes: [1, 0, 2, 0, 1, 1], active_labels: [0, 5, 2, 4], available_labels: [1, 3] }");
     }
 
     #[test]
     fn test_add_to_available_cluster() {
         let mut clustering = Clustering::from_vector(vec![0, 5, 2, 2, 4]);
-        clustering.reallocate(3, 1);
+        clustering.allocate(3, 1);
         check_output(&clustering, "Clustering { allocation: [0, 5, 2, 1, 4], sizes: [1, 1, 1, 0, 1, 1], active_labels: [0, 2, 4, 5, 1], available_labels: [3] }");
     }
 
@@ -553,8 +553,8 @@ mod tests {
     fn test_unique_labels() {
         let mut clustering = Clustering::from_vector(vec![2, 2, 4, 3, 4]);
         check_output(&clustering.active_labels(), "[2, 3, 4]");
-        clustering.reallocate(3, 2);
-        clustering.reallocate(1, 5);
+        clustering.allocate(3, 2);
+        clustering.allocate(1, 5);
         check_output(&clustering.active_labels(), "[2, 4, 5]");
     }
 }

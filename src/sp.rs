@@ -36,23 +36,25 @@ pub struct SpParameters {
 
 impl SpParameters {
     pub fn new(
-        target: Clustering,
+        baseline_partition: Clustering,
         weights: Weights,
         permutation: Permutation,
         baseline_distribution: Box<dyn PredictiveProbabilityFunctionOld>,
         loss_function: LossFunction,
     ) -> Option<Self> {
-        if (weights.n_items() != target.n_items()) || (target.n_items() != permutation.n_items()) {
+        if (weights.n_items() != baseline_partition.n_items())
+            || (baseline_partition.n_items() != permutation.n_items())
+        {
             None
         } else {
             let cache = Log2Cache::new(match loss_function {
                 LossFunction::VI(_) | LossFunction::NVI | LossFunction::ID | LossFunction::NID => {
-                    target.n_items()
+                    baseline_partition.n_items()
                 }
                 _ => 0,
             });
             Some(Self {
-                baseline_partition: target.standardize(),
+                baseline_partition: baseline_partition.standardize(),
                 weights,
                 permutation,
                 baseline_distribution,
@@ -158,7 +160,7 @@ fn engine<'a, T: Rng>(
         let labels_and_weights = available_labels
             .into_iter()
             .map(|label| {
-                clustering.reallocate(ii, label);
+                clustering.allocate(ii, label);
                 let loss_value = compute_loss(&clustering, parameters, &loss_computer);
                 let weight = parameters.baseline_distribution.log_predictive_probability(
                     ii,
@@ -180,7 +182,7 @@ fn engine<'a, T: Rng>(
             ),
         };
         log_probability += log_probability_contribution;
-        clustering.reallocate(ii, subset_index);
+        clustering.allocate(ii, subset_index);
     }
     (clustering, log_probability)
 }
