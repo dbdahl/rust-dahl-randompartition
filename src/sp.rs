@@ -226,44 +226,27 @@ fn engine2<'a, T: Rng>(
                 .map(|x| x.resize(max_candidate_label + 1, 0))
                 .collect()
         }
-        let map = parameters
+        let labels_and_log_weights = parameters
             .baseline_ppf
-            .log_predictive(item, candidate_labels, &clustering);
-        let labels_and_log_weights = map.iter().map(|(label, log_probability)| {
-            let distance = if !use_vi {
-                // Binder loss
-                fn ratio_squared(n: usize, d: f64) -> f64 {
-                    let r = (n as f64) / d;
-                    r * r
-                }
-                let d = (i + 1) as f64;
-                a * map.iter().fold(0.0, |sum, (label2, _)| {
-                    sum + ratio_squared(
-                        clustering.size_of(*label2) + if *label2 == *label { 1 } else { 0 },
-                        d,
-                    )
-                }) - (a + b)
-                    * counts_joint
-                        .iter()
-                        .enumerate()
-                        .fold(0.0, |sum, (label1, inner)| {
-                            sum + inner.iter().enumerate().fold(0.0, |sum, (label2, count)| {
-                                sum + ratio_squared(
-                                    count
-                                        + if (label1 == label_in_baseline) && (label2 == *label) {
-                                            1
-                                        } else {
-                                            0
-                                        },
-                                    d,
-                                )
-                            })
-                        })
-            } else {
-                unimplemented!("No go, yet!")
-            };
-            (*label, log_probability - scaled_weight * distance)
-        });
+            .log_predictive(item, candidate_labels, &clustering)
+            .into_iter()
+            .map(|(label, log_probability)| {
+                let distance = if !use_vi {
+                    // Binder loss
+                    fn ratio_squared(n: usize, d: f64) -> f64 {
+                        let r = (n as f64) / d;
+                        r * r
+                    }
+                    let d = (i + 1) as f64;
+                    let n1 = clustering.size_of(label);
+                    let n2 = counts_joint[label_in_baseline][label];
+                    a * (ratio_squared(n1 + 1, d) - ratio_squared(n1, d))
+                        + -(a + b) * (ratio_squared(n2 + 1, d) - ratio_squared(n2, d))
+                } else {
+                    unimplemented!("No go, yet!")
+                };
+                (label, log_probability - scaled_weight * distance)
+            });
         let (label, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
             None => clustering.select::<IsaacRng, _>(
