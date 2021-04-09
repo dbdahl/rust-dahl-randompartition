@@ -1,12 +1,10 @@
 // Shrinkage partition distribution
 
 use crate::clust::Clustering;
-use crate::cpp::CppParameters;
 use crate::crp::CrpParameters;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunctionOld};
-use crate::epa::EpaParameters;
-use crate::frp::FrpParameters;
-use crate::lsp::LspParameters;
+use crate::distr::{
+    PartitionSampler, PredictiveProbabilityFunction, PredictiveProbabilityFunctionOld,
+};
 use crate::perm::Permutation;
 use crate::prior::PartitionLogProbability;
 use crate::up::UpParameters;
@@ -30,6 +28,7 @@ pub struct SpParameters {
     pub weights: Weights,
     pub permutation: Permutation,
     pub baseline_distribution: Box<dyn PredictiveProbabilityFunctionOld>,
+    pub baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
     pub loss_function: LossFunction,
     cache: Log2Cache,
 }
@@ -40,6 +39,7 @@ impl SpParameters {
         weights: Weights,
         permutation: Permutation,
         baseline_distribution: Box<dyn PredictiveProbabilityFunctionOld>,
+        baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
         loss_function: LossFunction,
     ) -> Option<Self> {
         if (weights.n_items() != baseline_partition.n_items())
@@ -58,6 +58,7 @@ impl SpParameters {
                 weights,
                 permutation,
                 baseline_distribution,
+                baseline_ppf,
                 loss_function,
                 cache,
             })
@@ -126,6 +127,15 @@ fn engine<'a, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    match std::env::var("DBD_new_engine") {
+        Ok(val) => {
+            if val == "TRUE" {
+                // println!("Using new!");
+                return engine2(parameters, target, rng);
+            }
+        }
+        Err(_e) => {}
+    }
     let ni = parameters.baseline_partition.n_items();
     let loss_computer: Box<dyn CMLossComputer> = match parameters.loss_function {
         LossFunction::BinderDraws(a) => Box::new(BinderCMLossComputer::new(a)),
@@ -187,6 +197,97 @@ fn engine<'a, T: Rng>(
     (clustering, log_probability)
 }
 
+fn engine2<'a, T: Rng>(
+    parameters: &'a SpParameters,
+    target: Option<&[usize]>,
+    mut rng: Option<&mut T>,
+) -> (Clustering, f64) {
+    let ni = parameters.baseline_partition.n_items();
+    let b = 1.0;
+    let (use_vi, a) = match parameters.loss_function {
+        LossFunction::BinderDraws(a) => (false, a),
+        LossFunction::VI(a) => (true, a),
+        _ => panic!("Unsupported loss function."),
+    };
+    let mut log_probability = 0.0;
+    let mut clustering = Clustering::unallocated(ni);
+    let mut counts_marginal = vec![0_usize; parameters.baseline_partition.max_label() + 1];
+    let mut counts_joint = vec![vec![0_usize; 0]; parameters.baseline_partition.max_label() + 1];
+    for i in 0..clustering.n_items() {
+        let item = parameters.permutation.get(i);
+        let label_in_baseline = parameters.baseline_partition.get(item);
+        counts_marginal[label_in_baseline] += 1;
+        let scaled_weight = ((i + 1) as f64) * parameters.weights[item];
+        let candidate_labels: Vec<usize> = clustering
+            .available_labels_for_allocation_with_target(target, item)
+            .collect();
+        let max_candidate_label = *candidate_labels.iter().max().unwrap();
+        if max_candidate_label >= counts_joint[label_in_baseline].len() {
+            counts_joint
+                .iter_mut()
+                .map(|x| x.resize(max_candidate_label + 1, 0))
+                .collect()
+        }
+        let map = parameters
+            .baseline_ppf
+            .log_predictive(item, candidate_labels, &clustering);
+        let labels_and_log_weights = map.iter().map(|(label, log_probability)| {
+            let distance = if !use_vi {
+                // Binder loss
+                fn ratio_squared(n: usize, d: f64) -> f64 {
+                    let r = (n as f64) / d;
+                    r * r
+                }
+                let d = (i + 1) as f64;
+                a * map.iter().fold(0.0, |sum, (label2, _)| {
+                    sum + ratio_squared(
+                        clustering.size_of(*label2) + if *label2 == *label { 1 } else { 0 },
+                        d,
+                    )
+                }) + b * counts_marginal
+                    .iter()
+                    .enumerate()
+                    .fold(0.0, |sum, (_label, count)| sum + ratio_squared(*count, d))
+                    - (a + b)
+                        * counts_joint
+                            .iter()
+                            .enumerate()
+                            .fold(0.0, |sum, (label1, inner)| {
+                                sum + inner.iter().enumerate().fold(0.0, |sum, (label2, count)| {
+                                    sum + ratio_squared(
+                                        count
+                                            + if (label1 == label_in_baseline) && (label2 == *label)
+                                            {
+                                                1
+                                            } else {
+                                                0
+                                            },
+                                        d,
+                                    )
+                                })
+                            })
+            } else {
+                unimplemented!("No go, yet!")
+            };
+            (*label, log_probability - scaled_weight * distance)
+        });
+        let (label, log_probability_contribution) = match &mut rng {
+            Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
+            None => clustering.select::<IsaacRng, _>(
+                labels_and_log_weights,
+                true,
+                target.unwrap()[item],
+                None,
+                true,
+            ),
+        };
+        log_probability += log_probability_contribution;
+        clustering.allocate(item, label);
+        counts_joint[label_in_baseline][label] += 1;
+    }
+    (clustering, log_probability)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,13 +309,14 @@ mod tests {
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
+            let baseline_distribution =
+                CrpParameters::new_with_mass_and_discount(mass, discount, n_items);
             let parameters = SpParameters::new(
                 target,
                 weights,
                 permutation,
-                Box::new(CrpParameters::new_with_mass_and_discount(
-                    mass, discount, n_items,
-                )),
+                Box::new(baseline_distribution.clone()),
+                Box::new(baseline_distribution),
                 loss_function,
             )
             .unwrap();
@@ -248,13 +350,14 @@ mod tests {
             }
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
+            let baseline_distribution =
+                CrpParameters::new_with_mass_and_discount(mass, discount, n_items);
             let parameters = SpParameters::new(
                 target,
                 weights,
                 permutation,
-                Box::new(CrpParameters::new_with_mass_and_discount(
-                    mass, discount, n_items,
-                )),
+                Box::new(baseline_distribution.clone()),
+                Box::new(baseline_distribution),
                 loss_function,
             )
             .unwrap();
@@ -288,47 +391,37 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
             permutation_slice.iter().map(|x| *x as usize).collect();
         Permutation::from_vector(permutation_vector).unwrap()
     };
-    let baseline_distribution: Box<dyn PredictiveProbabilityFunctionOld> = match baseline_distr_id {
+    let loss_function = LossFunction::from_code(loss, a).unwrap();
+    let obj = match baseline_distr_id {
         1 => {
             let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CrpParameters).unwrap();
-            Box::new(p.as_ref().clone())
+            let baseline_distribution = p.as_ref().clone();
+            SpParameters::new(
+                opined,
+                weights,
+                permutation,
+                Box::new(baseline_distribution.clone()),
+                Box::new(baseline_distribution),
+                loss_function,
+            )
+            .unwrap()
         }
-        2 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut FrpParameters).unwrap();
-            Box::new(p.as_ref().clone())
-        }
-        3 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut LspParameters).unwrap();
-            Box::new(p.as_ref().clone())
-        }
-        4 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CppParameters).unwrap();
-            Box::new(p.as_ref().clone())
-        }
-        5 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut EpaParameters).unwrap();
-            Box::new(p.as_ref().clone())
-        }
-        //        6 => {
-        //            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut TRPParameters).unwrap();
-        //            Box::new(p.as_ref().clone())
-        //        }
         7 => {
             let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut UpParameters).unwrap();
-            Box::new(p.as_ref().clone())
+            let baseline_distribution = p.as_ref().clone();
+            SpParameters::new(
+                opined,
+                weights,
+                permutation,
+                Box::new(baseline_distribution.clone()),
+                Box::new(baseline_distribution),
+                loss_function,
+            )
+            .unwrap()
         }
         _ => panic!("Unsupported prior ID: {}", baseline_distr_id),
     };
-    let loss_function = LossFunction::from_code(loss, a).unwrap();
     // First we create a new object.
-    let obj = SpParameters::new(
-        opined,
-        weights,
-        permutation,
-        baseline_distribution,
-        loss_function,
-    )
-    .unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer

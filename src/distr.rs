@@ -14,7 +14,12 @@ pub trait PredictiveProbabilityFunctionOld {
 
 pub trait PredictiveProbabilityFunction {
     // Clustering is only partially allocated.
-    fn log_predictive(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)>;
+    fn log_predictive(
+        &self,
+        item: usize,
+        candidate_labels: Vec<usize>,
+        clustering: &Clustering,
+    ) -> Vec<(usize, f64)>;
 }
 
 //
@@ -40,7 +45,13 @@ pub(crate) fn default_partition_sampler_sample<S: Rng, T: PredictiveProbabilityF
     clustering.allocate(0, 0);
     for i in 1..clustering.n_items() {
         let ii = permutation.get(i);
-        let labels_and_log_weights = ppf.log_predictive(ii, &clustering).into_iter();
+        let labels_and_log_weights = ppf
+            .log_predictive(
+                ii,
+                clustering.available_labels_for_allocation().collect(),
+                &clustering,
+            )
+            .into_iter();
         let (label, _) = clustering.select(labels_and_log_weights, true, 0, Some(rng), false);
         clustering.allocate(ii, label);
     }

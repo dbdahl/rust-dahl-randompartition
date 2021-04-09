@@ -45,7 +45,12 @@ impl PredictiveProbabilityFunctionOld for UpParameters {
 }
 
 impl PredictiveProbabilityFunction for UpParameters {
-    fn log_predictive(&self, _item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
+    fn log_predictive(
+        &self,
+        _item: usize,
+        candidate_labels: Vec<usize>,
+        clustering: &Clustering,
+    ) -> Vec<(usize, f64)> {
         let n_allocated = clustering.n_items_allocated();
         let n_clusters = clustering.n_clusters();
         let (left, right) = {
@@ -54,8 +59,8 @@ impl PredictiveProbabilityFunction for UpParameters {
                 .probs_for_uniform(self.n_items - n_allocated, n_clusters);
             (x.0.ln(), x.1.ln())
         };
-        clustering
-            .available_labels_for_allocation()
+        candidate_labels
+            .into_iter()
             .map(|label| {
                 (
                     label,

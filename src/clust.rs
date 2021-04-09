@@ -3,6 +3,7 @@ use crate::perm::Permutation;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
 use std::collections::HashMap;
+use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub struct Clustering {
@@ -10,6 +11,24 @@ pub struct Clustering {
     sizes: Vec<usize>,
     active_labels: Vec<usize>,
     available_labels: Vec<usize>,
+}
+
+impl Display for Clustering {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let p = self
+            .allocation
+            .iter()
+            .map(|x| {
+                if *x == Clustering::UNALLOCATED {
+                    "_".to_string()
+                } else {
+                    x.to_string()
+                }
+            })
+            .collect::<Vec<String>>()
+            .concat();
+        write!(f, "{:?}", p)
+    }
 }
 
 impl Clustering {
