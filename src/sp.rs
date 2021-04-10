@@ -231,19 +231,28 @@ fn engine2<'a, T: Rng>(
             .log_predictive(item, candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
+                let nm = clustering.size_of(label);
+                let nj = counts_joint[label_in_baseline][label];
                 let distance = if !use_vi {
                     // Binder loss
-                    fn ratio_squared(n: usize, d: f64) -> f64 {
-                        let r = (n as f64) / d;
-                        r * r
+                    fn binder_delta(count: usize) -> f64 {
+                        count as f64
                     }
-                    let d = (i + 1) as f64;
-                    let n1 = clustering.size_of(label);
-                    let n2 = counts_joint[label_in_baseline][label];
-                    a * (ratio_squared(n1 + 1, d) - ratio_squared(n1, d))
-                        + -(a + b) * (ratio_squared(n2 + 1, d) - ratio_squared(n2, d))
+                    let multiplier = 2.0 / (((i + 1) * (i + 1)) as f64);
+                    multiplier * (a * binder_delta(nm) - (a + b) * binder_delta(nj))
                 } else {
-                    unimplemented!("No go, yet!")
+                    // Variation of information loss
+                    fn vi_delta(count: usize) -> f64 {
+                        if count == 0 {
+                            0.0
+                        } else {
+                            let n1 = (count + 1) as f64;
+                            let n0 = count as f64;
+                            n1 * (n1.log2()) - n0 * (n0.log2())
+                        }
+                    }
+                    let multiplier = 1.0 / ((i + 1) as f64);
+                    multiplier * (a * vi_delta(nm) - (a + b) * vi_delta(nj))
                 };
                 (label, log_probability - scaled_weight * distance)
             });
