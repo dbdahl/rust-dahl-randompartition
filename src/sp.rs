@@ -230,10 +230,6 @@ fn engine2<'a, T: Rng>(
         let map = parameters
             .baseline_ppf
             .log_predictive(item, candidate_labels, &clustering);
-        println!(
-            "item: {}, clustering: {}, counts_marginal: {:?}, counts_joint: {:?}",
-            item, clustering, counts_marginal, counts_joint
-        );
         let labels_and_log_weights = map.iter().map(|(label, log_probability)| {
             let distance = if !use_vi {
                 // Binder loss
@@ -241,7 +237,6 @@ fn engine2<'a, T: Rng>(
                     if n == 0 {
                         return 0.0;
                     }
-                    println!("{} {}", n, d);
                     let r = (n as f64) / d;
                     r * r
                 }
