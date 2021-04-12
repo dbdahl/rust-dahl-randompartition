@@ -211,6 +211,7 @@ fn engine2<'a, T: Rng>(
     };
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
+    let mut counts_marginal = vec![0_usize; parameters.baseline_partition.max_label() + 1];
     let mut counts_joint = vec![vec![0_usize; 0]; parameters.baseline_partition.max_label() + 1];
     for i in 0..clustering.n_items() {
         let item = parameters.permutation.get(i);
@@ -226,36 +227,64 @@ fn engine2<'a, T: Rng>(
                 .map(|x| x.resize(max_candidate_label + 1, 0))
                 .collect()
         }
-        let labels_and_log_weights = parameters
+        let map = parameters
             .baseline_ppf
-            .log_predictive(item, candidate_labels, &clustering)
-            .into_iter()
-            .map(|(label, log_probability)| {
-                let nm = clustering.size_of(label);
-                let nj = counts_joint[label_in_baseline][label];
-                let distance = if !use_vi {
-                    // Binder loss
-                    fn binder_delta(count: usize) -> f64 {
-                        count as f64
+            .log_predictive(item, candidate_labels, &clustering);
+        println!(
+            "item: {}, clustering: {}, counts_marginal: {:?}, counts_joint: {:?}",
+            item, clustering, counts_marginal, counts_joint
+        );
+        let labels_and_log_weights = map.iter().map(|(label, log_probability)| {
+            let distance = if !use_vi {
+                // Binder loss
+                fn ratio_squared(n: usize, d: f64) -> f64 {
+                    if n == 0 {
+                        return 0.0;
                     }
-                    let multiplier = 2.0 / (((i + 1) * (i + 1)) as f64);
-                    multiplier * (a * binder_delta(nm) - (a + b) * binder_delta(nj))
-                } else {
-                    // Variation of information loss
-                    fn vi_delta(count: usize) -> f64 {
-                        if count == 0 {
-                            0.0
-                        } else {
-                            let n1 = (count + 1) as f64;
-                            let n0 = count as f64;
-                            n1 * (n1.log2()) - n0 * (n0.log2())
-                        }
-                    }
-                    let multiplier = 1.0 / ((i + 1) as f64);
-                    multiplier * (a * vi_delta(nm) - (a + b) * vi_delta(nj))
-                };
-                (label, log_probability - scaled_weight * distance)
-            });
+                    println!("{} {}", n, d);
+                    let r = (n as f64) / d;
+                    r * r
+                }
+                let d = (i + 1) as f64;
+                let part1 =
+                    a * counts_marginal
+                        .iter()
+                        .enumerate()
+                        .fold(0.0, |sum, (label1, count)| {
+                            sum + ratio_squared(
+                                *count + if label1 == label_in_baseline { 1 } else { 0 },
+                                d,
+                            )
+                        });
+                let part2 = b * map.iter().fold(0.0, |sum, (label2, _)| {
+                    sum + ratio_squared(
+                        clustering.size_of(*label2) + if *label2 == *label { 1 } else { 0 },
+                        d,
+                    )
+                });
+                let part3 = (a + b)
+                    * counts_joint
+                        .iter()
+                        .enumerate()
+                        .fold(0.0, |sum, (label1, inner)| {
+                            sum + inner.iter().enumerate().fold(0.0, |sum, (label2, count)| {
+                                sum + ratio_squared(
+                                    count
+                                        + if (label1 == label_in_baseline) && (label2 == *label) {
+                                            1
+                                        } else {
+                                            0
+                                        },
+                                    d,
+                                )
+                            })
+                        });
+                part1 + part2 - part3
+            } else {
+                unimplemented!("No go, yet!")
+            };
+            (*label, log_probability - scaled_weight * distance)
+        });
         let (label, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
             None => clustering.select::<IsaacRng, _>(
@@ -268,6 +297,7 @@ fn engine2<'a, T: Rng>(
         };
         log_probability += log_probability_contribution;
         clustering.allocate(item, label);
+        counts_marginal[label_in_baseline] += 1;
         counts_joint[label_in_baseline][label] += 1;
     }
     (clustering, log_probability)
