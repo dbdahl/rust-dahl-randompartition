@@ -203,15 +203,13 @@ fn engine2<'a, T: Rng>(
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
     let ni = parameters.baseline_partition.n_items();
-    let b = 1.0;
-    let (use_vi, a) = match parameters.loss_function {
-        LossFunction::BinderDraws(a) => (false, a),
-        LossFunction::VI(a) => (true, a),
+    let (use_vi, a_plus_one) = match parameters.loss_function {
+        LossFunction::BinderDraws(a) => (false, a + 1.0),
+        LossFunction::VI(a) => (true, a + 1.0),
         _ => panic!("Unsupported loss function."),
     };
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut counts_marginal = vec![0_usize; parameters.baseline_partition.max_label() + 1];
     let mut counts_joint = vec![vec![0_usize; 0]; parameters.baseline_partition.max_label() + 1];
     for i in 0..clustering.n_items() {
         let item = parameters.permutation.get(i);
@@ -227,25 +225,27 @@ fn engine2<'a, T: Rng>(
                 .map(|x| x.resize(max_candidate_label + 1, 0))
                 .collect()
         }
+        let multiplier = if !use_vi {
+            2.0 / (((i + 1) * (i + 1)) as f64)
+        } else {
+            1.0 / ((i + 1) as f64)
+        };
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive(item, candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
-                let nm1 = clustering.size_of(label);
-                let nm2 = counts_marginal[label_in_baseline] + 1;
+                let nm = clustering.size_of(label);
                 let nj = counts_joint[label_in_baseline][label];
                 let distance = if !use_vi {
                     // Binder loss
                     fn binder_delta(count: usize) -> f64 {
                         count as f64
                     }
-                    let multiplier = 2.0 / (((i + 1) * (i + 1)) as f64);
-                    multiplier
-                        * (a * binder_delta(nm2) + b * binder_delta(nm1)
-                            - (a + b) * binder_delta(nj))
+                    multiplier * (binder_delta(nm) - a_plus_one * binder_delta(nj))
                 } else {
                     // Variation of information loss
+                    // Since this is a function on integers, we could cache these calculations for more computational efficiency.
                     fn vi_delta(count: usize) -> f64 {
                         if count == 0 {
                             0.0
@@ -255,8 +255,7 @@ fn engine2<'a, T: Rng>(
                             n1 * (n1.log2()) - n0 * (n0.log2())
                         }
                     }
-                    let multiplier = 1.0 / ((i + 1) as f64);
-                    multiplier * (b * vi_delta(nm1) - (a + b) * vi_delta(nj))
+                    multiplier * (vi_delta(nm) - a_plus_one * vi_delta(nj))
                 };
                 (label, log_probability - scaled_weight * distance)
             });
@@ -272,7 +271,6 @@ fn engine2<'a, T: Rng>(
         };
         log_probability += log_probability_contribution;
         clustering.allocate(item, label);
-        counts_marginal[label_in_baseline] += 1;
         counts_joint[label_in_baseline][label] += 1;
     }
     (clustering, log_probability)
