@@ -1,10 +1,7 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{
-    FullConditional, PartitionSampler, PredictiveProbabilityFunction,
-    PredictiveProbabilityFunctionOld,
-};
+use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
 use crate::prelude::*;
 use crate::prior::PartitionLogProbability;
 
@@ -30,24 +27,6 @@ impl CrpParameters {
             discount,
             n_items,
         }
-    }
-}
-
-impl PredictiveProbabilityFunctionOld for CrpParameters {
-    fn log_predictive_probability(
-        &self,
-        item: usize,
-        label: usize,
-        clustering: &Clustering,
-    ) -> f64 {
-        let size = clustering.size_of_without(label, item);
-        if size == 0 {
-            self.mass.unwrap()
-                + (clustering.n_clusters_without(item) as f64) * self.discount.unwrap()
-        } else {
-            size as f64 - self.discount.unwrap()
-        }
-        .ln()
     }
 }
 
@@ -103,35 +82,6 @@ impl PartitionSampler for CrpParameters {
         )
     }
 }
-
-/*
-impl PartitionSampler for CrpParameters {
-    fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
-        let mass = self.mass.unwrap();
-        let discount = self.discount.unwrap();
-        let mut clustering = Clustering::unallocated(self.n_items);
-        clustering.allocate(0, 0);
-        for i in 1..clustering.n_items() {
-            let n_clusters = clustering.n_clusters();
-            let weights = clustering.available_labels_for_allocation().map(|label| {
-                let n_items_in_cluster = clustering.size_of(label);
-                if n_items_in_cluster == 0 {
-                    mass + (n_clusters as f64) * discount
-                } else {
-                    (n_items_in_cluster as f64) - discount
-                }
-            });
-            // We're cheating here a bit in that we know the available labels are sequential from 0 to
-            // clustering.n_clusters() + 1, exclusive.  This won't be the case in a Gibbs sampling
-            // framework.
-            use rand::distributions::{Distribution, WeightedIndex};
-            let dist = WeightedIndex::new(weights).unwrap();
-            clustering.allocate(i, dist.sample(rng));
-        }
-        clustering
-    }
-}
-*/
 
 impl PartitionLogProbability for CrpParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
@@ -193,22 +143,24 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_neal_algorithm3() {
+        // This test seems to be messed up.  It probably don't do what was intended.
         let parameters =
             CrpParameters::new_with_mass_and_discount(Mass::new(2.0), Discount::new(0.1), 5);
         let l = |_i: usize, _indices: &[usize]| 0.0;
-        let mut clustering = Clustering::one_cluster(parameters.n_items);
+        let clustering = Clustering::one_cluster(parameters.n_items);
         let rng = &mut thread_rng();
         let permutation = Permutation::random(clustering.n_items(), rng);
         let sample_closure = || {
-            clustering = crate::mcmc::update_neal_algorithm3_v2(
+            let mut clust = clustering.clone();
+            clust = crate::mcmc::update_neal_algorithm3_v2(
                 1,
-                &clustering,
+                clust,
                 &permutation,
                 &parameters,
                 &l,
                 &mut thread_rng(),
             );
-            clustering.relabel(0, None, false).0
+            clust.relabel(0, None, false).0
         };
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_goodness_of_fit(

@@ -48,7 +48,7 @@ where
 
 pub fn update_neal_algorithm3_v2<T, U, V>(
     n_updates: u32,
-    current: &Clustering,
+    mut state: Clustering,
     permutation: &Permutation,
     prior: &T,
     log_posterior_predictive: &U,
@@ -59,7 +59,6 @@ where
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
-    let mut state = current.clone();
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
@@ -164,22 +163,24 @@ mod tests_mcmc {
 
     #[test]
     fn test_crp_neal_algorithm3() {
-        let mut current = Clustering::one_cluster(5);
+        // This test seems to be messed up.  It probably don't do what was intended.
+        let current = Clustering::one_cluster(5);
         let neal_functions = CrpParameters::new_with_mass(Mass::new(1.0), current.n_items());
         let permutation = Permutation::natural_and_fixed(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            current = update_neal_algorithm3_v2(
+            let mut clust = current.clone();
+            clust = update_neal_algorithm3_v2(
                 2,
-                &current,
+                clust,
                 &permutation,
                 &neal_functions,
                 &log_posterior_predictive,
                 &mut thread_rng(),
             );
-            sum += current.n_clusters();
+            sum += clust.n_clusters();
         }
         let mean_number_of_subsets = (sum as f64) / (n_samples as f64);
         let z_stat = (mean_number_of_subsets - 2.283333) / (0.8197222 / n_samples as f64).sqrt();
@@ -276,7 +277,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
         0 => current,
         1 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CrpParameters).unwrap();
-            update_neal_algorithm3_v2(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         2 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut FrpParameters).unwrap();
@@ -296,11 +297,11 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
         }
         6 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut SpParameters).unwrap();
-            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         7 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();
-            update_neal_algorithm3_v2(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
@@ -365,7 +366,7 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
         }
         6 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut SpParameters).unwrap();
-            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         7 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();

@@ -1,10 +1,7 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{
-    FullConditional, PartitionSampler, PredictiveProbabilityFunction,
-    PredictiveProbabilityFunctionOld,
-};
+use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
 use crate::prior::PartitionLogProbability;
 
 use crate::perm::Permutation;
@@ -23,24 +20,6 @@ impl UpParameters {
             n_items,
             cache: UniformDistributionCache::new(n_items),
         }
-    }
-}
-
-impl PredictiveProbabilityFunctionOld for UpParameters {
-    fn log_predictive_probability(
-        &self,
-        item: usize,
-        label: usize,
-        clustering: &Clustering,
-    ) -> f64 {
-        let n_allocated = clustering.n_items_allocated_without(item);
-        let n_clusters = clustering.n_clusters_without(item);
-        let (left, right) = self
-            .cache
-            .probs_for_uniform(self.n_items - n_allocated, n_clusters);
-        let size = clustering.size_of_without(label, item);
-        let predictive_probability = if size == 0 { right } else { left };
-        predictive_probability.ln()
     }
 }
 
@@ -131,21 +110,23 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_neal_algorithm3() {
+        // This test seems to be messed up.  It probably don't do what was intended.
         let parameters = UpParameters::new(5);
         let l = |_i: usize, _indices: &[usize]| 0.0;
-        let mut clustering = Clustering::one_cluster(parameters.n_items);
+        let clustering = Clustering::one_cluster(parameters.n_items);
         let rng = &mut thread_rng();
         let permutation = Permutation::random(clustering.n_items(), rng);
         let sample_closure = || {
-            clustering = crate::mcmc::update_neal_algorithm3(
+            let mut clust = clustering.clone();
+            clust = crate::mcmc::update_neal_algorithm3_v2(
                 1,
-                &clustering,
+                clust,
                 &permutation,
                 &parameters,
                 &l,
                 &mut thread_rng(),
             );
-            clustering.relabel(0, None, false).0
+            clust.relabel(0, None, false).0
         };
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
         crate::testing::assert_goodness_of_fit(
