@@ -59,19 +59,39 @@ impl SpParameters {
     }
 }
 
+fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
+    counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
+}
+
 impl FullConditional for SpParameters {
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
-        clustering
-            .available_labels_for_reallocation(item)
+        let candidate_labels = clustering.available_labels_for_reallocation(item);
+        let mut partial_clustering = clustering.clone();
+        for i in self.permutation.n_items_before(item)..partial_clustering.n_items() {
+            partial_clustering.remove(self.permutation.get(i));
+        }
+        let mut counts = vec![vec![0_usize; 0]; self.baseline_partition.max_label() + 1];
+        let max_label = partial_clustering.max_label();
+        if max_label >= counts[0].len() {
+            expand_counts(&mut counts, partial_clustering.max_label() + 1)
+        }
+        for i in 0..partial_clustering.n_items_allocated() {
+            let item = self.permutation.get(i);
+            let label_in_baseline = self.baseline_partition.get(item);
+            let label = target[item];
+            counts[label_in_baseline][label] += 1;
+        }
+        candidate_labels
             .map(|label| {
                 target[item] = label;
                 (
                     label,
                     engine::<IsaacRng>(
                         self,
-                        Clustering::unallocated(self.baseline_partition.n_items()),
+                        partial_clustering.clone(),
+                        counts.clone(),
                         Some(&target[..]),
                         None,
                     )
@@ -84,34 +104,37 @@ impl FullConditional for SpParameters {
 
 impl PartitionSampler for SpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
-        engine(
-            self,
-            Clustering::unallocated(self.baseline_partition.n_items()),
-            None,
-            Some(rng),
-        )
-        .0
+        engine_full(self, None, Some(rng)).0
     }
 }
 
 impl PartitionLogProbability for SpParameters {
     fn log_probability(&self, partition: &Clustering) -> f64 {
-        engine::<IsaacRng>(
-            self,
-            Clustering::unallocated(self.baseline_partition.n_items()),
-            Some(partition.allocation()),
-            None,
-        )
-        .1
+        engine_full::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
     fn is_normalized(&self) -> bool {
         true
     }
 }
 
+fn engine_full<'a, T: Rng>(
+    parameters: &'a SpParameters,
+    target: Option<&[usize]>,
+    rng: Option<&mut T>,
+) -> (Clustering, f64) {
+    engine(
+        parameters,
+        Clustering::unallocated(parameters.baseline_partition.n_items()),
+        vec![vec![0_usize; 0]; parameters.baseline_partition.max_label() + 1],
+        target,
+        rng,
+    )
+}
+
 fn engine<'a, T: Rng>(
     parameters: &'a SpParameters,
     mut clustering: Clustering,
+    mut counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -121,8 +144,7 @@ fn engine<'a, T: Rng>(
         _ => panic!("Unsupported loss function."),
     };
     let mut log_probability = 0.0;
-    let mut counts = vec![vec![0_usize; 0]; parameters.baseline_partition.max_label() + 1];
-    for i in 0..clustering.n_items() {
+    for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
         let scaled_weight = ((i + 1) as f64) * parameters.weights[item];
@@ -131,10 +153,7 @@ fn engine<'a, T: Rng>(
             .collect();
         let max_candidate_label = *candidate_labels.iter().max().unwrap();
         if max_candidate_label >= counts[label_in_baseline].len() {
-            counts
-                .iter_mut()
-                .map(|x| x.resize(max_candidate_label + 1, 0))
-                .collect()
+            expand_counts(&mut counts, max_candidate_label + 1)
         }
         let multiplier = if !use_vi {
             2.0 / (((i + 1) * (i + 1)) as f64)
