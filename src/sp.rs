@@ -2,9 +2,10 @@
 
 use crate::clust::Clustering;
 use crate::crp::CrpParameters;
-use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
+use crate::distr::{
+    FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+};
 use crate::perm::Permutation;
-use crate::prior::PartitionLogProbability;
 use crate::up::UpParameters;
 use crate::wgt::Weights;
 
@@ -108,8 +109,8 @@ impl PartitionSampler for SpParameters {
     }
 }
 
-impl PartitionLogProbability for SpParameters {
-    fn log_probability(&self, partition: &Clustering) -> f64 {
+impl ProbabilityMassFunction for SpParameters {
+    fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine_full::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
     fn is_normalized(&self) -> bool {
@@ -238,8 +239,7 @@ mod tests {
             )
             .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
-            let log_prob_closure =
-                |clustering: &mut Clustering| parameters.log_probability(clustering);
+            let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
                 10000,
                 n_items,
@@ -277,8 +277,7 @@ mod tests {
                 loss_function,
             )
             .unwrap();
-            let log_prob_closure =
-                |clustering: &mut Clustering| parameters.log_probability(clustering);
+            let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
     }

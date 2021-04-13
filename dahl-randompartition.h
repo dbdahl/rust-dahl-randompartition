@@ -112,11 +112,6 @@ void dahl_randompartition__neal_algorithm8(int32_t n_updates_for_partition,
                                            const void *prior_ptr,
                                            struct Rr_Sexp *map_ptr);
 
-struct FixedPartitionParameters *dahl_randompartition__fixedpartitionparameters_new(int32_t n_items,
-                                                                                    const int32_t *clustering_ptr);
-
-void dahl_randompartition__fixedpartitionparameters_free(struct FixedPartitionParameters *obj);
-
 void dahl_randompartition__sample_partition(int32_t n_partitions,
                                             int32_t n_items,
                                             int32_t *partition_labels_ptr,
@@ -131,6 +126,11 @@ void dahl_randompartition__log_probability_of_partition(int32_t n_partitions,
                                                         double *log_probabilities_ptr,
                                                         int32_t prior_id,
                                                         const void *prior_ptr);
+
+struct FixedPartitionParameters *dahl_randompartition__fixedpartitionparameters_new(int32_t n_items,
+                                                                                    const int32_t *clustering_ptr);
+
+void dahl_randompartition__fixedpartitionparameters_free(struct FixedPartitionParameters *obj);
 
 struct SpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
                                                              const int32_t *baseline_partition_ptr,

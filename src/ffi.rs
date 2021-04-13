@@ -1,7 +1,7 @@
 use crate::clust::Clustering;
 use crate::cpp::CppParameters;
 use crate::crp::CrpParameters;
-use crate::distr::PartitionSampler;
+use crate::distr::{PartitionSampler, ProbabilityMassFunction};
 use crate::epa::EpaParameters;
 use crate::fixed::FixedPartitionParameters;
 use crate::frp::FrpParameters;
@@ -15,11 +15,6 @@ use rand_isaac::IsaacRng;
 use std::convert::TryFrom;
 use std::ffi::c_void;
 use std::slice;
-
-pub trait PartitionLogProbability {
-    fn log_probability(&self, partition: &Clustering) -> f64;
-    fn is_normalized(&self) -> bool;
-}
 
 pub fn sample_into_slice<S: PartitionSampler, T: Rng, F: Fn(&mut S, &mut T)>(
     n_partitions: usize,
@@ -39,7 +34,7 @@ pub fn sample_into_slice<S: PartitionSampler, T: Rng, F: Fn(&mut S, &mut T)>(
     }
 }
 
-pub fn log_probabilities_into_slice<S: PartitionLogProbability>(
+pub fn log_probabilities_into_slice<S: ProbabilityMassFunction>(
     n_partitions: usize,
     n_items: usize,
     matrix: &[i32],
@@ -52,7 +47,7 @@ pub fn log_probabilities_into_slice<S: PartitionLogProbability>(
             target_labels.push(matrix[n_partitions * j + i] as usize);
         }
         let target = Clustering::from_vector(target_labels);
-        log_probabilities[i] = distr.log_probability(&target);
+        log_probabilities[i] = distr.log_pmf(&target);
     }
 }
 

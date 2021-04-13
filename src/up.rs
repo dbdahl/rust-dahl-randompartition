@@ -1,8 +1,9 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
-use crate::prior::PartitionLogProbability;
+use crate::distr::{
+    FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+};
 
 use crate::perm::Permutation;
 use dahl_bellnumber::UniformDistributionCache;
@@ -77,11 +78,10 @@ impl PartitionSampler for UpParameters {
     }
 }
 
-impl PartitionLogProbability for UpParameters {
-    fn log_probability(&self, _partition: &Clustering) -> f64 {
+impl ProbabilityMassFunction for UpParameters {
+    fn log_pmf(&self, _partition: &Clustering) -> f64 {
         -self.cache.lbell(self.n_items)
     }
-
     fn is_normalized(&self) -> bool {
         true
     }
@@ -97,7 +97,7 @@ mod tests {
     fn test_goodness_of_fit_constructive() {
         let parameters = UpParameters::new(5);
         let sample_closure = || parameters.sample(&mut thread_rng());
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
             100000,
             parameters.n_items,
@@ -118,7 +118,7 @@ mod tests {
         let permutation = Permutation::random(clustering.n_items(), rng);
         let sample_closure = || {
             let mut clust = clustering.clone();
-            clust = crate::mcmc::update_neal_algorithm3_v2(
+            clust = crate::mcmc::update_neal_algorithm3(
                 1,
                 clust,
                 &permutation,
@@ -128,7 +128,7 @@ mod tests {
             );
             clust.relabel(0, None, false).0
         };
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
             10000,
             parameters.n_items,
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_pmf() {
         let parameters = UpParameters::new(5);
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
 }

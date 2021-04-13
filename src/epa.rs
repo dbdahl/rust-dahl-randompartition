@@ -1,10 +1,9 @@
 // Ewens Pitman attraction partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunctionOld};
+use crate::distr::{FullConditional, PartitionSampler, ProbabilityMassFunction};
 use crate::perm::Permutation;
 use crate::prelude::*;
-use crate::prior::PartitionLogProbability;
 
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
@@ -151,16 +150,20 @@ impl<'a> SquareMatrixBorrower<'a> {
     }
 }
 
-impl<'a> PredictiveProbabilityFunctionOld for EpaParameters<'a> {
-    fn log_predictive_probability(
-        &self,
-        item_index: usize,
-        subset_index: usize,
-        clustering: &Clustering,
-    ) -> f64 {
+impl<'a> FullConditional for EpaParameters<'a> {
+    fn log_full_conditional<'b>(
+        &'b self,
+        item: usize,
+        clustering: &'b Clustering,
+    ) -> Vec<(usize, f64)> {
         let mut p = clustering.allocation().clone();
-        p[item_index] = subset_index;
-        engine::<IsaacRng>(self, Some(&p[..]), None).1
+        clustering
+            .available_labels_for_reallocation(item)
+            .map(|label| {
+                p[item] = label;
+                (label, engine::<IsaacRng>(self, Some(&p[..]), None).1)
+            })
+            .collect()
     }
 }
 
@@ -170,8 +173,8 @@ impl<'a> PartitionSampler for EpaParameters<'a> {
     }
 }
 
-impl<'a> PartitionLogProbability for EpaParameters<'a> {
-    fn log_probability(&self, partition: &Clustering) -> f64 {
+impl<'a> ProbabilityMassFunction for EpaParameters<'a> {
+    fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
     fn is_normalized(&self) -> bool {
@@ -261,7 +264,7 @@ mod tests {
         let parameters =
             EpaParameters::new(similarity_borrower, permutation, mass, discount).unwrap();
         let sample_closure = || parameters.sample(&mut thread_rng());
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
             10000,
             n_items,
@@ -303,7 +306,7 @@ mod tests {
         let similarity_borrower = similarity.view();
         let parameters =
             EpaParameters::new(similarity_borrower, permutation, mass, discount).unwrap();
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
     }
 }

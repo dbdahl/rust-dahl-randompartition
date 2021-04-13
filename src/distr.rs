@@ -1,14 +1,7 @@
 use crate::clust::Clustering;
 use crate::perm::Permutation;
+
 use rand::Rng;
-
-//
-
-pub trait PredictiveProbabilityFunctionOld {
-    // Item may already be allocated somewhere in clustering.
-    fn log_predictive_probability(&self, item: usize, label: usize, clustering: &Clustering)
-        -> f64;
-}
 
 //
 

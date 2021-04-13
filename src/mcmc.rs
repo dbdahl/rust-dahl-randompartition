@@ -1,52 +1,21 @@
 use crate::clust::Clustering;
-use crate::distr::{FullConditional, PredictiveProbabilityFunctionOld};
-use crate::perm::Permutation;
-use crate::push_into_slice_i32;
-
-//use crate::frp;
 use crate::cpp::CppParameters;
 use crate::crp::CrpParameters;
+use crate::distr::FullConditional;
 use crate::epa::EpaParameters;
 use crate::frp::FrpParameters;
 use crate::lsp::LspParameters;
+use crate::perm::Permutation;
+use crate::push_into_slice_i32;
 use crate::sp::SpParameters;
 use crate::up::UpParameters;
+
 use dahl_roxido::mk_rng_isaac;
 use rand::prelude::*;
 use std::ffi::c_void;
 use std::slice;
 
 pub fn update_neal_algorithm3<T, U, V>(
-    n_updates: u32,
-    current: &Clustering,
-    permutation: &Permutation,
-    prior: &T,
-    log_posterior_predictive: &U,
-    rng: &mut V,
-) -> Clustering
-where
-    T: PredictiveProbabilityFunctionOld,
-    U: Fn(usize, &[usize]) -> f64,
-    V: Rng,
-{
-    let mut state = current.clone();
-    for _ in 0..n_updates {
-        for i in 0..state.n_items() {
-            let ii = permutation.get(i);
-            let labels_and_weights = state.available_labels_for_reallocation(ii).map(|label| {
-                let indices = &state.items_of_without(label, ii)[..];
-                let log_weight = log_posterior_predictive(ii, indices)
-                    + prior.log_predictive_probability(ii, label, &state);
-                (label, log_weight)
-            });
-            let pair = state.select(labels_and_weights, true, 0, Some(rng), false);
-            state.allocate(ii, pair.0);
-        }
-    }
-    state
-}
-
-pub fn update_neal_algorithm3_v2<T, U, V>(
     n_updates: u32,
     mut state: Clustering,
     permutation: &Permutation,
@@ -78,36 +47,6 @@ where
 }
 
 pub fn update_neal_algorithm8<T, U, V>(
-    n_updates: u32,
-    current: &Clustering,
-    permutation: &Permutation,
-    prior: &T,
-    log_likelihood_contribution_fn: &U,
-    rng: &mut V,
-) -> Clustering
-where
-    T: PredictiveProbabilityFunctionOld,
-    U: Fn(usize, usize, bool) -> f64,
-    V: Rng,
-{
-    let mut state = current.clone();
-    for _ in 0..n_updates {
-        for i in 0..state.n_items() {
-            let ii = permutation.get(i);
-            let labels_and_weights = state.available_labels_for_reallocation(ii).map(|label| {
-                let log_weight =
-                    log_likelihood_contribution_fn(ii, label, state.size_of(label) == 0)
-                        + prior.log_predictive_probability(ii, label, &state);
-                (label, log_weight)
-            });
-            let pair = state.select(labels_and_weights, true, 0, Some(rng), false);
-            state.allocate(ii, pair.0);
-        }
-    }
-    state
-}
-
-pub fn update_neal_algorithm8_v2<T, U, V>(
     n_updates: u32,
     mut state: Clustering,
     permutation: &Permutation,
@@ -172,7 +111,7 @@ mod tests_mcmc {
         let n_samples = 10000;
         for _ in 0..n_samples {
             let mut clust = current.clone();
-            clust = update_neal_algorithm3_v2(
+            clust = update_neal_algorithm3(
                 2,
                 clust,
                 &permutation,
@@ -277,31 +216,31 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
         0 => current,
         1 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CrpParameters).unwrap();
-            update_neal_algorithm3_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         2 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut FrpParameters).unwrap();
-            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         3 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut LspParameters).unwrap();
-            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         4 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CppParameters).unwrap();
-            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         5 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut EpaParameters).unwrap();
-            update_neal_algorithm3(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         6 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut SpParameters).unwrap();
-            update_neal_algorithm3_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         7 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();
-            update_neal_algorithm3_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
@@ -346,31 +285,31 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
         0 => current,
         1 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CrpParameters).unwrap();
-            update_neal_algorithm8_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         2 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut FrpParameters).unwrap();
-            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         3 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut LspParameters).unwrap();
-            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         4 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut CppParameters).unwrap();
-            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         5 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut EpaParameters).unwrap();
-            update_neal_algorithm8(nup, &current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         6 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut SpParameters).unwrap();
-            update_neal_algorithm8_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         7 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();
-            update_neal_algorithm8_v2(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
+            update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };

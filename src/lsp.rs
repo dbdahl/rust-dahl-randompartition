@@ -1,10 +1,9 @@
 // Location scale partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, PredictiveProbabilityFunctionOld};
+use crate::distr::{FullConditional, PartitionSampler, ProbabilityMassFunction};
 use crate::perm::Permutation;
 use crate::prelude::*;
-use crate::prior::PartitionLogProbability;
 
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
@@ -57,16 +56,20 @@ impl LspParameters {
     }
 }
 
-impl PredictiveProbabilityFunctionOld for LspParameters {
-    fn log_predictive_probability(
-        &self,
-        item_index: usize,
-        subset_index: usize,
-        clustering: &Clustering,
-    ) -> f64 {
+impl FullConditional for LspParameters {
+    fn log_full_conditional<'a>(
+        &'a self,
+        item: usize,
+        clustering: &'a Clustering,
+    ) -> Vec<(usize, f64)> {
         let mut p = clustering.allocation().clone();
-        p[item_index] = subset_index;
-        engine::<IsaacRng>(self, Some(&p[..]), None).1
+        clustering
+            .available_labels_for_reallocation(item)
+            .map(|label| {
+                p[item] = label;
+                (label, engine::<IsaacRng>(self, Some(&p[..]), None).1)
+            })
+            .collect()
     }
 }
 
@@ -76,8 +79,8 @@ impl PartitionSampler for LspParameters {
     }
 }
 
-impl PartitionLogProbability for LspParameters {
-    fn log_probability(&self, partition: &Clustering) -> f64 {
+impl ProbabilityMassFunction for LspParameters {
+    fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine::<IsaacRng>(self, Some(partition.allocation()), None).1
     }
     fn is_normalized(&self) -> bool {
@@ -170,8 +173,7 @@ mod tests {
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters = LspParameters::new_with_rate(baseline, rate, permutation).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
-            let log_prob_closure =
-                |clustering: &mut Clustering| parameters.log_probability(clustering);
+            let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
                 10000,
                 n_items,
@@ -192,8 +194,7 @@ mod tests {
             let rate = Rate::new(rng.gen_range(0.0..10.0));
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters = LspParameters::new_with_rate(baseline, rate, permutation).unwrap();
-            let log_prob_closure =
-                |clustering: &mut Clustering| parameters.log_probability(clustering);
+            let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
     }

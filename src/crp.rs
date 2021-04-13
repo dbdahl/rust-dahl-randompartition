@@ -1,11 +1,12 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{FullConditional, PartitionSampler, PredictiveProbabilityFunction};
-use crate::prelude::*;
-use crate::prior::PartitionLogProbability;
-
+use crate::distr::{
+    FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+};
 use crate::perm::Permutation;
+use crate::prelude::*;
+
 use rand::Rng;
 use statrs::function::gamma::ln_gamma;
 
@@ -83,8 +84,8 @@ impl PartitionSampler for CrpParameters {
     }
 }
 
-impl PartitionLogProbability for CrpParameters {
-    fn log_probability(&self, partition: &Clustering) -> f64 {
+impl ProbabilityMassFunction for CrpParameters {
+    fn log_pmf(&self, partition: &Clustering) -> f64 {
         let m = self.mass.unwrap();
         let d = self.discount.unwrap();
         let mut result = 0.0;
@@ -130,7 +131,7 @@ mod tests {
     fn test_goodness_of_fit_constructive() {
         let parameters = CrpParameters::new_with_mass(Mass::new(2.0), 5);
         let sample_closure = || parameters.sample(&mut thread_rng());
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
             100000,
             parameters.n_items,
@@ -152,7 +153,7 @@ mod tests {
         let permutation = Permutation::random(clustering.n_items(), rng);
         let sample_closure = || {
             let mut clust = clustering.clone();
-            clust = crate::mcmc::update_neal_algorithm3_v2(
+            clust = crate::mcmc::update_neal_algorithm3(
                 1,
                 clust,
                 &permutation,
@@ -162,7 +163,7 @@ mod tests {
             );
             clust.relabel(0, None, false).0
         };
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
             10000,
             parameters.n_items,
@@ -176,7 +177,7 @@ mod tests {
     #[test]
     fn test_pmf_without_discount() {
         let parameters = CrpParameters::new_with_mass(Mass::new(1.5), 5);
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
 
@@ -184,7 +185,7 @@ mod tests {
     fn test_pmf_with_discount() {
         let parameters =
             CrpParameters::new_with_mass_and_discount(Mass::new(1.5), Discount::new(0.1), 5);
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_probability(clustering);
+        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
 }

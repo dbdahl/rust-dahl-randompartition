@@ -1,8 +1,7 @@
 // Fixed partition
 
 use crate::clust::Clustering;
-use crate::distr::PartitionSampler;
-use crate::prior::PartitionLogProbability;
+use crate::distr::{PartitionSampler, ProbabilityMassFunction};
 
 use rand::Rng;
 use std::slice;
@@ -26,8 +25,8 @@ impl PartitionSampler for FixedPartitionParameters {
     }
 }
 
-impl PartitionLogProbability for FixedPartitionParameters {
-    fn log_probability(&self, partition: &Clustering) -> f64 {
+impl ProbabilityMassFunction for FixedPartitionParameters {
+    fn log_pmf(&self, partition: &Clustering) -> f64 {
         if partition.standardize().allocation() == self.clustering.allocation() {
             0.0
         } else {

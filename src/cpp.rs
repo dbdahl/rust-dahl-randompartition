@@ -2,10 +2,9 @@
 
 use crate::clust::Clustering;
 use crate::crp::CrpParameters;
-use crate::distr::PredictiveProbabilityFunctionOld;
+use crate::distr::{FullConditional, ProbabilityMassFunction};
 use crate::prelude::*;
 
-use crate::prior::PartitionLogProbability;
 use dahl_salso::clustering::Clusterings;
 use dahl_salso::clustering::WorkingClustering;
 use dahl_salso::log2cache::Log2Cache;
@@ -73,21 +72,25 @@ impl CppParameters {
     }
 }
 
-impl PredictiveProbabilityFunctionOld for CppParameters {
-    fn log_predictive_probability(
-        &self,
-        item_index: usize,
-        subset_index: usize,
-        clustering: &Clustering,
-    ) -> f64 {
-        let mut p = clustering.clone();
-        p.allocate(item_index, subset_index);
-        log_pmf(&p, self)
+impl FullConditional for CppParameters {
+    fn log_full_conditional<'a>(
+        &'a self,
+        item: usize,
+        clustering: &'a Clustering,
+    ) -> Vec<(usize, f64)> {
+        clustering
+            .available_labels_for_reallocation(item)
+            .map(|label| {
+                let mut p = clustering.clone();
+                p.allocate(item, label);
+                (label, log_pmf(&p, self))
+            })
+            .collect()
     }
 }
 
-impl PartitionLogProbability for CppParameters {
-    fn log_probability(&self, partition: &Clustering) -> f64 {
+impl ProbabilityMassFunction for CppParameters {
+    fn log_pmf(&self, partition: &Clustering) -> f64 {
         log_pmf(partition, self)
     }
     fn is_normalized(&self) -> bool {
@@ -125,7 +128,7 @@ fn log_pmf(target: &Clustering, parameters: &CppParameters) -> f64 {
             parameters.discount,
             parameters.baseline_partition.n_items(),
         );
-        crp_parameters.log_probability(target) + log_multiplier
+        crp_parameters.log_pmf(target) + log_multiplier
     }
 }
 
@@ -147,8 +150,7 @@ mod tests {
             let rate = Rate::new(rng.gen_range(0.0..10.0));
             //let rate = Rate::new(0.0);
             let parameters = CppParameters::use_vi(baseline, rate, false, mass, discount).unwrap();
-            let log_prob_closure =
-                |clustering: &mut Clustering| parameters.log_probability(clustering);
+            let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
