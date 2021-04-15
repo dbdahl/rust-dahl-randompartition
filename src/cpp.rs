@@ -124,9 +124,9 @@ fn log_pmf(target: &Clustering, parameters: &CppParameters) -> f64 {
         log_multiplier
     } else {
         let crp_parameters = CrpParameters::new_with_mass_and_discount(
+            parameters.baseline_partition.n_items(),
             parameters.mass,
             parameters.discount,
-            parameters.baseline_partition.n_items(),
         );
         crp_parameters.log_pmf(target) + log_multiplier
     }

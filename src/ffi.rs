@@ -5,6 +5,7 @@ use crate::distr::{PartitionSampler, ProbabilityMassFunction};
 use crate::epa::EpaParameters;
 use crate::fixed::FixedPartitionParameters;
 use crate::frp::FrpParameters;
+use crate::jlp::JlpParameters;
 use crate::lsp::LspParameters;
 use crate::sp::SpParameters;
 use crate::up::UpParameters;
@@ -132,6 +133,11 @@ pub unsafe extern "C" fn dahl_randompartition__sample_partition(
             let callback = |_p: &mut UpParameters, _rng: &mut IsaacRng| {};
             sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
         }
+        8 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut JlpParameters).unwrap();
+            let callback = |_p: &mut JlpParameters, _rng: &mut IsaacRng| {};
+            sample_into_slice(np, ni, matrix, rng, p.as_mut(), callback);
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
 }
@@ -180,6 +186,10 @@ pub unsafe extern "C" fn dahl_randompartition__log_probability_of_partition(
         }
         7 => {
             let mut p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();
+            log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
+        }
+        8 => {
+            let mut p = std::ptr::NonNull::new(prior_ptr as *mut JlpParameters).unwrap();
             log_probabilities_into_slice(np, ni, matrix, log_probabilities, p.as_mut());
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

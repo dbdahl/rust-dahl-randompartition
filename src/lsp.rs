@@ -11,10 +11,10 @@ use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct LspParameters {
-    pub baseline_partition: Clustering,
-    pub scale: Scale,
-    pub rate: Rate,
-    pub permutation: Permutation,
+    baseline_partition: Clustering,
+    scale: Scale,
+    rate: Rate,
+    permutation: Permutation,
 }
 
 impl LspParameters {

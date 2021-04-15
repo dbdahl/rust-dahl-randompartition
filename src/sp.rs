@@ -5,6 +5,7 @@ use crate::crp::CrpParameters;
 use crate::distr::{
     FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
 };
+use crate::jlp::JlpParameters;
 use crate::perm::Permutation;
 use crate::up::UpParameters;
 use crate::wgt::Weights;
@@ -17,11 +18,11 @@ use std::ffi::c_void;
 use std::slice;
 
 pub struct SpParameters {
-    pub baseline_partition: Clustering,
-    pub weights: Weights,
-    pub permutation: Permutation,
-    pub baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
-    pub loss_function: LossFunction,
+    baseline_partition: Clustering,
+    weights: Weights,
+    permutation: Permutation,
+    baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
+    loss_function: LossFunction,
     cache: Log2Cache,
 }
 
@@ -229,7 +230,7 @@ mod tests {
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
-                CrpParameters::new_with_mass_and_discount(mass, discount, n_items);
+                CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters = SpParameters::new(
                 target,
                 weights,
@@ -268,7 +269,7 @@ mod tests {
             let weights = Weights::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
-                CrpParameters::new_with_mass_and_discount(mass, discount, n_items);
+                CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters = SpParameters::new(
                 target,
                 weights,
@@ -322,6 +323,18 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
         }
         7 => {
             let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut UpParameters).unwrap();
+            let baseline_distribution = p.as_ref().clone();
+            SpParameters::new(
+                opined,
+                weights,
+                permutation,
+                Box::new(baseline_distribution),
+                loss_function,
+            )
+            .unwrap()
+        }
+        8 => {
+            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut JlpParameters).unwrap();
             let baseline_distribution = p.as_ref().clone();
             SpParameters::new(
                 opined,

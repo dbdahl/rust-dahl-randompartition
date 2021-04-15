@@ -12,21 +12,21 @@ use statrs::function::gamma::ln_gamma;
 
 #[derive(Debug, Clone)]
 pub struct CrpParameters {
+    n_items: usize,
     mass: Mass,
     discount: Discount,
-    n_items: usize,
 }
 
 impl CrpParameters {
-    pub fn new_with_mass(mass: Mass, n_items: usize) -> Self {
-        Self::new_with_mass_and_discount(mass, Discount::new(0.0), n_items)
+    pub fn new_with_mass(n_items: usize, mass: Mass) -> Self {
+        Self::new_with_mass_and_discount(n_items, mass, Discount::new(0.0))
     }
 
-    pub fn new_with_mass_and_discount(mass: Mass, discount: Discount, n_items: usize) -> Self {
+    pub fn new_with_mass_and_discount(n_items: usize, mass: Mass, discount: Discount) -> Self {
         Self {
+            n_items,
             mass,
             discount,
-            n_items,
         }
     }
 }
@@ -38,6 +38,9 @@ impl PredictiveProbabilityFunction for CrpParameters {
         candidate_labels: Vec<usize>,
         clustering: &Clustering,
     ) -> Vec<(usize, f64)> {
+        if candidate_labels.len() == 1 {
+            return vec![(candidate_labels[0], 0.0)];
+        }
         let discount = self.discount.unwrap();
         candidate_labels
             .into_iter()
@@ -129,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_constructive() {
-        let parameters = CrpParameters::new_with_mass(Mass::new(2.0), 5);
+        let parameters = CrpParameters::new_with_mass(5, Mass::new(2.0));
         let sample_closure = || parameters.sample(&mut thread_rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
@@ -144,9 +147,9 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_neal_algorithm3() {
-        // This test seems to be messed up.  It probably don't do what was intended.
+        // This test seems to be messed up.  It probably does not do what was intended.
         let parameters =
-            CrpParameters::new_with_mass_and_discount(Mass::new(2.0), Discount::new(0.1), 5);
+            CrpParameters::new_with_mass_and_discount(5, Mass::new(2.0), Discount::new(0.1));
         let l = |_i: usize, _indices: &[usize]| 0.0;
         let clustering = Clustering::one_cluster(parameters.n_items);
         let rng = &mut thread_rng();
@@ -176,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_pmf_without_discount() {
-        let parameters = CrpParameters::new_with_mass(Mass::new(1.5), 5);
+        let parameters = CrpParameters::new_with_mass(5, Mass::new(1.5));
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
@@ -184,7 +187,7 @@ mod tests {
     #[test]
     fn test_pmf_with_discount() {
         let parameters =
-            CrpParameters::new_with_mass_and_discount(Mass::new(1.5), Discount::new(0.1), 5);
+            CrpParameters::new_with_mass_and_discount(5, Mass::new(1.5), Discount::new(0.1));
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
@@ -199,7 +202,7 @@ pub unsafe extern "C" fn dahl_randompartition__crpparameters_new(
     let d = Discount::new(discount);
     let m = Mass::new_with_variable_constraint(mass, discount);
     // First we create a new object.
-    let obj = CrpParameters::new_with_mass_and_discount(m, d, n_items as usize);
+    let obj = CrpParameters::new_with_mass_and_discount(n_items as usize, m, d);
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer

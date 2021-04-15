@@ -16,6 +16,7 @@ pub mod mcmc;
 pub mod distr;
 pub mod ffi;
 pub mod fixed;
+pub mod jlp;
 pub mod perm;
 pub mod prelude;
 pub mod sp;

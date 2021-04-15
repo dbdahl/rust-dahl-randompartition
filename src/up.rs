@@ -11,7 +11,7 @@ use rand::Rng;
 
 #[derive(Debug, Clone)]
 pub struct UpParameters {
-    pub n_items: usize,
+    n_items: usize,
     cache: UniformDistributionCache,
 }
 
@@ -90,7 +90,6 @@ impl ProbabilityMassFunction for UpParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::perm::Permutation;
     use rand::prelude::*;
 
     #[test]
@@ -109,37 +108,6 @@ mod tests {
     }
 
     #[test]
-    fn test_goodness_of_fit_neal_algorithm3() {
-        // This test seems to be messed up.  It probably don't do what was intended.
-        let parameters = UpParameters::new(5);
-        let l = |_i: usize, _indices: &[usize]| 0.0;
-        let clustering = Clustering::one_cluster(parameters.n_items);
-        let rng = &mut thread_rng();
-        let permutation = Permutation::random(clustering.n_items(), rng);
-        let sample_closure = || {
-            let mut clust = clustering.clone();
-            clust = crate::mcmc::update_neal_algorithm3(
-                1,
-                clust,
-                &permutation,
-                &parameters,
-                &l,
-                &mut thread_rng(),
-            );
-            clust.relabel(0, None, false).0
-        };
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
-        crate::testing::assert_goodness_of_fit(
-            10000,
-            parameters.n_items,
-            sample_closure,
-            log_prob_closure,
-            5,
-            0.001,
-        );
-    }
-
-    #[test]
     fn test_pmf() {
         let parameters = UpParameters::new(5);
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
@@ -148,9 +116,7 @@ mod tests {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__urpparameters_new(
-    n_items: i32,
-) -> *mut UpParameters {
+pub unsafe extern "C" fn dahl_randompartition__upparameters_new(n_items: i32) -> *mut UpParameters {
     // First we create a new object.
     let obj = UpParameters::new(n_items as usize);
     // Then copy it to the heap (so we have a stable pointer to it).
@@ -160,7 +126,7 @@ pub unsafe extern "C" fn dahl_randompartition__urpparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__urpparameters_free(obj: *mut UpParameters) {
+pub unsafe extern "C" fn dahl_randompartition__upparameters_free(obj: *mut UpParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;

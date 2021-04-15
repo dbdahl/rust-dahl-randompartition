@@ -4,6 +4,7 @@ use crate::crp::CrpParameters;
 use crate::distr::FullConditional;
 use crate::epa::EpaParameters;
 use crate::frp::FrpParameters;
+use crate::jlp::JlpParameters;
 use crate::lsp::LspParameters;
 use crate::perm::Permutation;
 use crate::push_into_slice_i32;
@@ -102,9 +103,9 @@ mod tests_mcmc {
 
     #[test]
     fn test_crp_neal_algorithm3() {
-        // This test seems to be messed up.  It probably don't do what was intended.
+        // This test seems to be messed up.  It probably does not do what was intended.
         let current = Clustering::one_cluster(5);
-        let neal_functions = CrpParameters::new_with_mass(Mass::new(1.0), current.n_items());
+        let neal_functions = CrpParameters::new_with_mass(current.n_items(), Mass::new(1.0));
         let permutation = Permutation::natural_and_fixed(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
@@ -242,6 +243,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm3(
             let p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();
             update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
+        8 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut JlpParameters).unwrap();
+            update_neal_algorithm3(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
         _ => panic!("Unsupported prior ID: {}", prior_id),
     };
     clustering = clustering.relabel(1, None, false).0;
@@ -309,6 +314,10 @@ pub unsafe extern "C" fn dahl_randompartition__neal_algorithm8(
         }
         7 => {
             let p = std::ptr::NonNull::new(prior_ptr as *mut UpParameters).unwrap();
+            update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
+        }
+        8 => {
+            let p = std::ptr::NonNull::new(prior_ptr as *mut JlpParameters).unwrap();
             update_neal_algorithm8(nup, current, &perm, p.as_ref(), &log_like, &mut rng)
         }
         _ => panic!("Unsupported prior ID: {}", prior_id),

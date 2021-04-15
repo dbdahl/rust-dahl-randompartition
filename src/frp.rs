@@ -12,12 +12,12 @@ use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct FrpParameters {
-    pub baseline_partition: Clustering,
-    pub weights: Weights,
-    pub permutation: Permutation,
-    pub mass: Mass,
-    pub discount: Discount,
-    pub power: Power,
+    baseline_partition: Clustering,
+    weights: Weights,
+    permutation: Permutation,
+    mass: Mass,
+    discount: Discount,
+    power: Power,
 }
 
 impl FrpParameters {

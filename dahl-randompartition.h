@@ -13,6 +13,8 @@ typedef struct FixedPartitionParameters FixedPartitionParameters;
 
 typedef struct FrpParameters FrpParameters;
 
+typedef struct JlpParameters JlpParameters;
+
 typedef struct LspParameters LspParameters;
 
 typedef struct SpParameters SpParameters;
@@ -132,6 +134,13 @@ struct FixedPartitionParameters *dahl_randompartition__fixedpartitionparameters_
 
 void dahl_randompartition__fixedpartitionparameters_free(struct FixedPartitionParameters *obj);
 
+struct JlpParameters *dahl_randompartition__jlpparameters_new(int32_t n_items,
+                                                              double mass,
+                                                              const int32_t *permutation_ptr,
+                                                              int32_t use_natural_permutation);
+
+void dahl_randompartition__jlpparameters_free(struct JlpParameters *obj);
+
 struct SpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
                                                              const int32_t *baseline_partition_ptr,
                                                              const double *weights_ptr,
@@ -144,6 +153,6 @@ struct SpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
 
 void dahl_randompartition__trpparameters_free(struct SpParameters *obj);
 
-struct UpParameters *dahl_randompartition__urpparameters_new(int32_t n_items);
+struct UpParameters *dahl_randompartition__upparameters_new(int32_t n_items);
 
-void dahl_randompartition__urpparameters_free(struct UpParameters *obj);
+void dahl_randompartition__upparameters_free(struct UpParameters *obj);
