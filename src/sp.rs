@@ -7,8 +7,8 @@ use crate::distr::{
 };
 use crate::jlp::JlpParameters;
 use crate::perm::Permutation;
+use crate::shrink::Shrinkage;
 use crate::up::UpParameters;
-use crate::wgt::Weights;
 
 use dahl_salso::log2cache::Log2Cache;
 use dahl_salso::LossFunction;
@@ -19,7 +19,7 @@ use std::slice;
 
 pub struct SpParameters {
     baseline_partition: Clustering,
-    weights: Weights,
+    shrinkage: Shrinkage,
     permutation: Permutation,
     baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
     loss_function: LossFunction,
@@ -29,12 +29,12 @@ pub struct SpParameters {
 impl SpParameters {
     pub fn new(
         baseline_partition: Clustering,
-        weights: Weights,
+        shrinkage: Shrinkage,
         permutation: Permutation,
         baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
         loss_function: LossFunction,
     ) -> Option<Self> {
-        if (weights.n_items() != baseline_partition.n_items())
+        if (shrinkage.n_items() != baseline_partition.n_items())
             || (baseline_partition.n_items() != permutation.n_items())
         {
             None
@@ -47,7 +47,7 @@ impl SpParameters {
             });
             Some(Self {
                 baseline_partition: baseline_partition.standardize(),
-                weights,
+                shrinkage,
                 permutation,
                 baseline_ppf,
                 loss_function,
@@ -149,7 +149,7 @@ fn engine<'a, T: Rng>(
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
-        let scaled_weight = ((i + 1) as f64) * parameters.weights[item];
+        let scaled_shrinkage = ((i + 1) as f64) * parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -189,7 +189,7 @@ fn engine<'a, T: Rng>(
                     }
                     multiplier * (vi_delta(nm) - a_plus_one * vi_delta(nj))
                 };
-                (label, log_probability - scaled_weight * distance)
+                (label, log_probability - scaled_shrinkage * distance)
             });
         let (label, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
@@ -227,13 +227,13 @@ mod tests {
             for _ in 0..target.n_items() {
                 vec.push(rng.gen_range(0.0..10.0));
             }
-            let weights = Weights::from(&vec[..]).unwrap();
+            let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters = SpParameters::new(
                 target,
-                weights,
+                shrinkage,
                 permutation,
                 Box::new(baseline_distribution),
                 loss_function,
@@ -266,13 +266,13 @@ mod tests {
             for _ in 0..target.n_items() {
                 vec.push(rng.gen_range(0.0..10.0));
             }
-            let weights = Weights::from(&vec[..]).unwrap();
+            let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters = SpParameters::new(
                 target,
-                weights,
+                shrinkage,
                 permutation,
                 Box::new(baseline_distribution),
                 loss_function,
@@ -288,7 +288,7 @@ mod tests {
 pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
     n_items: i32,
     baseline_partition_ptr: *const i32,
-    weights_ptr: *const f64,
+    shrinkage_ptr: *const f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
     baseline_distr_id: i32,
@@ -298,7 +298,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
 ) -> *mut SpParameters {
     let ni = n_items as usize;
     let opined = Clustering::from_slice(slice::from_raw_parts(baseline_partition_ptr, ni));
-    let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
+    let shrinkage = Shrinkage::from(slice::from_raw_parts(shrinkage_ptr, ni)).unwrap();
     let permutation = if use_natural_permutation != 0 {
         Permutation::natural_and_fixed(ni)
     } else {
@@ -314,7 +314,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
             let baseline_distribution = p.as_ref().clone();
             SpParameters::new(
                 opined,
-                weights,
+                shrinkage,
                 permutation,
                 Box::new(baseline_distribution),
                 loss_function,
@@ -326,7 +326,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
             let baseline_distribution = p.as_ref().clone();
             SpParameters::new(
                 opined,
-                weights,
+                shrinkage,
                 permutation,
                 Box::new(baseline_distribution),
                 loss_function,
@@ -338,7 +338,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
             let baseline_distribution = p.as_ref().clone();
             SpParameters::new(
                 opined,
-                weights,
+                shrinkage,
                 permutation,
                 Box::new(baseline_distribution),
                 loss_function,

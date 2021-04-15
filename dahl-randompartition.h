@@ -59,7 +59,7 @@ void dahl_randompartition__epaparameters_free(struct EpaParameters *obj);
 
 struct FrpParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
                                                               const int32_t *baseline_ptr,
-                                                              const double *weights_ptr,
+                                                              const double *shrinkage_ptr,
                                                               const int32_t *permutation_ptr,
                                                               int32_t use_natural_permutation,
                                                               double mass,
@@ -143,7 +143,7 @@ void dahl_randompartition__jlpparameters_free(struct JlpParameters *obj);
 
 struct SpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
                                                              const int32_t *baseline_partition_ptr,
-                                                             const double *weights_ptr,
+                                                             const double *shrinkage_ptr,
                                                              const int32_t *permutation_ptr,
                                                              int32_t use_natural_permutation,
                                                              int32_t baseline_distr_id,

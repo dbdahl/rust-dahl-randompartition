@@ -4,7 +4,7 @@ use crate::clust::Clustering;
 use crate::distr::{FullConditional, PartitionSampler, ProbabilityMassFunction};
 use crate::perm::Permutation;
 use crate::prelude::*;
-use crate::wgt::Weights;
+use crate::shrink::Shrinkage;
 
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
@@ -13,7 +13,7 @@ use std::slice;
 #[derive(Debug, Clone)]
 pub struct FrpParameters {
     baseline_partition: Clustering,
-    weights: Weights,
+    shrinkage: Shrinkage,
     permutation: Permutation,
     mass: Mass,
     discount: Discount,
@@ -23,20 +23,20 @@ pub struct FrpParameters {
 impl FrpParameters {
     pub fn new(
         baseline: Clustering,
-        weights: Weights,
+        shrinkage: Shrinkage,
         permutation: Permutation,
         mass: Mass,
         discount: Discount,
         power: Power,
     ) -> Option<Self> {
-        if (weights.n_items() != baseline.n_items())
+        if (shrinkage.n_items() != baseline.n_items())
             || (baseline.n_items() != permutation.n_items())
         {
             None
         } else {
             Some(Self {
                 baseline_partition: baseline.standardize(),
-                weights,
+                shrinkage,
                 permutation,
                 mass,
                 discount,
@@ -101,11 +101,11 @@ fn engine<T: Rng>(
     for i in 0..clustering.n_items() {
         let ii = parameters.permutation.get(i);
         let baseline_subset_index = parameters.baseline_partition.get(ii);
-        let scaled_weight = (i as f64) * parameters.weights[ii];
-        let normalized_scaled_weight = if total_counter[baseline_subset_index] == 0.0 {
+        let scaled_shrinkage = (i as f64) * parameters.shrinkage[ii];
+        let normalized_scaled_shrinkage = if total_counter[baseline_subset_index] == 0.0 {
             0.0
         } else {
-            scaled_weight / total_counter[baseline_subset_index]
+            scaled_shrinkage / total_counter[baseline_subset_index]
         };
         let n_occupied_subsets = clustering.n_clusters() as f64;
         let labels_and_weights = clustering
@@ -118,7 +118,7 @@ fn engine<T: Rng>(
                     } else {
                         mass + discount * n_occupied_subsets + {
                             if total_counter[baseline_subset_index] == 0.0 {
-                                scaled_weight
+                                scaled_shrinkage
                             } else {
                                 0.0
                             }
@@ -126,7 +126,7 @@ fn engine<T: Rng>(
                     }
                 } else {
                     ((n_items_in_cluster as f64) - discount).powf(power)
-                        + normalized_scaled_weight
+                        + normalized_scaled_shrinkage
                             * intersection_counter[baseline_subset_index][label]
                 };
                 (label, weight)
@@ -172,10 +172,11 @@ mod tests {
             for _ in 0..baseline.n_items() {
                 vec.push(rng.gen_range(0.0..10.0));
             }
-            let weights = Weights::from(&vec[..]).unwrap();
+            let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
-                FrpParameters::new(baseline, weights, permutation, mass, discount, power).unwrap();
+                FrpParameters::new(baseline, shrinkage, permutation, mass, discount, power)
+                    .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
@@ -203,10 +204,11 @@ mod tests {
             for _ in 0..baseline.n_items() {
                 vec.push(rng.gen_range(0.0..10.0));
             }
-            let weights = Weights::from(&vec[..]).unwrap();
+            let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
-                FrpParameters::new(baseline, weights, permutation, mass, discount, power).unwrap();
+                FrpParameters::new(baseline, shrinkage, permutation, mass, discount, power)
+                    .unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
@@ -217,7 +219,7 @@ mod tests {
 pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     n_items: i32,
     baseline_ptr: *const i32,
-    weights_ptr: *const f64,
+    shrinkage_ptr: *const f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
     mass: f64,
@@ -226,7 +228,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
 ) -> *mut FrpParameters {
     let ni = n_items as usize;
     let baseline = Clustering::from_slice(slice::from_raw_parts(baseline_ptr, ni));
-    let weights = Weights::from(slice::from_raw_parts(weights_ptr, ni)).unwrap();
+    let shrinkage = Shrinkage::from(slice::from_raw_parts(shrinkage_ptr, ni)).unwrap();
     let permutation = if use_natural_permutation != 0 {
         Permutation::natural_and_fixed(ni)
     } else {
@@ -239,7 +241,7 @@ pub unsafe extern "C" fn dahl_randompartition__frpparameters_new(
     let m = Mass::new_with_variable_constraint(mass, discount);
     let p = Power::new(power);
     // First we create a new object.
-    let obj = FrpParameters::new(baseline, weights, permutation, m, d, p).unwrap();
+    let obj = FrpParameters::new(baseline, shrinkage, permutation, m, d, p).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
