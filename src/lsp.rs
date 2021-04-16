@@ -118,7 +118,7 @@ fn engine<T: Rng>(
                 let n_items_in_cluster = clustering.size_of(label);
                 let weight = if n_items_in_cluster == 0 {
                     if n_occupied_subsets == 0.0 {
-                        1.0
+                        parameters.mass.unwrap()
                     } else {
                         {
                             if total_counter[baseline_subset_index] == 0.0 {
