@@ -57,6 +57,26 @@ struct EpaParameters *dahl_randompartition__epaparameters_new(int32_t n_items,
 
 void dahl_randompartition__epaparameters_free(struct EpaParameters *obj);
 
+void dahl_randompartition__sample_partition(int32_t n_partitions,
+                                            int32_t n_items,
+                                            int32_t *partition_labels_ptr,
+                                            const int32_t *seed_ptr,
+                                            int32_t prior_id,
+                                            const void *prior_ptr,
+                                            bool randomize_permutation);
+
+void dahl_randompartition__log_probability_of_partition(int32_t n_partitions,
+                                                        int32_t n_items,
+                                                        int32_t *partition_labels_ptr,
+                                                        double *log_probabilities_ptr,
+                                                        int32_t prior_id,
+                                                        const void *prior_ptr);
+
+struct FixedPartitionParameters *dahl_randompartition__fixedpartitionparameters_new(int32_t n_items,
+                                                                                    const int32_t *clustering_ptr);
+
+void dahl_randompartition__fixedpartitionparameters_free(struct FixedPartitionParameters *obj);
+
 struct FrpParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
                                                               const int32_t *baseline_ptr,
                                                               const double *shrinkage_ptr,
@@ -68,9 +88,17 @@ struct FrpParameters *dahl_randompartition__frpparameters_new(int32_t n_items,
 
 void dahl_randompartition__frpparameters_free(struct FrpParameters *obj);
 
+struct JlpParameters *dahl_randompartition__jlpparameters_new(int32_t n_items,
+                                                              double mass,
+                                                              const int32_t *permutation_ptr,
+                                                              int32_t use_natural_permutation);
+
+void dahl_randompartition__jlpparameters_free(struct JlpParameters *obj);
+
 struct LspParameters *dahl_randompartition__lspparameters_new(int32_t n_items,
                                                               const int32_t *baseline_ptr,
                                                               double rate,
+                                                              double mass,
                                                               const int32_t *permutation_ptr,
                                                               int32_t use_natural_permutation);
 
@@ -113,33 +141,6 @@ void dahl_randompartition__neal_algorithm8(int32_t n_updates_for_partition,
                                            int32_t prior_id,
                                            const void *prior_ptr,
                                            struct Rr_Sexp *map_ptr);
-
-void dahl_randompartition__sample_partition(int32_t n_partitions,
-                                            int32_t n_items,
-                                            int32_t *partition_labels_ptr,
-                                            const int32_t *seed_ptr,
-                                            int32_t prior_id,
-                                            const void *prior_ptr,
-                                            bool randomize_permutation);
-
-void dahl_randompartition__log_probability_of_partition(int32_t n_partitions,
-                                                        int32_t n_items,
-                                                        int32_t *partition_labels_ptr,
-                                                        double *log_probabilities_ptr,
-                                                        int32_t prior_id,
-                                                        const void *prior_ptr);
-
-struct FixedPartitionParameters *dahl_randompartition__fixedpartitionparameters_new(int32_t n_items,
-                                                                                    const int32_t *clustering_ptr);
-
-void dahl_randompartition__fixedpartitionparameters_free(struct FixedPartitionParameters *obj);
-
-struct JlpParameters *dahl_randompartition__jlpparameters_new(int32_t n_items,
-                                                              double mass,
-                                                              const int32_t *permutation_ptr,
-                                                              int32_t use_natural_permutation);
-
-void dahl_randompartition__jlpparameters_free(struct JlpParameters *obj);
 
 struct SpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
                                                              const int32_t *baseline_partition_ptr,

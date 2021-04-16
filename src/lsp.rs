@@ -14,6 +14,7 @@ pub struct LspParameters {
     baseline_partition: Clustering,
     scale: Scale,
     rate: Rate,
+    mass: Mass,
     permutation: Permutation,
 }
 
@@ -21,6 +22,7 @@ impl LspParameters {
     pub fn new_with_scale(
         baseline: Clustering,
         scale: Scale,
+        mass: Mass,
         permutation: Permutation,
     ) -> Option<Self> {
         if baseline.n_items() != permutation.n_items() {
@@ -30,6 +32,7 @@ impl LspParameters {
                 baseline_partition: baseline,
                 scale,
                 rate: Rate::new(1.0 / scale.unwrap()),
+                mass,
                 permutation,
             })
         }
@@ -37,6 +40,7 @@ impl LspParameters {
     pub fn new_with_rate(
         baseline: Clustering,
         rate: Rate,
+        mass: Mass,
         permutation: Permutation,
     ) -> Option<Self> {
         if baseline.n_items() != permutation.n_items() {
@@ -46,6 +50,7 @@ impl LspParameters {
                 baseline_partition: baseline,
                 scale: Scale::new(1.0 / rate.unwrap()),
                 rate,
+                mass,
                 permutation,
             })
         }
@@ -117,16 +122,21 @@ fn engine<T: Rng>(
                     } else {
                         {
                             if total_counter[baseline_subset_index] == 0.0 {
-                                (1.0 + parameters.rate)
-                                    / (1.0 + (n_visited_subsets as f64) + parameters.rate)
+                                (parameters.mass.unwrap() + parameters.rate)
+                                    / (parameters.mass.unwrap()
+                                        + (n_visited_subsets as f64)
+                                        + parameters.rate)
                             } else {
-                                1.0 / (1.0 + (n_visited_subsets as f64) + parameters.rate)
+                                parameters.mass.unwrap()
+                                    / (parameters.mass.unwrap()
+                                        + (n_visited_subsets as f64)
+                                        + parameters.rate)
                             }
                         }
                     }
                 } else {
                     (1.0 + parameters.rate * intersection_counter[baseline_subset_index][label])
-                        / (1.0
+                        / (parameters.mass.unwrap()
                             + (n_visited_subsets as f64)
                             + parameters.rate * (n_items_in_cluster as f64))
                 };
@@ -171,7 +181,8 @@ mod tests {
             let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0..10.0));
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters = LspParameters::new_with_rate(baseline, rate, permutation).unwrap();
+            let parameters =
+                LspParameters::new_with_rate(baseline, rate, Mass::new(1.0), permutation).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
@@ -193,7 +204,8 @@ mod tests {
             let baseline = Clustering::from_vector(baseline);
             let rate = Rate::new(rng.gen_range(0.0..10.0));
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters = LspParameters::new_with_rate(baseline, rate, permutation).unwrap();
+            let parameters =
+                LspParameters::new_with_rate(baseline, rate, Mass::new(1.0), permutation).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
@@ -205,6 +217,7 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
     n_items: i32,
     baseline_ptr: *const i32,
     rate: f64,
+    mass: f64,
     permutation_ptr: *const i32,
     use_natural_permutation: i32,
 ) -> *mut LspParameters {
@@ -219,8 +232,9 @@ pub unsafe extern "C" fn dahl_randompartition__lspparameters_new(
         Permutation::from_vector(permutation_vector).unwrap()
     };
     let r = Rate::new(rate);
+    let m = Mass::new(mass);
     // First we create a new object.
-    let obj = LspParameters::new_with_rate(baseline, r, permutation).unwrap();
+    let obj = LspParameters::new_with_rate(baseline, r, m, permutation).unwrap();
     // Then copy it to the heap (so we have a stable pointer to it).
     let boxed_obj = Box::new(obj);
     // Then return a pointer by converting our `Box<_>` into a raw pointer
