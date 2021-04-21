@@ -142,17 +142,17 @@ void dahl_randompartition__neal_algorithm8(int32_t n_updates_for_partition,
                                            const void *prior_ptr,
                                            struct Rr_Sexp *map_ptr);
 
-struct SpParameters *dahl_randompartition__trpparameters_new(int32_t n_items,
-                                                             const int32_t *baseline_partition_ptr,
-                                                             const double *shrinkage_ptr,
-                                                             const int32_t *permutation_ptr,
-                                                             int32_t use_natural_permutation,
-                                                             int32_t baseline_distr_id,
-                                                             const void *baseline_distr_ptr,
-                                                             int32_t loss,
-                                                             double a);
+struct SpParameters *dahl_randompartition__spparameters_new(int32_t n_items,
+                                                            const int32_t *baseline_partition_ptr,
+                                                            const double *shrinkage_ptr,
+                                                            const int32_t *permutation_ptr,
+                                                            int32_t use_natural_permutation,
+                                                            int32_t baseline_distr_id,
+                                                            const void *baseline_distr_ptr,
+                                                            int32_t loss,
+                                                            double a);
 
-void dahl_randompartition__trpparameters_free(struct SpParameters *obj);
+void dahl_randompartition__spparameters_free(struct SpParameters *obj);
 
 struct UpParameters *dahl_randompartition__upparameters_new(int32_t n_items);
 

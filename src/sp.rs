@@ -285,7 +285,7 @@ mod tests {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
+pub unsafe extern "C" fn dahl_randompartition__spparameters_new(
     n_items: i32,
     baseline_partition_ptr: *const i32,
     shrinkage_ptr: *const f64,
@@ -355,7 +355,7 @@ pub unsafe extern "C" fn dahl_randompartition__trpparameters_new(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__trpparameters_free(obj: *mut SpParameters) {
+pub unsafe extern "C" fn dahl_randompartition__spparameters_free(obj: *mut SpParameters) {
     // As a rule of thumb, freeing a null pointer is just a noop.
     if obj.is_null() {
         return;
