@@ -35,7 +35,7 @@ impl PredictiveProbabilityFunction for CrpParameters {
     fn log_predictive(
         &self,
         _item: usize,
-        candidate_labels: Vec<usize>,
+        candidate_labels: &Vec<usize>,
         clustering: &Clustering,
     ) -> Vec<(usize, f64)> {
         if candidate_labels.len() == 1 {
@@ -43,16 +43,16 @@ impl PredictiveProbabilityFunction for CrpParameters {
         }
         let discount = self.discount.unwrap();
         candidate_labels
-            .into_iter()
+            .iter()
             .map(|label| {
-                let size = clustering.size_of(label);
+                let size = clustering.size_of(*label);
                 let value = if size == 0 {
                     self.mass.unwrap() + (clustering.n_clusters() as f64) * discount
                 } else {
                     size as f64 - discount
                 }
                 .ln();
-                (label, value)
+                (*label, value)
             })
             .collect()
     }

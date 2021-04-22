@@ -74,16 +74,18 @@ impl FullConditional for SpParameters {
         for i in self.permutation.n_items_before(item)..partial_clustering.n_items() {
             partial_clustering.remove(self.permutation.get(i));
         }
-        let mut counts = vec![vec![0_usize; 0]; self.baseline_partition.max_label() + 1];
+        let mut marginal_counts = vec![0_usize; self.baseline_partition.max_label() + 1];
+        let mut joint_counts = vec![vec![0_usize; 0]; self.baseline_partition.max_label() + 1];
         let max_label = partial_clustering.max_label();
-        if max_label >= counts[0].len() {
-            expand_counts(&mut counts, partial_clustering.max_label() + 1)
+        if max_label >= joint_counts[0].len() {
+            expand_counts(&mut joint_counts, partial_clustering.max_label() + 1)
         }
         for i in 0..partial_clustering.n_items_allocated() {
             let item = self.permutation.get(i);
             let label_in_baseline = self.baseline_partition.get(item);
             let label = target[item];
-            counts[label_in_baseline][label] += 1;
+            marginal_counts[label_in_baseline] += 1;
+            joint_counts[label_in_baseline][label] += 1;
         }
         candidate_labels
             .map(|label| {
@@ -93,7 +95,8 @@ impl FullConditional for SpParameters {
                     engine::<IsaacRng>(
                         self,
                         partial_clustering.clone(),
-                        counts.clone(),
+                        marginal_counts.clone(),
+                        joint_counts.clone(),
                         Some(&target[..]),
                         None,
                     )
@@ -127,13 +130,149 @@ fn engine_full<'a, T: Rng>(
     engine(
         parameters,
         Clustering::unallocated(parameters.baseline_partition.n_items()),
+        vec![0_usize; parameters.baseline_partition.max_label() + 1],
         vec![vec![0_usize; 0]; parameters.baseline_partition.max_label() + 1],
         target,
         rng,
     )
 }
-
 fn engine<'a, T: Rng>(
+    parameters: &'a SpParameters,
+    mut clustering: Clustering,
+    mut marginal_counts: Vec<usize>,
+    mut joint_counts: Vec<Vec<usize>>,
+    target: Option<&[usize]>,
+    mut rng: Option<&mut T>,
+) -> (Clustering, f64) {
+    if let Ok(value) = std::env::var("DBD_ORIGINAL") {
+        if value == "TRUE" {
+            return engine_original(parameters, clustering, joint_counts, target, rng);
+        }
+    }
+    let use_exponential_decay = match std::env::var("DBD_DECAY") {
+        Ok(value) => value != "logistic",
+        Err(_) => true,
+    };
+    let sill = if let Ok(value) = std::env::var("DBD_SILL") {
+        value.parse().unwrap()
+    } else {
+        0.0
+    };
+    println!(
+        "use_exponential_decay: {}, sill: {}",
+        use_exponential_decay, sill
+    );
+    let (use_vi, a_plus_one) = match parameters.loss_function {
+        LossFunction::BinderDraws(a) => (false, a + 1.0),
+        LossFunction::VI(a) => (true, a + 1.0),
+        _ => panic!("Unsupported loss function."),
+    };
+    let mut log_probability = 0.0;
+    for i in clustering.n_items_allocated()..clustering.n_items() {
+        let item = parameters.permutation.get(i);
+        let candidate_labels: Vec<usize> = clustering
+            .available_labels_for_allocation_with_target(target, item)
+            .collect();
+        let log_predictives =
+            parameters
+                .baseline_ppf
+                .log_predictive(item, &candidate_labels, &clustering);
+        let label_in_baseline = parameters.baseline_partition.get(item);
+        let shrinkage = parameters.shrinkage[item];
+        let max_candidate_label = *candidate_labels.iter().max().unwrap();
+        if max_candidate_label >= joint_counts[label_in_baseline].len() {
+            expand_counts(&mut joint_counts, max_candidate_label + 1)
+        }
+        let delta = |count: usize| {
+            if !use_vi {
+                count as f64
+            } else {
+                if count == 0 {
+                    0.0
+                } else {
+                    let n1 = (count + 1) as f64;
+                    let n0 = count as f64;
+                    n1 * (n1.log2()) - n0 * (n0.log2())
+                }
+            }
+        };
+        let multiplier = if !use_vi {
+            2.0 / (((i + 1) * (i + 1)) as f64)
+        } else {
+            1.0 / ((i + 1) as f64)
+        };
+        let distance_common = {
+            let contribution = |c: usize, n: usize| {
+                if !use_vi {
+                    if c == 0 {
+                        0.0
+                    } else {
+                        ((c as f64) / (n as f64)).powi(2)
+                    }
+                } else {
+                    if c == 0 {
+                        0.0
+                    } else {
+                        let x = (c as f64) / (n as f64);
+                        x * x.ln()
+                    }
+                }
+            };
+            let x0 = multiplier * delta(marginal_counts[label_in_baseline]);
+            let x1 = clustering.active_labels().iter().fold(0.0, |sum, label| {
+                sum + contribution(clustering.size_of(*label), i + 1)
+            });
+            let x2 = marginal_counts
+                .iter()
+                .fold(0.0, |sum, c| sum + contribution(*c, i + 1));
+            let x12 = joint_counts.iter().fold(0.0, |sum1, y| {
+                sum1 + y.iter().fold(0.0, |sum2, c| sum2 + contribution(*c, i + 1))
+            });
+            (a_plus_one - 1.0) * (x0 + x1) + x2 - a_plus_one * x12
+        };
+        let distances = candidate_labels.iter().map(|label| {
+            let nm = clustering.size_of(*label);
+            let nj = joint_counts[label_in_baseline][*label];
+            let distance_delta = multiplier * (delta(nm) - a_plus_one * delta(nj));
+            distance_common + distance_delta
+        });
+        let distances: Vec<_> = distances.collect();
+        let sum_of_distances: f64 = distances.iter().sum();
+        let sum_of_distances = if sum_of_distances > 0.0 {
+            sum_of_distances
+        } else {
+            1.0
+        };
+        let normalized_distances = distances.iter().map(|x| x / sum_of_distances);
+        let labels_and_log_weights = log_predictives.iter().zip(normalized_distances).map(
+            |((label, log_probability), normalized_distance)| {
+                let log_weight = if use_exponential_decay {
+                    *log_probability - shrinkage * normalized_distance
+                } else {
+                    *log_probability - (1.0 + (shrinkage * normalized_distance - sill).exp()).ln()
+                };
+                (*label, log_weight)
+            },
+        );
+        let (label, log_probability_contribution) = match &mut rng {
+            Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
+            None => clustering.select::<IsaacRng, _>(
+                labels_and_log_weights,
+                true,
+                target.unwrap()[item],
+                None,
+                true,
+            ),
+        };
+        clustering.allocate(item, label);
+        log_probability += log_probability_contribution;
+        marginal_counts[label_in_baseline] += 1;
+        joint_counts[label_in_baseline][label] += 1;
+    }
+    (clustering, log_probability)
+}
+
+fn engine_original<'a, T: Rng>(
     parameters: &'a SpParameters,
     mut clustering: Clustering,
     mut counts: Vec<Vec<usize>>,
@@ -164,7 +303,7 @@ fn engine<'a, T: Rng>(
         };
         let labels_and_log_weights = parameters
             .baseline_ppf
-            .log_predictive(item, candidate_labels, &clustering)
+            .log_predictive(item, &candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
                 let nm = clustering.size_of(label);

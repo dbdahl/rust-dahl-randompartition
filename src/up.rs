@@ -28,7 +28,7 @@ impl PredictiveProbabilityFunction for UpParameters {
     fn log_predictive(
         &self,
         _item: usize,
-        candidate_labels: Vec<usize>,
+        candidate_labels: &Vec<usize>,
         clustering: &Clustering,
     ) -> Vec<(usize, f64)> {
         let n_allocated = clustering.n_items_allocated();
@@ -43,8 +43,8 @@ impl PredictiveProbabilityFunction for UpParameters {
             .into_iter()
             .map(|label| {
                 (
-                    label,
-                    if clustering.size_of(label) == 0 {
+                    *label,
+                    if clustering.size_of(*label) == 0 {
                         right
                     } else {
                         left

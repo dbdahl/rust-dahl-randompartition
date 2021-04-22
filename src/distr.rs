@@ -11,7 +11,7 @@ pub trait PredictiveProbabilityFunction {
     fn log_predictive(
         &self,
         item: usize,
-        candidate_labels: Vec<usize>,
+        candidate_labels: &Vec<usize>,
         clustering: &Clustering,
     ) -> Vec<(usize, f64)>;
 }
@@ -41,7 +41,7 @@ pub(crate) fn default_partition_sampler_sample<S: Rng, T: PredictiveProbabilityF
         let labels_and_log_weights = ppf
             .log_predictive(
                 ii,
-                clustering.available_labels_for_allocation().collect(),
+                &clustering.available_labels_for_allocation().collect(),
                 &clustering,
             )
             .into_iter();
@@ -72,7 +72,7 @@ pub(crate) fn default_probability_mass_function_log_pmf<T: PredictiveProbability
         let labels_and_log_weights = ppf
             .log_predictive(
                 ii,
-                working_clustering
+                &working_clustering
                     .available_labels_for_allocation_with_target(Some(target), ii)
                     .collect(),
                 &working_clustering,
