@@ -158,10 +158,6 @@ fn engine<'a, T: Rng>(
     } else {
         0.0
     };
-    println!(
-        "use_exponential_decay: {}, sill: {}",
-        use_exponential_decay, sill
-    );
     let (use_vi, a_plus_one) = match parameters.loss_function {
         LossFunction::BinderDraws(a) => (false, a + 1.0),
         LossFunction::VI(a) => (true, a + 1.0),
