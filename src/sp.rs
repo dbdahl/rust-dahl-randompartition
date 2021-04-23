@@ -226,20 +226,24 @@ fn engine<'a, T: Rng>(
             });
             (a_plus_one - 1.0) * (x0 + x1) + x2 - a_plus_one * x12
         };
-        let distances = candidate_labels.iter().map(|label| {
-            let nm = clustering.size_of(*label);
-            let nj = joint_counts[label_in_baseline][*label];
-            let distance_delta = multiplier * (delta(nm) - a_plus_one * delta(nj));
-            distance_common + distance_delta
-        });
-        let distances: Vec<_> = distances.collect();
-        let sum_of_distances: f64 = distances.iter().sum();
-        let sum_of_distances = if sum_of_distances > 0.0 {
-            sum_of_distances
+        let distances: Vec<_> = candidate_labels
+            .iter()
+            .map(|label| {
+                let nm = clustering.size_of(*label);
+                let nj = joint_counts[label_in_baseline][*label];
+                let distance_delta = multiplier * (delta(nm) - a_plus_one * delta(nj));
+                distance_common + distance_delta
+            })
+            .collect();
+        let (sum, min) = distances
+            .iter()
+            .fold((0.0, 0.0), |cum, x| (x + cum.0, x.min(cum.1)));
+        let divisor = if distances.len() > 0 && sum > 0.0 {
+            sum - ((distances.len() as f64) * min)
         } else {
             1.0
         };
-        let normalized_distances = distances.iter().map(|x| x / sum_of_distances);
+        let normalized_distances = distances.iter().map(|x| (x - min) / divisor);
         let labels_and_log_weights = log_predictives.iter().zip(normalized_distances).map(
             |((label, log_probability), normalized_distance)| {
                 let log_weight = if use_exponential_decay {
