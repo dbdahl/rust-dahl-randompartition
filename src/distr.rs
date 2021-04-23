@@ -7,13 +7,36 @@ use rand_isaac::IsaacRng;
 //
 
 pub trait PredictiveProbabilityFunction {
-    // Clustering is only partially allocated.
-    fn log_predictive(
+    // Clustering is only partially allocated.  Responses are log weights, not necessarily log probabilities.
+    fn log_predictive_weight(
         &self,
         item: usize,
         candidate_labels: &Vec<usize>,
         clustering: &Clustering,
     ) -> Vec<(usize, f64)>;
+
+    fn predictive_probability(
+        &self,
+        item: usize,
+        candidate_labels: &Vec<usize>,
+        clustering: &Clustering,
+    ) -> Vec<(usize, f64)> {
+        let (labels, log_weights): (Vec<_>, Vec<_>) = self
+            .log_predictive_weight(item, candidate_labels, clustering)
+            .into_iter()
+            .unzip();
+        let max_log_weight = log_weights.iter().cloned().fold(f64::NAN, f64::max);
+        let weights = log_weights
+            .iter()
+            .map(|x| (*x - max_log_weight).exp())
+            .collect::<Vec<_>>();
+        let sum: f64 = weights.iter().sum();
+        labels
+            .into_iter()
+            .zip(weights.into_iter())
+            .map(|(label, x)| (label, x / sum))
+            .collect()
+    }
 }
 
 //
@@ -39,7 +62,7 @@ pub(crate) fn default_partition_sampler_sample<S: Rng, T: PredictiveProbabilityF
     for i in 0..clustering.n_items() {
         let ii = permutation.get(i);
         let labels_and_log_weights = ppf
-            .log_predictive(
+            .log_predictive_weight(
                 ii,
                 &clustering.available_labels_for_allocation().collect(),
                 &clustering,
@@ -70,7 +93,7 @@ pub(crate) fn default_probability_mass_function_log_pmf<T: PredictiveProbability
     for i in 0..working_clustering.n_items() {
         let ii = permutation.get(i);
         let labels_and_log_weights = ppf
-            .log_predictive(
+            .log_predictive_weight(
                 ii,
                 &working_clustering
                     .available_labels_for_allocation_with_target(Some(target), ii)

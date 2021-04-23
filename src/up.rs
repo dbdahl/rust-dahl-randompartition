@@ -25,7 +25,7 @@ impl UpParameters {
 }
 
 impl PredictiveProbabilityFunction for UpParameters {
-    fn log_predictive(
+    fn log_predictive_weight(
         &self,
         _item: usize,
         candidate_labels: &Vec<usize>,

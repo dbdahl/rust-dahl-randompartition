@@ -169,10 +169,6 @@ fn engine<'a, T: Rng>(
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
-        let log_predictives =
-            parameters
-                .baseline_ppf
-                .log_predictive(item, &candidate_labels, &clustering);
         let label_in_baseline = parameters.baseline_partition.get(item);
         let shrinkage = parameters.shrinkage[item];
         let max_candidate_label = *candidate_labels.iter().max().unwrap();
@@ -237,14 +233,18 @@ fn engine<'a, T: Rng>(
             .collect();
         let (sum, min) = distances
             .iter()
-            .fold((0.0, 0.0), |cum, x| (x + cum.0, x.min(cum.1)));
+            .fold((0.0, f64::MAX), |cum, x| (x + cum.0, x.min(cum.1)));
         let divisor = if distances.len() > 0 && sum > 0.0 {
             sum - ((distances.len() as f64) * min)
         } else {
             1.0
         };
         let normalized_distances = distances.iter().map(|x| (x - min) / divisor);
-        let labels_and_log_weights = log_predictives.iter().zip(normalized_distances).map(
+        let log_predictive_weight =
+            parameters
+                .baseline_ppf
+                .log_predictive_weight(item, &candidate_labels, &clustering);
+        let labels_and_log_weights = log_predictive_weight.iter().zip(normalized_distances).map(
             |((label, log_probability), normalized_distance)| {
                 let log_weight = if use_exponential_decay {
                     *log_probability - shrinkage * normalized_distance
@@ -303,7 +303,7 @@ fn engine_original<'a, T: Rng>(
         };
         let labels_and_log_weights = parameters
             .baseline_ppf
-            .log_predictive(item, &candidate_labels, &clustering)
+            .log_predictive_weight(item, &candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
                 let nm = clustering.size_of(label);

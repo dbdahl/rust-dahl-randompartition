@@ -36,7 +36,7 @@ impl JlpParameters {
 }
 
 impl PredictiveProbabilityFunction for JlpParameters {
-    fn log_predictive(
+    fn log_predictive_weight(
         &self,
         _item: usize,
         candidate_labels: &Vec<usize>,

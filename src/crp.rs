@@ -32,7 +32,7 @@ impl CrpParameters {
 }
 
 impl PredictiveProbabilityFunction for CrpParameters {
-    fn log_predictive(
+    fn log_predictive_weight(
         &self,
         _item: usize,
         candidate_labels: &Vec<usize>,
