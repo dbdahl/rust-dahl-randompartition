@@ -175,6 +175,16 @@ impl Clustering {
         &self.allocation
     }
 
+    pub fn into_vector(self) -> Vec<usize> {
+        self.allocation
+    }
+
+    pub fn into_slice<T: FromUsize>(self, slice: &mut [T]) {
+        for (old_label, slice_item) in self.allocation.iter().zip(slice.iter_mut()) {
+            *slice_item = T::from_usize(*old_label);
+        }
+    }
+
     pub fn size_of(&self, label: usize) -> usize {
         match self.sizes.get(label) {
             Some(size) => *size,
@@ -424,6 +434,33 @@ impl Clustering {
             },
             mapping,
         )
+    }
+
+    pub fn relabel_into_slice<T: UnitIncrementor + Copy> (
+        &self,
+        first_label: T,
+        slice: &mut [T]
+    ) {
+        let mut map = HashMap::new();
+        let mut next_new_label = first_label;
+        for (old_label, slice_item) in self.allocation.iter().zip(slice.iter_mut()) {
+            *slice_item = *map.entry(*old_label).or_insert_with(|| {
+                let new_label = next_new_label;
+                T::next(&mut next_new_label);
+                new_label
+            });
+        }
+    }
+}
+
+pub trait UnitIncrementor {
+    fn next(x: &mut Self);
+}
+
+impl UnitIncrementor for i32 {
+    #[inline]
+    fn next(x: &mut i32) {
+        *x += 1
     }
 }
 
