@@ -436,11 +436,7 @@ impl Clustering {
         )
     }
 
-    pub fn relabel_into_slice<T: UnitIncrementor + Copy> (
-        &self,
-        first_label: T,
-        slice: &mut [T]
-    ) {
+    pub fn relabel_into_slice<T: UnitIncrementor + Copy>(&self, first_label: T, slice: &mut [T]) {
         let mut map = HashMap::new();
         let mut next_new_label = first_label;
         for (old_label, slice_item) in self.allocation.iter().zip(slice.iter_mut()) {
