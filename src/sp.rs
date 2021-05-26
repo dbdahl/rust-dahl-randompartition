@@ -149,6 +149,8 @@ fn engine<'a, T: Rng>(
             return engine_original(parameters, clustering, joint_counts, target, rng);
         }
     }
+    let use_exponential_decay = true;
+    /*
     let use_exponential_decay = match std::env::var("DBD_DECAY") {
         Ok(value) => value != "logistic",
         Err(_) => true,
@@ -158,6 +160,7 @@ fn engine<'a, T: Rng>(
     } else {
         0.0
     };
+    */
     let (use_vi, a_plus_one) = match parameters.loss_function {
         LossFunction::BinderDraws(a) => (false, a + 1.0),
         LossFunction::VI(a) => (true, a + 1.0),
@@ -234,11 +237,8 @@ fn engine<'a, T: Rng>(
         let (sum, min) = distances
             .iter()
             .fold((0.0, f64::MAX), |cum, x| (x + cum.0, x.min(cum.1)));
-        let divisor = if distances.len() > 0 && sum > 0.0 {
-            sum - ((distances.len() as f64) * min)
-        } else {
-            1.0
-        };
+        let divisor = sum - ((distances.len() as f64) * min);
+        let divisor = if divisor <= 0.0 { 1.0 } else { divisor };
         let normalized_distances = distances.iter().map(|x| (x - min) / divisor);
         let log_predictive_weight =
             parameters
@@ -249,7 +249,8 @@ fn engine<'a, T: Rng>(
                 let log_weight = if use_exponential_decay {
                     *log_probability - shrinkage * normalized_distance
                 } else {
-                    *log_probability - (1.0 + (shrinkage * normalized_distance - sill).exp()).ln()
+                    panic!("Not yet explored.\n")
+                    // *log_probability - (1.0 + (shrinkage * normalized_distance - sill).exp()).ln()
                 };
                 (*label, log_weight)
             },
