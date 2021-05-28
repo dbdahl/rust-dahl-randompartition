@@ -271,8 +271,11 @@ impl Clustering {
         };
         let (label, index) = match rng {
             Some(r) => {
-                let dist = WeightedIndex::new(w.iter()).unwrap();
-                let index = dist.sample(r);
+                let index = if w.len() == 1 {
+                    0
+                } else {
+                    WeightedIndex::new(w.iter()).unwrap().sample(r)
+                };
                 (labels[index], index)
             }
             None => {
