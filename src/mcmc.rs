@@ -92,24 +92,22 @@ mod tests_mcmc {
 
     #[test]
     fn test_crp_neal_algorithm3() {
-        // This test seems to be messed up.  It probably does not do what was intended.
-        let current = Clustering::one_cluster(5);
+        let mut current = Clustering::one_cluster(5);
         let neal_functions = CrpParameters::new_with_mass(current.n_items(), Mass::new(1.0));
         let permutation = Permutation::natural_and_fixed(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            let mut clust = current.clone();
-            clust = update_neal_algorithm3(
+            current = update_neal_algorithm3(
                 2,
-                clust,
+                current,
                 &permutation,
                 &neal_functions,
                 &log_posterior_predictive,
                 &mut thread_rng(),
             );
-            sum += clust.n_clusters();
+            sum += current.n_clusters();
         }
         let mean_number_of_subsets = (sum as f64) / (n_samples as f64);
         let z_stat = (mean_number_of_subsets - 2.283333) / (0.8197222 / n_samples as f64).sqrt();

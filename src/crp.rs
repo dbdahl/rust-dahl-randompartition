@@ -127,7 +127,6 @@ impl ProbabilityMassFunction for CrpParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::perm::Permutation;
     use rand::prelude::*;
 
     #[test]
@@ -141,38 +140,6 @@ mod tests {
             sample_closure,
             log_prob_closure,
             1,
-            0.001,
-        );
-    }
-
-    #[test]
-    fn test_goodness_of_fit_neal_algorithm3() {
-        // This test seems to be messed up.  It probably does not do what was intended.
-        let parameters =
-            CrpParameters::new_with_mass_and_discount(5, Mass::new(2.0), Discount::new(0.1));
-        let l = |_i: usize, _indices: &[usize]| 0.0;
-        let clustering = Clustering::one_cluster(parameters.n_items);
-        let rng = &mut thread_rng();
-        let permutation = Permutation::random(clustering.n_items(), rng);
-        let sample_closure = || {
-            let mut clust = clustering.clone();
-            clust = crate::mcmc::update_neal_algorithm3(
-                1,
-                clust,
-                &permutation,
-                &parameters,
-                &l,
-                &mut thread_rng(),
-            );
-            clust.relabel(0, None, false).0
-        };
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
-        crate::testing::assert_goodness_of_fit(
-            10000,
-            parameters.n_items,
-            sample_closure,
-            log_prob_closure,
-            5,
             0.001,
         );
     }
