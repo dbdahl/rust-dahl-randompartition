@@ -38,11 +38,11 @@ impl PredictiveProbabilityFunction for JlpParameters {
     fn log_predictive_weight(
         &self,
         _item: usize,
-        candidate_labels: &Vec<usize>,
+        candidate_labels: &[usize],
         clustering: &Clustering,
     ) -> Vec<(usize, f64)> {
         candidate_labels
-            .into_iter()
+            .iter()
             .map(|label| {
                 (
                     *label,

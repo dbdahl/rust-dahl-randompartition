@@ -114,6 +114,9 @@ impl<'a> SquareMatrixBorrower<'a> {
         Self { data, n_items }
     }
 
+    /// # Safety
+    ///
+    /// You're on your own.
     pub unsafe fn from_ptr(data: *mut f64, n_items: usize) -> Self {
         let data = slice::from_raw_parts_mut(data, n_items * n_items);
         Self { data, n_items }
@@ -123,6 +126,9 @@ impl<'a> SquareMatrixBorrower<'a> {
         self.n_items
     }
 
+    /// # Safety
+    ///
+    /// You're on your own.
     pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &f64 {
         self.data.get_unchecked(self.n_items * j + i)
     }

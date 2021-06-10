@@ -183,14 +183,12 @@ fn engine<'a, T: Rng>(
         let delta = |count: usize| {
             if !use_vi {
                 count as f64
+            } else if count == 0 {
+                0.0
             } else {
-                if count == 0 {
-                    0.0
-                } else {
-                    let n1 = (count + 1) as f64;
-                    let n0 = count as f64;
-                    n1 * (n1.log2()) - n0 * (n0.log2())
-                }
+                let n1 = (count + 1) as f64;
+                let n0 = count as f64;
+                n1 * (n1.log2()) - n0 * (n0.log2())
             }
         };
         let multiplier = if !use_vi {
@@ -206,13 +204,11 @@ fn engine<'a, T: Rng>(
                     } else {
                         ((c as f64) / (n as f64)).powi(2)
                     }
+                } else if c == 0 {
+                    0.0
                 } else {
-                    if c == 0 {
-                        0.0
-                    } else {
-                        let x = (c as f64) / (n as f64);
-                        x * x.ln()
-                    }
+                    let x = (c as f64) / (n as f64);
+                    x * x.ln()
                 }
             };
             let x0 = multiplier * delta(marginal_counts[label_in_baseline]);

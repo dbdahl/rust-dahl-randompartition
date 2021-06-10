@@ -11,14 +11,14 @@ pub trait PredictiveProbabilityFunction {
     fn log_predictive_weight(
         &self,
         item: usize,
-        candidate_labels: &Vec<usize>,
+        candidate_labels: &[usize],
         clustering: &Clustering,
     ) -> Vec<(usize, f64)>;
 
     fn predictive_probability(
         &self,
         item: usize,
-        candidate_labels: &Vec<usize>,
+        candidate_labels: &[usize],
         clustering: &Clustering,
     ) -> Vec<(usize, f64)> {
         let (labels, log_weights): (Vec<_>, Vec<_>) = self
@@ -61,12 +61,9 @@ pub(crate) fn default_partition_sampler_sample<S: Rng, T: PredictiveProbabilityF
     let mut clustering = Clustering::unallocated(n_items);
     for i in 0..clustering.n_items() {
         let ii = permutation.get(i);
+        let candidate_labels: Vec<_> = clustering.available_labels_for_allocation().collect();
         let labels_and_log_weights = ppf
-            .log_predictive_weight(
-                ii,
-                &clustering.available_labels_for_allocation().collect(),
-                &clustering,
-            )
+            .log_predictive_weight(ii, &candidate_labels, &clustering)
             .into_iter();
         let (label, _) = clustering.select(labels_and_log_weights, true, 0, Some(rng), false);
         clustering.allocate(ii, label);
@@ -97,7 +94,7 @@ pub(crate) fn default_probability_mass_function_log_pmf<T: PredictiveProbability
                 ii,
                 &working_clustering
                     .available_labels_for_allocation_with_target(Some(target), ii)
-                    .collect(),
+                    .collect::<Vec<_>>()[..],
                 &working_clustering,
             )
             .into_iter();

@@ -35,7 +35,7 @@ impl PredictiveProbabilityFunction for CrpParameters {
     fn log_predictive_weight(
         &self,
         _item: usize,
-        candidate_labels: &Vec<usize>,
+        candidate_labels: &[usize],
         clustering: &Clustering,
     ) -> Vec<(usize, f64)> {
         if candidate_labels.len() == 1 {
