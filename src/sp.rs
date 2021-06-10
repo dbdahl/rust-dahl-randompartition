@@ -278,6 +278,11 @@ fn engine_original<'a, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    let no_scale = if let Ok(value) = std::env::var("DBD_NO_SCALE") {
+        value == "TRUE"
+    } else {
+        false
+    };
     let (use_vi, a_plus_one) = match parameters.loss_function {
         LossFunction::BinderDraws(a) => (false, a + 1.0),
         LossFunction::VI(a) => (true, a + 1.0),
@@ -287,7 +292,11 @@ fn engine_original<'a, T: Rng>(
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
-        let scaled_shrinkage = ((i + 1) as f64) * parameters.shrinkage[item];
+        let scaled_shrinkage = if !no_scale {
+            ((i + 1) as f64) * parameters.shrinkage[item]
+        } else {
+            parameters.shrinkage[item]
+        };
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
