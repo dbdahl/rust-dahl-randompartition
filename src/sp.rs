@@ -1,21 +1,16 @@
 // Shrinkage partition distribution
 
 use crate::clust::Clustering;
-use crate::crp::CrpParameters;
 use crate::distr::{
     FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
 };
-use crate::jlp::JlpParameters;
 use crate::perm::Permutation;
 use crate::shrink::Shrinkage;
-use crate::up::UpParameters;
 
 use dahl_salso::log2cache::Log2Cache;
 use dahl_salso::LossFunction;
 use rand::prelude::*;
 use rand_isaac::IsaacRng;
-use std::ffi::c_void;
-use std::slice;
 
 pub struct SpParameters {
     baseline_partition: Clustering,
@@ -32,19 +27,26 @@ impl SpParameters {
         shrinkage: Shrinkage,
         permutation: Permutation,
         baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
-        loss_function: LossFunction,
+        use_vi: bool,
+        a: f64,
     ) -> Option<Self> {
         if (shrinkage.n_items() != baseline_partition.n_items())
             || (baseline_partition.n_items() != permutation.n_items())
         {
             None
         } else {
-            let cache = Log2Cache::new(match loss_function {
-                LossFunction::VI(_) | LossFunction::NVI | LossFunction::ID | LossFunction::NID => {
-                    baseline_partition.n_items()
-                }
-                _ => 0,
+            let cache = Log2Cache::new(if use_vi {
+                baseline_partition.n_items()
+            } else {
+                0
             });
+            if a <= 0.0 {
+                return None;
+            }
+            let loss_function = match use_vi {
+                true => LossFunction::VI(a),
+                false => LossFunction::BinderDraws(a),
+            };
             Some(Self {
                 baseline_partition: baseline_partition.standardize(),
                 shrinkage,
@@ -352,6 +354,7 @@ fn engine_original<'a, T: Rng>(
 mod tests {
     use super::*;
     use crate::prelude::*;
+    use crate::crp::CrpParameters;
 
     #[test]
     fn test_goodness_of_fit_constructive() {
@@ -359,7 +362,6 @@ mod tests {
         let discount = 0.1;
         let mass = Mass::new_with_variable_constraint(2.0, discount);
         let discount = Discount::new(discount);
-        let loss_function = LossFunction::VI(1.0);
         let mut rng = thread_rng();
         for target in Clustering::iter(n_items) {
             let target = Clustering::from_vector(target);
@@ -376,7 +378,8 @@ mod tests {
                 shrinkage,
                 permutation,
                 Box::new(baseline_distribution),
-                loss_function,
+                true,
+                1.0,
             )
             .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
@@ -398,7 +401,6 @@ mod tests {
         let discount = 0.1;
         let mass = Mass::new_with_variable_constraint(2.0, discount);
         let discount = Discount::new(discount);
-        let loss_function = LossFunction::VI(1.0);
         let mut rng = thread_rng();
         for target in Clustering::iter(n_items) {
             let target = Clustering::from_vector(target);
@@ -415,93 +417,12 @@ mod tests {
                 shrinkage,
                 permutation,
                 Box::new(baseline_distribution),
-                loss_function,
+                true,
+                1.0,
             )
             .unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__spparameters_new(
-    n_items: i32,
-    baseline_partition_ptr: *const i32,
-    shrinkage_ptr: *const f64,
-    permutation_ptr: *const i32,
-    use_natural_permutation: i32,
-    baseline_distr_id: i32,
-    baseline_distr_ptr: *const c_void,
-    loss: i32,
-    a: f64,
-) -> *mut SpParameters {
-    let ni = n_items as usize;
-    let opined = Clustering::from_slice(slice::from_raw_parts(baseline_partition_ptr, ni));
-    let shrinkage = Shrinkage::from(slice::from_raw_parts(shrinkage_ptr, ni)).unwrap();
-    let permutation = if use_natural_permutation != 0 {
-        Permutation::natural_and_fixed(ni)
-    } else {
-        let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
-        let permutation_vector: Vec<usize> =
-            permutation_slice.iter().map(|x| *x as usize).collect();
-        Permutation::from_vector(permutation_vector).unwrap()
-    };
-    let loss_function = LossFunction::from_code(loss, a).unwrap();
-    let obj = match baseline_distr_id {
-        1 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut CrpParameters).unwrap();
-            let baseline_distribution = p.as_ref().clone();
-            SpParameters::new(
-                opined,
-                shrinkage,
-                permutation,
-                Box::new(baseline_distribution),
-                loss_function,
-            )
-            .unwrap()
-        }
-        7 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut UpParameters).unwrap();
-            let baseline_distribution = p.as_ref().clone();
-            SpParameters::new(
-                opined,
-                shrinkage,
-                permutation,
-                Box::new(baseline_distribution),
-                loss_function,
-            )
-            .unwrap()
-        }
-        8 => {
-            let p = std::ptr::NonNull::new(baseline_distr_ptr as *mut JlpParameters).unwrap();
-            let baseline_distribution = p.as_ref().clone();
-            SpParameters::new(
-                opined,
-                shrinkage,
-                permutation,
-                Box::new(baseline_distribution),
-                loss_function,
-            )
-            .unwrap()
-        }
-        _ => panic!("Unsupported prior ID: {}", baseline_distr_id),
-    };
-    // First we create a new object.
-    // Then copy it to the heap (so we have a stable pointer to it).
-    let boxed_obj = Box::new(obj);
-    // Then return a pointer by converting our `Box<_>` into a raw pointer
-    Box::into_raw(boxed_obj)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__spparameters_free(obj: *mut SpParameters) {
-    // As a rule of thumb, freeing a null pointer is just a noop.
-    if obj.is_null() {
-        return;
-    }
-    // Convert the raw pointer back to a Box<_>
-    let boxed = Box::from_raw(obj);
-    // Then explicitly drop it (optional)
-    drop(boxed);
 }
