@@ -9,7 +9,6 @@ use dahl_salso::clustering::Clusterings;
 use dahl_salso::clustering::WorkingClustering;
 use dahl_salso::log2cache::Log2Cache;
 use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputer};
-use std::slice;
 
 #[derive(Debug, Clone)]
 pub struct CppParameters {
@@ -155,40 +154,4 @@ mod tests {
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__cppparameters_new(
-    n_items: i32,
-    baseline_ptr: *const i32,
-    rate: f64,
-    uniform: bool,
-    mass: f64,
-    discount: f64,
-    use_vi: bool,
-    a: f64,
-) -> *mut CppParameters {
-    let ni = n_items as usize;
-    let baseline = Clustering::from_slice(slice::from_raw_parts(baseline_ptr, ni));
-    let r = Rate::new(rate);
-    let d = Discount::new(discount);
-    let m = Mass::new_with_variable_constraint(mass, discount);
-    // First we create a new object.
-    let obj = CppParameters::new(baseline, r, uniform, m, d, use_vi, a).unwrap();
-    // Then copy it to the heap (so we have a stable pointer to it).
-    let boxed_obj = Box::new(obj);
-    // Then return a pointer by converting our `Box<_>` into a raw pointer
-    Box::into_raw(boxed_obj)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__cppparameters_free(obj: *mut CppParameters) {
-    // As a rule of thumb, freeing a null pointer is just a noop.
-    if obj.is_null() {
-        return;
-    }
-    // Convert the raw pointer back to a Box<_>
-    let boxed = Box::from_raw(obj);
-    // Then explicitly drop it (optional)
-    drop(boxed);
 }
