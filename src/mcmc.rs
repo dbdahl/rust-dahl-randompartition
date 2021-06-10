@@ -87,8 +87,8 @@ where
 #[cfg(test)]
 mod tests_mcmc {
     use super::*;
-    use crate::prelude::*;
     use crate::crp::CrpParameters;
+    use crate::prelude::*;
 
     #[test]
     fn test_crp_neal_algorithm3() {
@@ -116,4 +116,3 @@ mod tests_mcmc {
         assert!(z_stat.abs() < 3.290527);
     }
 }
-

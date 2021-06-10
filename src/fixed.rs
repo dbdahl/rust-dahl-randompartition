@@ -37,4 +37,3 @@ impl ProbabilityMassFunction for FixedPartitionParameters {
         true
     }
 }
-

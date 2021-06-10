@@ -38,4 +38,3 @@ pub fn log_probabilities_into_slice<S: ProbabilityMassFunction>(
         log_probabilities[i] = distr.log_pmf(&target);
     }
 }
-

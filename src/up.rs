@@ -114,4 +114,3 @@ mod tests {
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
 }
-
