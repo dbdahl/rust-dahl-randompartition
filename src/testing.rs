@@ -1,5 +1,5 @@
 use crate::clust::Clustering;
-use statrs::distribution::{ChiSquared, Univariate};
+use statrs::distribution::{ChiSquared, ContinuousCDF};
 use std::collections::HashMap;
 
 pub fn assert_goodness_of_fit(
