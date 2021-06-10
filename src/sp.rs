@@ -353,8 +353,8 @@ fn engine_original<'a, T: Rng>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
     use crate::crp::CrpParameters;
+    use crate::prelude::*;
 
     #[test]
     fn test_goodness_of_fit_constructive() {
