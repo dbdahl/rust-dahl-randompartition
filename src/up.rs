@@ -115,24 +115,3 @@ mod tests {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__upparameters_new(n_items: i32) -> *mut UpParameters {
-    // First we create a new object.
-    let obj = UpParameters::new(n_items as usize);
-    // Then copy it to the heap (so we have a stable pointer to it).
-    let boxed_obj = Box::new(obj);
-    // Then return a pointer by converting our `Box<_>` into a raw pointer
-    Box::into_raw(boxed_obj)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__upparameters_free(obj: *mut UpParameters) {
-    // As a rule of thumb, freeing a null pointer is just a noop.
-    if obj.is_null() {
-        return;
-    }
-    // Convert the raw pointer back to a Box<_>
-    let boxed = Box::from_raw(obj);
-    // Then explicitly drop it (optional)
-    drop(boxed);
-}

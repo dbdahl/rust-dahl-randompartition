@@ -6,7 +6,7 @@ use crate::perm::Permutation;
 use crate::prelude::*;
 
 use rand::prelude::*;
-use rand_isaac::IsaacRng;
+use rand_pcg::Pcg64Mcg;
 use std::slice;
 
 #[derive(Debug, Clone)]
@@ -72,7 +72,7 @@ impl FullConditional for LspParameters {
             .available_labels_for_reallocation(item)
             .map(|label| {
                 p[item] = label;
-                (label, engine::<IsaacRng>(self, Some(&p[..]), None).1)
+                (label, engine::<Pcg64Mcg>(self, Some(&p[..]), None).1)
             })
             .collect()
     }
@@ -86,7 +86,7 @@ impl PartitionSampler for LspParameters {
 
 impl ProbabilityMassFunction for LspParameters {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
-        engine::<IsaacRng>(self, Some(partition.allocation()), None).1
+        engine::<Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
     fn is_normalized(&self) -> bool {
         true
@@ -144,7 +144,7 @@ fn engine<T: Rng>(
             });
         let (subset_index, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_weights, false, 0, Some(r), true),
-            None => clustering.select::<IsaacRng, _>(
+            None => clustering.select::<Pcg64Mcg, _>(
                 labels_and_weights,
                 false,
                 target.unwrap()[ii],

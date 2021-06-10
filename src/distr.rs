@@ -2,7 +2,7 @@ use crate::clust::Clustering;
 use crate::perm::Permutation;
 
 use rand::Rng;
-use rand_isaac::IsaacRng;
+use rand_pcg::Pcg64Mcg;
 
 //
 
@@ -101,7 +101,7 @@ pub(crate) fn default_probability_mass_function_log_pmf<T: PredictiveProbability
                 &working_clustering,
             )
             .into_iter();
-        let (label, contribution) = working_clustering.select::<IsaacRng, _>(
+        let (label, contribution) = working_clustering.select::<Pcg64Mcg, _>(
             labels_and_log_weights,
             true,
             target[ii],

@@ -10,7 +10,7 @@ use crate::shrink::Shrinkage;
 use dahl_salso::log2cache::Log2Cache;
 use dahl_salso::LossFunction;
 use rand::prelude::*;
-use rand_isaac::IsaacRng;
+use rand_pcg::Pcg64Mcg;
 
 pub struct SpParameters {
     baseline_partition: Clustering,
@@ -94,7 +94,7 @@ impl FullConditional for SpParameters {
                 target[item] = label;
                 (
                     label,
-                    engine::<IsaacRng>(
+                    engine::<Pcg64Mcg>(
                         self,
                         partial_clustering.clone(),
                         marginal_counts.clone(),
@@ -117,7 +117,7 @@ impl PartitionSampler for SpParameters {
 
 impl ProbabilityMassFunction for SpParameters {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
-        engine_full::<IsaacRng>(self, Some(partition.allocation()), None).1
+        engine_full::<Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
     fn is_normalized(&self) -> bool {
         true
@@ -259,7 +259,7 @@ fn engine<'a, T: Rng>(
         );
         let (label, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
-            None => clustering.select::<IsaacRng, _>(
+            None => clustering.select::<Pcg64Mcg, _>(
                 labels_and_log_weights,
                 true,
                 target.unwrap()[item],
@@ -335,7 +335,7 @@ fn engine_original<'a, T: Rng>(
             });
         let (label, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
-            None => clustering.select::<IsaacRng, _>(
+            None => clustering.select::<Pcg64Mcg, _>(
                 labels_and_log_weights,
                 true,
                 target.unwrap()[item],

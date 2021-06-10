@@ -3,10 +3,10 @@
 use crate::clust::Clustering;
 use crate::distr::{FullConditional, PartitionSampler, ProbabilityMassFunction};
 use crate::perm::Permutation;
-use crate::prelude::*;
+use crate::prelude::{Discount, Mass};
 
 use rand::prelude::*;
-use rand_isaac::IsaacRng;
+use rand_pcg::Pcg64Mcg;
 use std::slice;
 
 type SimilarityBorrower<'a> = SquareMatrixBorrower<'a>;
@@ -161,7 +161,7 @@ impl<'a> FullConditional for EpaParameters<'a> {
             .available_labels_for_reallocation(item)
             .map(|label| {
                 p[item] = label;
-                (label, engine::<IsaacRng>(self, Some(&p[..]), None).1)
+                (label, engine::<Pcg64Mcg>(self, Some(&p[..]), None).1)
             })
             .collect()
     }
@@ -175,7 +175,7 @@ impl<'a> PartitionSampler for EpaParameters<'a> {
 
 impl<'a> ProbabilityMassFunction for EpaParameters<'a> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
-        engine::<IsaacRng>(self, Some(partition.allocation()), None).1
+        engine::<Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
     fn is_normalized(&self) -> bool {
         true
@@ -214,7 +214,7 @@ pub fn engine<T: Rng>(
             });
         let (subset_index, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_weights, false, 0, Some(r), true),
-            None => clustering.select::<IsaacRng, _>(
+            None => clustering.select::<Pcg64Mcg, _>(
                 labels_and_weights,
                 false,
                 target.unwrap()[ii],
@@ -311,43 +311,3 @@ mod tests {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__epaparameters_new(
-    n_items: i32,
-    similarity_ptr: *mut f64,
-    permutation_ptr: *const i32,
-    use_natural_permutation: i32,
-    mass: f64,
-    discount: f64,
-) -> *mut EpaParameters<'static> {
-    let ni = n_items as usize;
-    let similarity = SquareMatrixBorrower::from_ptr(similarity_ptr, ni);
-    let permutation = if use_natural_permutation != 0 {
-        Permutation::natural_and_fixed(ni)
-    } else {
-        let permutation_slice = slice::from_raw_parts(permutation_ptr, ni);
-        let permutation_vector: Vec<usize> =
-            permutation_slice.iter().map(|x| *x as usize).collect();
-        Permutation::from_vector(permutation_vector).unwrap()
-    };
-    let d = Discount::new(discount);
-    let m = Mass::new_with_variable_constraint(mass, discount);
-    // First we create a new object.
-    let obj = EpaParameters::new(similarity, permutation, m, d).unwrap();
-    // Then copy it to the heap (so we have a stable pointer to it).
-    let boxed_obj = Box::new(obj);
-    // Then return a pointer by converting our `Box<_>` into a raw pointer
-    Box::into_raw(boxed_obj)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn dahl_randompartition__epaparameters_free(obj: *mut EpaParameters) {
-    // As a rule of thumb, freeing a null pointer is just a noop.
-    if obj.is_null() {
-        return;
-    }
-    // Convert the raw pointer back to a Box<_>
-    let boxed = Box::from_raw(obj);
-    // Then explicitly drop it (optional)
-    drop(boxed);
-}
