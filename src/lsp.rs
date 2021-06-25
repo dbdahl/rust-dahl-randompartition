@@ -6,6 +6,7 @@ use crate::perm::Permutation;
 use crate::prelude::*;
 
 use rand::prelude::*;
+use rand_distr::Beta;
 use rand_pcg::Pcg64Mcg;
 
 #[derive(Debug, Clone)]
@@ -57,6 +58,12 @@ impl LspParameters {
 
     pub fn shuffle_permutation<T: Rng>(&mut self, rng: &mut T) {
         self.permutation.shuffle(rng);
+    }
+
+    pub fn resample_rate<T: Rng>(&mut self, max: f64, shape1: f64, shape2: f64, rng: &mut T) {
+        let beta = Beta::new(shape1, shape2).unwrap();
+        self.rate = Rate::new(max * beta.sample(rng));
+        self.scale = Scale::new(1.0 / self.rate.unwrap());
     }
 }
 

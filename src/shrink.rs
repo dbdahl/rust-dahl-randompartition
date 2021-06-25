@@ -1,4 +1,6 @@
 use crate::prelude::Rate;
+use rand::prelude::*;
+use rand_distr::{Beta, Distribution};
 
 #[derive(Debug, Clone)]
 pub struct Shrinkage(Vec<f64>);
@@ -17,6 +19,18 @@ impl Shrinkage {
             return None;
         }
         Some(Shrinkage(vec![value; n_items]))
+    }
+
+    pub fn constant_random<T: Rng>(
+        n_items: usize,
+        max: f64,
+        shape1: f64,
+        shape2: f64,
+        rng: &mut T,
+    ) -> Shrinkage {
+        let beta = Beta::new(shape1, shape2).unwrap();
+        let value = max * beta.sample(rng);
+        Shrinkage(vec![value; n_items])
     }
 
     pub fn from(w: &[f64]) -> Option<Shrinkage> {

@@ -61,6 +61,11 @@ impl SpParameters {
     pub fn shuffle_permutation<T: Rng>(&mut self, rng: &mut T) {
         self.permutation.shuffle(rng);
     }
+
+    pub fn resample_shrinkage<T: Rng>(&mut self, max: f64, shape1: f64, shape2: f64, rng: &mut T) {
+        self.shrinkage =
+            Shrinkage::constant_random(self.shrinkage.n_items(), max, shape1, shape2, rng);
+    }
 }
 
 fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {

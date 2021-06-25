@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 rand = "0.8.3"
 rand_pcg = "0.3.0"
+rand_distr = "0.4.1"
 statrs = "0.14.0"
 
 dahl-bellnumber = { git="https://dahl-git.byu.edu/dahl/rust-dahl-bellnumber.git" }
