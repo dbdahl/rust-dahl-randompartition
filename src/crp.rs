@@ -2,7 +2,8 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+    FullConditional, PartitionConditionalSampler, PartitionSampler, PredictiveProbabilityFunction,
+    ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
 use crate::prelude::*;
@@ -82,6 +83,17 @@ impl PartitionSampler for CrpParameters {
         crate::distr::default_partition_sampler_sample(
             self,
             &Permutation::natural_and_fixed(self.n_items),
+            rng,
+        )
+    }
+}
+
+impl PartitionConditionalSampler for CrpParameters {
+    fn sample_conditionally<T: Rng>(&self, clustering: Clustering, rng: &mut T) -> Clustering {
+        crate::distr::default_partition_conditional_sampler_sample(
+            self,
+            &Permutation::natural_and_fixed(self.n_items),
+            clustering,
             rng,
         )
     }

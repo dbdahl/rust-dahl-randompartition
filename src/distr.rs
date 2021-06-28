@@ -57,9 +57,24 @@ pub(crate) fn default_partition_sampler_sample<S: Rng, T: PredictiveProbabilityF
     permutation: &Permutation,
     rng: &mut S,
 ) -> Clustering {
-    let n_items = permutation.n_items();
-    let mut clustering = Clustering::unallocated(n_items);
-    for i in 0..clustering.n_items() {
+    let clustering = Clustering::unallocated(permutation.n_items());
+    default_partition_conditional_sampler_sample(ppf, permutation, clustering, rng)
+}
+
+pub trait PartitionConditionalSampler {
+    fn sample_conditionally<T: Rng>(&self, clustering: Clustering, rng: &mut T) -> Clustering;
+}
+
+pub(crate) fn default_partition_conditional_sampler_sample<
+    S: Rng,
+    T: PredictiveProbabilityFunction,
+>(
+    ppf: &T,
+    permutation: &Permutation,
+    mut clustering: Clustering,
+    rng: &mut S,
+) -> Clustering {
+    for i in clustering.n_items_allocated()..clustering.n_items() {
         let ii = permutation.get(i);
         let candidate_labels: Vec<_> = clustering.available_labels_for_allocation().collect();
         let labels_and_log_weights = ppf
