@@ -18,6 +18,7 @@ pub struct SpParameters {
     permutation: Permutation,
     baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
     loss_function: LossFunction,
+    scaling: fn(usize, f64) -> f64,
     cache: Log2Cache,
 }
 
@@ -29,6 +30,7 @@ impl SpParameters {
         baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
         use_vi: bool,
         a: f64,
+        scaling: fn(usize, f64) -> f64,
     ) -> Option<Self> {
         if (shrinkage.n_items() != baseline_partition.n_items())
             || (baseline_partition.n_items() != permutation.n_items())
@@ -53,6 +55,7 @@ impl SpParameters {
                 permutation,
                 baseline_ppf,
                 loss_function,
+                scaling,
                 cache,
             })
         }
@@ -199,19 +202,11 @@ fn engine_core<'a, S: EngineFunctions, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let scaling_fn = match std::env::var("DBD_SCALE") {
-        Ok(x) if x == "1" => |_i: usize, s: f64| s,
-        Ok(x) if x == "i^2" => |i: usize, s: f64| {
-            let i_plus_1 = (i + 1) as f64;
-            i_plus_1 * i_plus_1 * s
-        },
-        _ => |i: usize, s: f64| ((i + 1) as f64) * s,
-    };
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
-        let scaled_shrinkage = scaling_fn(i, parameters.shrinkage[item]);
+        let scaled_shrinkage = (parameters.scaling)(i, parameters.shrinkage[item]);
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -277,6 +272,7 @@ mod tests {
                 Box::new(baseline_distribution),
                 true,
                 1.0,
+                |i: usize, s: f64| (i as f64) * s,
             )
             .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
@@ -316,6 +312,7 @@ mod tests {
                 Box::new(baseline_distribution),
                 true,
                 1.0,
+                |i: usize, s: f64| (i as f64) * s,
             )
             .unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
