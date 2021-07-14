@@ -18,7 +18,7 @@ pub struct SpParameters {
     permutation: Permutation,
     baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
     loss_function: LossFunction,
-    scaling: fn(usize, f64) -> f64,
+    scaling_exponent: f64,
     cache: Log2Cache,
 }
 
@@ -30,7 +30,7 @@ impl SpParameters {
         baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
         use_vi: bool,
         a: f64,
-        scaling: fn(usize, f64) -> f64,
+        scaling_exponent: f64,
     ) -> Option<Self> {
         if (shrinkage.n_items() != baseline_partition.n_items())
             || (baseline_partition.n_items() != permutation.n_items())
@@ -55,7 +55,7 @@ impl SpParameters {
                 permutation,
                 baseline_ppf,
                 loss_function,
-                scaling,
+                scaling_exponent,
                 cache,
             })
         }
@@ -206,7 +206,8 @@ fn engine_core<'a, S: EngineFunctions, T: Rng>(
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
-        let scaled_shrinkage = (parameters.scaling)(i, parameters.shrinkage[item]);
+        let scaled_shrinkage =
+            (i as f64).powf(parameters.scaling_exponent) * parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -272,7 +273,7 @@ mod tests {
                 Box::new(baseline_distribution),
                 true,
                 1.0,
-                |i: usize, s: f64| (i as f64) * s,
+                1.0,
             )
             .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
@@ -312,7 +313,7 @@ mod tests {
                 Box::new(baseline_distribution),
                 true,
                 1.0,
-                |i: usize, s: f64| (i as f64) * s,
+                1.0,
             )
             .unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
