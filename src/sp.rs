@@ -12,22 +12,22 @@ use dahl_salso::LossFunction;
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 
-pub struct SpParameters {
+pub struct SpParameters<D: PredictiveProbabilityFunction> {
     baseline_partition: Clustering,
     shrinkage: Shrinkage,
     permutation: Permutation,
-    baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
+    baseline_ppf: D,
     loss_function: LossFunction,
     scaling_exponent: f64,
     cache: Log2Cache,
 }
 
-impl SpParameters {
+impl<D: PredictiveProbabilityFunction> SpParameters<D> {
     pub fn new(
         baseline_partition: Clustering,
         shrinkage: Shrinkage,
         permutation: Permutation,
-        baseline_ppf: Box<dyn PredictiveProbabilityFunction>,
+        baseline_ppf: D,
         use_vi: bool,
         a: f64,
         scaling_exponent: f64,
@@ -75,7 +75,7 @@ fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
     counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
 }
 
-impl FullConditional for SpParameters {
+impl<D: PredictiveProbabilityFunction> FullConditional for SpParameters<D> {
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
@@ -100,7 +100,7 @@ impl FullConditional for SpParameters {
                 target[item] = label;
                 (
                     label,
-                    engine::<Pcg64Mcg>(
+                    engine::<D, Pcg64Mcg>(
                         self,
                         partial_clustering.clone(),
                         counts.clone(),
@@ -114,23 +114,23 @@ impl FullConditional for SpParameters {
     }
 }
 
-impl PartitionSampler for SpParameters {
+impl<D: PredictiveProbabilityFunction> PartitionSampler for SpParameters<D> {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine_full(self, None, Some(rng)).0
     }
 }
 
-impl ProbabilityMassFunction for SpParameters {
+impl<D: PredictiveProbabilityFunction> ProbabilityMassFunction for SpParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
-        engine_full::<Pcg64Mcg>(self, Some(partition.allocation()), None).1
+        engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
     fn is_normalized(&self) -> bool {
         true
     }
 }
 
-fn engine_full<'a, T: Rng>(
-    parameters: &'a SpParameters,
+fn engine_full<'a, D: PredictiveProbabilityFunction, T: Rng>(
+    parameters: &'a SpParameters<D>,
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -175,8 +175,8 @@ impl EngineFunctions for Vi {
     }
 }
 
-fn engine<'a, T: Rng>(
-    parameters: &'a SpParameters,
+fn engine<'a, D: PredictiveProbabilityFunction, T: Rng>(
+    parameters: &'a SpParameters<D>,
     clustering: Clustering,
     counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
@@ -193,10 +193,10 @@ fn engine<'a, T: Rng>(
     }
 }
 
-fn engine_core<'a, S: EngineFunctions, T: Rng>(
+fn engine_core<'a, D: PredictiveProbabilityFunction, S: EngineFunctions, T: Rng>(
     functions: S,
     a_plus_one: f64,
-    parameters: &'a SpParameters,
+    parameters: &'a SpParameters<D>,
     mut clustering: Clustering,
     mut counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
@@ -270,7 +270,7 @@ mod tests {
                 target,
                 shrinkage,
                 permutation,
-                Box::new(baseline_distribution),
+                baseline_distribution,
                 true,
                 1.0,
                 1.0,
@@ -310,7 +310,7 @@ mod tests {
                 target,
                 shrinkage,
                 permutation,
-                Box::new(baseline_distribution),
+                baseline_distribution,
                 true,
                 1.0,
                 1.0,
