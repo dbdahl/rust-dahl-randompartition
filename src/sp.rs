@@ -207,7 +207,7 @@ fn engine_core<'a, S: EngineFunctions, T: Rng>(
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
         let scaled_shrinkage =
-            ((i +1) as f64).powf(parameters.scaling_exponent) * parameters.shrinkage[item];
+            ((i + 1) as f64).powf(parameters.scaling_exponent) * parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
