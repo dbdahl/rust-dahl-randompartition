@@ -9,21 +9,21 @@ use dahl_salso::clustering::WorkingClustering;
 use dahl_salso::log2cache::Log2Cache;
 use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputer};
 
-pub struct CppParameters {
+pub struct CppParameters<D: ProbabilityMassFunction> {
     baseline_partition: Clustering,
     rate: Rate,
-    baseline_pmf: Box<dyn ProbabilityMassFunction>,
+    baseline_pmf: D,
     use_vi: bool,
     a: f64,
     log2cache: Log2Cache,
     baseline_as_clusterings: Clusterings,
 }
 
-impl CppParameters {
+impl<D: ProbabilityMassFunction> CppParameters<D> {
     pub fn new(
         baseline: Clustering,
         rate: Rate,
-        baseline_pmf: Box<dyn ProbabilityMassFunction>,
+        baseline_pmf: D,
         use_vi: bool,
         a: f64,
     ) -> Option<Self> {
@@ -43,7 +43,7 @@ impl CppParameters {
     }
 }
 
-impl FullConditional for CppParameters {
+impl<D: ProbabilityMassFunction> FullConditional for CppParameters<D> {
     fn log_full_conditional<'a>(
         &'a self,
         item: usize,
@@ -60,7 +60,7 @@ impl FullConditional for CppParameters {
     }
 }
 
-impl ProbabilityMassFunction for CppParameters {
+impl<D: ProbabilityMassFunction> ProbabilityMassFunction for CppParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         log_pmf(partition, self)
     }
@@ -69,7 +69,7 @@ impl ProbabilityMassFunction for CppParameters {
     }
 }
 
-fn log_pmf(target: &Clustering, parameters: &CppParameters) -> f64 {
+fn log_pmf<D: ProbabilityMassFunction>(target: &Clustering, parameters: &CppParameters<D>) -> f64 {
     let computer: Box<dyn CMLossComputer> = if parameters.use_vi {
         Box::new(VICMLossComputer::new(parameters.a, &parameters.log2cache))
     } else {
@@ -115,8 +115,7 @@ mod tests {
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters =
-                CppParameters::new(baseline, rate, Box::new(baseline_distribution), true, 1.0)
-                    .unwrap();
+                CppParameters::new(baseline, rate, baseline_distribution, true, 1.0).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
