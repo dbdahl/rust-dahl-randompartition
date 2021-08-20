@@ -12,7 +12,8 @@ use dahl_salso::LossFunction;
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 
-pub struct SpParameters<D: PredictiveProbabilityFunction> {
+#[derive(Debug, Clone)]
+pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
     baseline_partition: Clustering,
     shrinkage: Shrinkage,
     permutation: Permutation,
@@ -22,7 +23,7 @@ pub struct SpParameters<D: PredictiveProbabilityFunction> {
     cache: Log2Cache,
 }
 
-impl<D: PredictiveProbabilityFunction> SpParameters<D> {
+impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
     pub fn new(
         baseline_partition: Clustering,
         shrinkage: Shrinkage,
@@ -75,7 +76,7 @@ fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
     counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
 }
 
-impl<D: PredictiveProbabilityFunction> FullConditional for SpParameters<D> {
+impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<D> {
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
@@ -114,13 +115,13 @@ impl<D: PredictiveProbabilityFunction> FullConditional for SpParameters<D> {
     }
 }
 
-impl<D: PredictiveProbabilityFunction> PartitionSampler for SpParameters<D> {
+impl<D: PredictiveProbabilityFunction + Clone> PartitionSampler for SpParameters<D> {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine_full(self, None, Some(rng)).0
     }
 }
 
-impl<D: PredictiveProbabilityFunction> ProbabilityMassFunction for SpParameters<D> {
+impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
@@ -129,7 +130,7 @@ impl<D: PredictiveProbabilityFunction> ProbabilityMassFunction for SpParameters<
     }
 }
 
-fn engine_full<'a, D: PredictiveProbabilityFunction, T: Rng>(
+fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &'a SpParameters<D>,
     target: Option<&[usize]>,
     rng: Option<&mut T>,
@@ -175,7 +176,7 @@ impl EngineFunctions for Vi {
     }
 }
 
-fn engine<'a, D: PredictiveProbabilityFunction, T: Rng>(
+fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &'a SpParameters<D>,
     clustering: Clustering,
     counts: Vec<Vec<usize>>,
@@ -193,7 +194,7 @@ fn engine<'a, D: PredictiveProbabilityFunction, T: Rng>(
     }
 }
 
-fn engine_core<'a, D: PredictiveProbabilityFunction, S: EngineFunctions, T: Rng>(
+fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions, T: Rng>(
     functions: S,
     a_plus_one: f64,
     parameters: &'a SpParameters<D>,

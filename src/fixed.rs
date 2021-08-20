@@ -5,7 +5,7 @@ use crate::distr::{PartitionSampler, ProbabilityMassFunction};
 
 use rand::Rng;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FixedPartitionParameters {
     clustering: Clustering,
 }
