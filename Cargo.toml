@@ -11,11 +11,11 @@ license = "MIT OR Apache-2.0"
 rand = "0.8.3"
 rand_pcg = "0.3.0"
 rand_distr = "0.4.1"
-statrs = "0.14.0"
+statrs = "0.15.0"
 
 dahl-bellnumber = { git="https://dahl-git.byu.edu/dahl/rust-dahl-bellnumber.git" }
 # dahl-bellnumber = { path="/home/dahl/docs/devel/rust-dahl-bellnumber" }
 
-dahl-salso = "0.5.4"
+dahl-salso = "0.6.1"
 # dahl-salso = { git="https://dahl-git.byu.edu/dahl/rust-dahl-salso.git" }
 # dahl-salso = { path="/home/dahl/docs/devel/rust-dahl-salso" }

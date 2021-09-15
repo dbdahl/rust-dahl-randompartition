@@ -203,9 +203,17 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    // In R: Sys.setenv("PUMPKIN_DEBUG"="TRUE")
+    let debug = std::env::var("PUMPKIN_DEBUG").unwrap_or_default() == "TRUE";
+    if debug {
+        println!("####");
+    }
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
+        if debug {
+            println!("---- i = {}, item = {}", i + 1, item + 1);
+        }
         let label_in_baseline = parameters.baseline_partition.get(item);
         let scaled_shrinkage =
             ((i + 1) as f64).powf(parameters.scaling_exponent) * parameters.shrinkage[item];
@@ -227,6 +235,14 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
                 let distance = m * (functions.delta(nm) - a_plus_one * functions.delta(nj));
                 (label, log_probability - scaled_shrinkage * distance)
             });
+        if debug {
+            let a = labels_and_log_weights
+                .clone()
+                .map(|x| format!("{} => {}", x.0, x.1.exp()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("{}", a);
+        }
         let (label, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
             None => clustering.select::<Pcg64Mcg, _>(
@@ -240,6 +256,9 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
         log_probability += log_probability_contribution;
         clustering.allocate(item, label);
         counts[label_in_baseline][label] += 1;
+        if debug {
+            println!("clustering: {}", clustering)
+        }
     }
     (clustering, log_probability)
 }
