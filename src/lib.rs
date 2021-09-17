@@ -15,5 +15,6 @@ pub mod perm;
 pub mod prelude;
 pub mod shrink;
 pub mod sp;
+pub mod sp2;
 pub mod testing;
 pub mod up;

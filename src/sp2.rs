@@ -1,4 +1,4 @@
-// Shrinkage partition distribution
+// Alternative shrinkage partition distribution
 
 use crate::clust::Clustering;
 use crate::distr::{
@@ -13,7 +13,7 @@ use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 
 #[derive(Debug, Clone)]
-pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
+pub struct Sp2Parameters<D: PredictiveProbabilityFunction + Clone> {
     baseline_partition: Clustering,
     shrinkage: Shrinkage,
     permutation: Permutation,
@@ -23,7 +23,7 @@ pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
     cache: Log2Cache,
 }
 
-impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
+impl<D: PredictiveProbabilityFunction + Clone> Sp2Parameters<D> {
     pub fn new(
         baseline_partition: Clustering,
         shrinkage: Shrinkage,
@@ -76,7 +76,7 @@ fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
     counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
 }
 
-impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<D> {
+impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Sp2Parameters<D> {
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
@@ -115,13 +115,13 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
     }
 }
 
-impl<D: PredictiveProbabilityFunction + Clone> PartitionSampler for SpParameters<D> {
+impl<D: PredictiveProbabilityFunction + Clone> PartitionSampler for Sp2Parameters<D> {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine_full(self, None, Some(rng)).0
     }
 }
 
-impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpParameters<D> {
+impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for Sp2Parameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
@@ -131,7 +131,7 @@ impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpPar
 }
 
 fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a SpParameters<D>,
+    parameters: &'a Sp2Parameters<D>,
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -177,7 +177,7 @@ impl EngineFunctions for Vi {
 }
 
 fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a SpParameters<D>,
+    parameters: &'a Sp2Parameters<D>,
     clustering: Clustering,
     counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
@@ -195,9 +195,9 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
 }
 
 fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions, T: Rng>(
-    functions: S,
-    a_plus_one: f64,
-    parameters: &'a SpParameters<D>,
+    _functions: S,
+    _a_plus_one: f64,
+    parameters: &'a Sp2Parameters<D>,
     mut clustering: Clustering,
     mut counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
@@ -206,7 +206,7 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
     // In R: Sys.setenv("PUMPKIN_DEBUG"="TRUE")
     let debug = std::env::var("PUMPKIN_DEBUG").unwrap_or_default() == "TRUE";
     if debug {
-        println!("####");
+        println!("#### on alternative shrinkage");
     }
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
@@ -224,22 +224,28 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
         if max_candidate_label >= counts[label_in_baseline].len() {
             expand_counts(&mut counts, max_candidate_label + 1)
         }
-        let m = functions.multiplier(i);
+        let ndenom = counts[label_in_baseline].iter().sum::<usize>() as f64;
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
-                let nm = clustering.size_of(label);
                 let nj = counts[label_in_baseline][label];
-                let distance = m * (functions.delta(nm) - a_plus_one * functions.delta(nj));
                 if debug {
                     println!(
-                        "label {}: {} {} {}",
-                        label, log_probability, scaled_shrinkage, distance
+                        "label {}: {} {} {} {}",
+                        label, log_probability, scaled_shrinkage, nj, ndenom
                     );
                 }
-                (label, log_probability - scaled_shrinkage * distance)
+                (
+                    label,
+                    log_probability
+                        + if ndenom > 0.0 {
+                            scaled_shrinkage * nj as f64 / ndenom
+                        } else {
+                            0.0
+                        },
+                )
             });
         if debug {
             let a = labels_and_log_weights
@@ -292,7 +298,7 @@ mod tests {
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
-            let parameters = SpParameters::new(
+            let parameters = Sp2Parameters::new(
                 target,
                 shrinkage,
                 permutation,
@@ -332,7 +338,7 @@ mod tests {
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
-            let parameters = SpParameters::new(
+            let parameters = Sp2Parameters::new(
                 target,
                 shrinkage,
                 permutation,
