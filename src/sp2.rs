@@ -215,8 +215,9 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
             println!("---- i = {}, item = {}", i + 1, item + 1);
         }
         let label_in_baseline = parameters.baseline_partition.get(item);
-        let scaled_shrinkage =
-            ((i + 1) as f64).powf(parameters.scaling_exponent) * parameters.shrinkage[item];
+        let scaled_shrinkage = parameters.shrinkage[item];
+        //let scaled_shrinkage =
+        //    ((i + 1) as f64).powf(parameters.scaling_exponent) * parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
