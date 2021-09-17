@@ -205,6 +205,11 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
 ) -> (Clustering, f64) {
     // In R: Sys.setenv("PUMPKIN_DEBUG"="TRUE")
     let debug = std::env::var("PUMPKIN_DEBUG").unwrap_or_default() == "TRUE";
+    let mapper = if std::env::var("PUMPKIN_SP2_EXP").unwrap_or_default() == "FALSE" {
+        |x: f64| (1.0 + x).ln()
+    } else {
+        |x: f64| x
+    };
     if debug {
         println!("#### on alternative shrinkage");
     }
@@ -242,7 +247,7 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
                     label,
                     log_probability
                         + if ndenom > 0.0 {
-                            scaled_shrinkage * nj as f64 / ndenom
+                            mapper(scaled_shrinkage * nj as f64 / ndenom)
                         } else {
                             0.0
                         },
