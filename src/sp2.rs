@@ -7,8 +7,6 @@ use crate::distr::{
 use crate::perm::Permutation;
 use crate::shrink::Shrinkage;
 
-use dahl_salso::log2cache::Log2Cache;
-use dahl_salso::LossFunction;
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 
@@ -18,9 +16,6 @@ pub struct Sp2Parameters<D: PredictiveProbabilityFunction + Clone> {
     shrinkage: Shrinkage,
     permutation: Permutation,
     baseline_ppf: D,
-    loss_function: LossFunction,
-    scaling_exponent: f64,
-    cache: Log2Cache,
 }
 
 impl<D: PredictiveProbabilityFunction + Clone> Sp2Parameters<D> {
@@ -29,35 +24,17 @@ impl<D: PredictiveProbabilityFunction + Clone> Sp2Parameters<D> {
         shrinkage: Shrinkage,
         permutation: Permutation,
         baseline_ppf: D,
-        use_vi: bool,
-        a: f64,
-        scaling_exponent: f64,
     ) -> Option<Self> {
         if (shrinkage.n_items() != baseline_partition.n_items())
             || (baseline_partition.n_items() != permutation.n_items())
         {
             None
         } else {
-            let cache = Log2Cache::new(if use_vi {
-                baseline_partition.n_items()
-            } else {
-                0
-            });
-            if a <= 0.0 {
-                return None;
-            }
-            let loss_function = match use_vi {
-                true => LossFunction::VI(a),
-                false => LossFunction::BinderDraws(a),
-            };
             Some(Self {
                 baseline_partition: baseline_partition.standardize(),
                 shrinkage,
                 permutation,
                 baseline_ppf,
-                loss_function,
-                scaling_exponent,
-                cache,
             })
         }
     }
@@ -144,59 +121,7 @@ fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     )
 }
 
-trait EngineFunctions {
-    fn multiplier(&self, i: usize) -> f64;
-    fn delta(&self, count: usize) -> f64;
-}
-
-struct Binder;
-impl EngineFunctions for Binder {
-    fn multiplier(&self, i: usize) -> f64 {
-        2.0 / (((i + 1) * (i + 1)) as f64)
-    }
-    fn delta(&self, count: usize) -> f64 {
-        count as f64
-    }
-}
-
-struct Vi;
-impl EngineFunctions for Vi {
-    fn multiplier(&self, i: usize) -> f64 {
-        1.0 / ((i + 1) as f64)
-    }
-    // Since this is a function on integers, we could cache these calculations for more computational efficiency.
-    fn delta(&self, count: usize) -> f64 {
-        if count == 0 {
-            0.0
-        } else {
-            let n1 = (count + 1) as f64;
-            let n0 = count as f64;
-            n1 * (n1.log2()) - n0 * (n0.log2())
-        }
-    }
-}
-
 fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a Sp2Parameters<D>,
-    clustering: Clustering,
-    counts: Vec<Vec<usize>>,
-    target: Option<&[usize]>,
-    rng: Option<&mut T>,
-) -> (Clustering, f64) {
-    match parameters.loss_function {
-        LossFunction::BinderDraws(a) => {
-            engine_core(Binder, a + 1.0, parameters, clustering, counts, target, rng)
-        }
-        LossFunction::VI(a) => {
-            engine_core(Vi, a + 1.0, parameters, clustering, counts, target, rng)
-        }
-        _ => panic!("Unsupported loss function."),
-    }
-}
-
-fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions, T: Rng>(
-    _functions: S,
-    _a_plus_one: f64,
     parameters: &'a Sp2Parameters<D>,
     mut clustering: Clustering,
     mut counts: Vec<Vec<usize>>,
@@ -221,8 +146,6 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
         }
         let label_in_baseline = parameters.baseline_partition.get(item);
         let scaled_shrinkage = parameters.shrinkage[item];
-        //let scaled_shrinkage =
-        //    ((i + 1) as f64).powf(parameters.scaling_exponent) * parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -304,16 +227,8 @@ mod tests {
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
-            let parameters = Sp2Parameters::new(
-                target,
-                shrinkage,
-                permutation,
-                baseline_distribution,
-                true,
-                1.0,
-                1.0,
-            )
-            .unwrap();
+            let parameters =
+                Sp2Parameters::new(target, shrinkage, permutation, baseline_distribution).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
@@ -344,16 +259,8 @@ mod tests {
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
-            let parameters = Sp2Parameters::new(
-                target,
-                shrinkage,
-                permutation,
-                baseline_distribution,
-                true,
-                1.0,
-                1.0,
-            )
-            .unwrap();
+            let parameters =
+                Sp2Parameters::new(target, shrinkage, permutation, baseline_distribution).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
