@@ -62,7 +62,10 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Sp2Parameters
         for i in self.permutation.n_items_before(item)..partial_clustering.n_items() {
             partial_clustering.remove(self.permutation.get(i));
         }
-        let mut counts = vec![vec![0_usize; 0]; self.baseline_partition.max_label() + 1];
+        let (mut counts_marginal, mut counts) = {
+            let m = self.baseline_partition.max_label() + 1;
+            (vec![0; m], vec![Vec::new(); m])
+        };
         let max_label = partial_clustering.max_label();
         if max_label >= counts[0].len() {
             expand_counts(&mut counts, partial_clustering.max_label() + 1)
@@ -71,6 +74,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Sp2Parameters
             let item = self.permutation.get(i);
             let label_in_baseline = self.baseline_partition.get(item);
             let label = target[item];
+            counts_marginal[label_in_baseline] += 1;
             counts[label_in_baseline][label] += 1;
         }
         candidate_labels
@@ -81,6 +85,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Sp2Parameters
                     engine::<D, Pcg64Mcg>(
                         self,
                         partial_clustering.clone(),
+                        counts_marginal.clone(),
                         counts.clone(),
                         Some(&target[..]),
                         None,
@@ -112,10 +117,12 @@ fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    let m = parameters.baseline_partition.max_label() + 1;
     engine(
         parameters,
         Clustering::unallocated(parameters.baseline_partition.n_items()),
-        vec![vec![0_usize; 0]; parameters.baseline_partition.max_label() + 1],
+        vec![0; m],
+        vec![Vec::new(); m],
         target,
         rng,
     )
@@ -124,28 +131,24 @@ fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
 fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &'a Sp2Parameters<D>,
     mut clustering: Clustering,
+    mut counts_marginal: Vec<usize>,
     mut counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    // In R: Sys.setenv("PUMPKIN_DEBUG"="TRUE")
-    let debug = std::env::var("PUMPKIN_DEBUG").unwrap_or_default() == "TRUE";
+    // Removing this mapper functionality could speed computations and, therefore, should be removed
+    // once the formulation is finalized.
+    // In R: Sys.setenv("PUMPKIN_SP2_EXP"="FALSE")
     let mapper = if std::env::var("PUMPKIN_SP2_EXP").unwrap_or_default() == "FALSE" {
         |x: f64| (1.0 + x).ln()
     } else {
         |x: f64| x
     };
-    if debug {
-        println!("#### on alternative shrinkage");
-    }
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
-        if debug {
-            println!("---- i = {}, item = {}", i + 1, item + 1);
-        }
         let label_in_baseline = parameters.baseline_partition.get(item);
-        let scaled_shrinkage = parameters.shrinkage[item];
+        let shrinkage = parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -153,37 +156,23 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
         if max_candidate_label >= counts[label_in_baseline].len() {
             expand_counts(&mut counts, max_candidate_label + 1)
         }
-        let ndenom = counts[label_in_baseline].iter().sum::<usize>() as f64;
+        let n_marginal = counts_marginal[label_in_baseline] as f64;
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
-                let nj = counts[label_in_baseline][label];
-                if debug {
-                    println!(
-                        "label {}: {} {} {} {}",
-                        label, log_probability, scaled_shrinkage, nj, ndenom
-                    );
-                }
+                let n_joint = counts[label_in_baseline][label] as f64;
                 (
                     label,
                     log_probability
-                        + if ndenom > 0.0 {
-                            mapper(scaled_shrinkage * nj as f64 / ndenom)
+                        + if n_marginal > 0.0 {
+                            mapper(shrinkage * n_joint / n_marginal)
                         } else {
                             0.0
                         },
                 )
             });
-        if debug {
-            let a = labels_and_log_weights
-                .clone()
-                .map(|x| format!("{} => {}", x.0, x.1.exp()))
-                .collect::<Vec<_>>()
-                .join(", ");
-            println!("{}", a);
-        }
         let (label, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
             None => clustering.select::<Pcg64Mcg, _>(
@@ -196,10 +185,8 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
         };
         log_probability += log_probability_contribution;
         clustering.allocate(item, label);
+        counts_marginal[label_in_baseline] += 1;
         counts[label_in_baseline][label] += 1;
-        if debug {
-            println!("clustering: {}", clustering)
-        }
     }
     (clustering, log_probability)
 }
