@@ -136,6 +136,7 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    // println!("---");
     // Removing this mapper functionality could speed computations and, therefore, should be removed
     // once the formulation is finalized.
     // In R: Sys.setenv("PUMPKIN_SP2_EXP"="FALSE")
@@ -146,6 +147,7 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     };
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
+        // println!("clustering = {} {:?}", clustering, clustering);
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
         let shrinkage = parameters.shrinkage[item];
@@ -163,15 +165,21 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .into_iter()
             .map(|(label, log_probability)| {
                 let n_joint = counts[label_in_baseline][label] as f64;
-                (
-                    label,
-                    log_probability
-                        + if n_marginal > 0.0 {
-                            mapper(shrinkage * n_joint / n_marginal)
+                let lp = log_probability
+                    + if n_joint > 0.0 {
+                        mapper(shrinkage * n_joint / n_marginal)
+                    } else {
+                        if n_marginal == 0.0 && clustering.size_of(label) == 0 {
+                            mapper(shrinkage)
                         } else {
                             0.0
-                        },
-                )
+                        }
+                    };
+                // println!(
+                //      "i = {}, item = {}, label = {}, label_in_baseline = {}, n_joint = {}, n_marginal = {}, lp = {}",
+                //      i, item, label, label_in_baseline, n_joint, n_marginal, lp
+                // );
+                (label, lp)
             });
         let (label, log_probability_contribution) = match &mut rng {
             Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
