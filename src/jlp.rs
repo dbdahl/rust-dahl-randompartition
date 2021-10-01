@@ -13,7 +13,7 @@ use rand::Rng;
 pub struct JlpParameters {
     n_items: usize,
     mass: Mass,
-    permutation: Permutation,
+    pub permutation: Permutation,
 }
 
 impl JlpParameters {
@@ -27,10 +27,6 @@ impl JlpParameters {
                 permutation,
             })
         }
-    }
-
-    pub fn shuffle_permutation<T: Rng>(&mut self, rng: &mut T) {
-        self.permutation.shuffle(rng);
     }
 }
 

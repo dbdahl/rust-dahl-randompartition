@@ -6,16 +6,14 @@ use crate::perm::Permutation;
 use crate::prelude::*;
 
 use rand::prelude::*;
-use rand_distr::Beta;
 use rand_pcg::Pcg64Mcg;
 
 #[derive(Debug, Clone)]
 pub struct LspParameters {
     baseline_partition: Clustering,
-    scale: Scale,
-    rate: Rate,
-    mass: Mass,
-    permutation: Permutation,
+    pub rate: Rate,
+    pub mass: Mass,
+    pub permutation: Permutation,
 }
 
 impl LspParameters {
@@ -30,13 +28,13 @@ impl LspParameters {
         } else {
             Some(Self {
                 baseline_partition: baseline,
-                scale,
                 rate: Rate::new(1.0 / scale.unwrap()),
                 mass,
                 permutation,
             })
         }
     }
+
     pub fn new_with_rate(
         baseline: Clustering,
         rate: Rate,
@@ -48,22 +46,11 @@ impl LspParameters {
         } else {
             Some(Self {
                 baseline_partition: baseline,
-                scale: Scale::new(1.0 / rate.unwrap()),
                 rate,
                 mass,
                 permutation,
             })
         }
-    }
-
-    pub fn shuffle_permutation<T: Rng>(&mut self, rng: &mut T) {
-        self.permutation.shuffle(rng);
-    }
-
-    pub fn resample_rate<T: Rng>(&mut self, max: f64, shape1: f64, shape2: f64, rng: &mut T) {
-        let beta = Beta::new(shape1, shape2).unwrap();
-        self.rate = Rate::new(max * beta.sample(rng));
-        self.scale = Scale::new(1.0 / self.rate.unwrap());
     }
 }
 

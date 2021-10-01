@@ -12,8 +12,8 @@ use rand_pcg::Pcg64Mcg;
 #[derive(Debug, Clone)]
 pub struct FrpParameters {
     baseline_partition: Clustering,
-    shrinkage: Shrinkage,
-    permutation: Permutation,
+    pub shrinkage: Shrinkage,
+    pub permutation: Permutation,
     mass: Mass,
     discount: Discount,
     power: Power,
@@ -42,15 +42,6 @@ impl FrpParameters {
                 power,
             })
         }
-    }
-
-    pub fn shuffle_permutation<T: Rng>(&mut self, rng: &mut T) {
-        self.permutation.shuffle(rng);
-    }
-
-    pub fn resample_shrinkage<T: Rng>(&mut self, max: f64, shape1: f64, shape2: f64, rng: &mut T) {
-        self.shrinkage =
-            Shrinkage::constant_random(self.shrinkage.n_items(), max, shape1, shape2, rng);
     }
 }
 

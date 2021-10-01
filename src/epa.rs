@@ -14,9 +14,9 @@ type SimilarityBorrower<'a> = SquareMatrixBorrower<'a>;
 #[derive(Debug, Clone)]
 pub struct EpaParameters<'a> {
     similarity: SimilarityBorrower<'a>,
-    permutation: Permutation,
-    mass: Mass,
-    discount: Discount,
+    pub permutation: Permutation,
+    pub mass: Mass,
+    pub discount: Discount,
 }
 
 impl<'a> EpaParameters<'a> {
@@ -36,10 +36,6 @@ impl<'a> EpaParameters<'a> {
                 discount,
             })
         }
-    }
-
-    pub fn shuffle_permutation<T: Rng>(&mut self, rng: &mut T) {
-        self.permutation.shuffle(rng);
     }
 }
 
