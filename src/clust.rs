@@ -352,12 +352,15 @@ impl Clustering {
     pub fn items_of(&self, label: usize) -> Vec<usize> {
         let size = self.size_of(label);
         let mut items = Vec::with_capacity(size);
-        let mut i = 0;
-        while items.len() != size {
-            if self.allocation[i] == label {
-                items.push(i);
+        if size > 0 {
+            for (i, k) in self.allocation.iter().enumerate() {
+                if *k == label {
+                    items.push(i);
+                    if items.len() == size {
+                        break;
+                    }
+                }
             }
-            i += 1;
         }
         items
     }
@@ -365,12 +368,15 @@ impl Clustering {
     pub fn items_of_without(&self, label: usize, item: usize) -> Vec<usize> {
         let size = self.size_of_without(label, item);
         let mut items = Vec::with_capacity(size);
-        let mut i = 0;
-        while items.len() != size {
-            if i != item && self.allocation[i] == label {
-                items.push(i);
+        if size > 0 {
+            for (i, k) in self.allocation.iter().enumerate() {
+                if i != item && *k == label {
+                    items.push(i);
+                    if items.len() == size {
+                        break;
+                    }
+                }
             }
-            i += 1;
         }
         items
     }

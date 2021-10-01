@@ -12,7 +12,7 @@ use rand_pcg::Pcg64Mcg;
 
 #[derive(Debug, Clone)]
 pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
-    baseline_partition: Clustering,
+    pub baseline_partition: Clustering,
     pub shrinkage: Shrinkage,
     pub permutation: Permutation,
     baseline_ppf: D,
