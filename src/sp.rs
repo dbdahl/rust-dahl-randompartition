@@ -1,4 +1,4 @@
-// Alternative shrinkage partition distribution
+// Shrinkage partition distribution
 
 use crate::clust::Clustering;
 use crate::distr::{
@@ -127,21 +127,8 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    if std::env::var("PUMPKIN_SP_ADDITIVE").unwrap_or_default() == "TRUE" {
-        return engine2(parameters, clustering, counts_marginal, counts, target, rng);
-    }
-    // println!("---");
-    // Removing this mapper functionality could speed computations and, therefore, should be removed
-    // once the formulation is finalized.
-    // In R: Sys.setenv("PUMPKIN_SP2_EXP"="FALSE")
-    let mapper = if std::env::var("PUMPKIN_SP2_EXP").unwrap_or_default() == "FALSE" {
-        |x: f64| (1.0 + x).ln()
-    } else {
-        |x: f64| x
-    };
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
-        // println!("clustering = {} {:?}", clustering, clustering);
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
         let shrinkage = parameters.shrinkage[item];
@@ -153,6 +140,7 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
             expand_counts(&mut counts, max_candidate_label + 1)
         }
         let n_marginal = counts_marginal[label_in_baseline] as f64;
+        let multiplier = shrinkage / n_marginal;
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
@@ -161,18 +149,14 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
                 let n_joint = counts[label_in_baseline][label] as f64;
                 let lp = log_probability
                     + if n_joint > 0.0 {
-                        mapper(shrinkage * n_joint / n_marginal)
+                        multiplier * n_joint
                     } else {
                         if n_marginal == 0.0 && clustering.size_of(label) == 0 {
-                            mapper(shrinkage)
+                            shrinkage
                         } else {
                             0.0
                         }
                     };
-                // println!(
-                //      "i = {}, item = {}, label = {}, label_in_baseline = {}, n_joint = {}, n_marginal = {}, lp = {}",
-                //      i, item, label, label_in_baseline, n_joint, n_marginal, lp
-                // );
                 (label, lp)
             });
         let (label, log_probability_contribution) = match &mut rng {
@@ -180,75 +164,6 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
             None => clustering.select::<Pcg64Mcg, _>(
                 labels_and_log_weights,
                 true,
-                target.unwrap()[item],
-                None,
-                true,
-            ),
-        };
-        log_probability += log_probability_contribution;
-        clustering.allocate(item, label);
-        counts_marginal[label_in_baseline] += 1;
-        counts[label_in_baseline][label] += 1;
-    }
-    (clustering, log_probability)
-}
-
-fn engine2<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a SpParameters<D>,
-    mut clustering: Clustering,
-    mut counts_marginal: Vec<usize>,
-    mut counts: Vec<Vec<usize>>,
-    target: Option<&[usize]>,
-    mut rng: Option<&mut T>,
-) -> (Clustering, f64) {
-    let mut log_probability = 0.0;
-    for i in clustering.n_items_allocated()..clustering.n_items() {
-        // println!("clustering = {} {:?}", clustering, clustering);
-        let item = parameters.permutation.get(i);
-        let label_in_baseline = parameters.baseline_partition.get(item);
-        let shrinkage = parameters.shrinkage[item];
-        let candidate_labels: Vec<usize> = clustering
-            .available_labels_for_allocation_with_target(target, item)
-            .collect();
-        let max_candidate_label = *candidate_labels.iter().max().unwrap();
-        if max_candidate_label >= counts[label_in_baseline].len() {
-            expand_counts(&mut counts, max_candidate_label + 1)
-        }
-        let n_marginal = counts_marginal[label_in_baseline] as f64;
-        let labels_and_log_weights =
-            parameters
-                .baseline_ppf
-                .log_predictive_weight(item, &candidate_labels, &clustering);
-        let log_sum = labels_and_log_weights
-            .iter()
-            .fold(0.0, |sum, x| sum + x.1.exp())
-            .ln();
-        let labels_and_weights =
-            labels_and_log_weights
-                .into_iter()
-                .map(|(label, log_probability)| {
-                    let n_joint = counts[label_in_baseline][label] as f64;
-                    let p = (log_probability - log_sum).exp()
-                        + if n_joint > 0.0 {
-                            shrinkage * n_joint / n_marginal
-                        } else {
-                            if n_marginal == 0.0 && clustering.size_of(label) == 0 {
-                                shrinkage
-                            } else {
-                                0.0
-                            }
-                        };
-                    // println!(
-                    //      "i = {}, item = {}, label = {}, label_in_baseline = {}, n_joint = {}, n_marginal = {}, lp = {}",
-                    //      i, item, label, label_in_baseline, n_joint, n_marginal, lp
-                    // );
-                    (label, p)
-                });
-        let (label, log_probability_contribution) = match &mut rng {
-            Some(r) => clustering.select(labels_and_weights, false, 0, Some(r), true),
-            None => clustering.select::<Pcg64Mcg, _>(
-                labels_and_weights,
-                false,
                 target.unwrap()[item],
                 None,
                 true,
