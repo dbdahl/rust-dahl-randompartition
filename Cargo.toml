@@ -13,9 +13,9 @@ rand_pcg = "0.3.0"
 rand_distr = "0.4.2"
 statrs = "0.15.0"
 
-dahl-bellnumber = { git="https://dahl-git.byu.edu/dahl/rust-dahl-bellnumber.git" }
+dahl-bellnumber = { git="https://github.com/dbdahl/rust-dahl-bellnumber.git" }
 # dahl-bellnumber = { path="/home/dahl/docs/devel/rust-dahl-bellnumber" }
 
-dahl-salso = "0.6.1"
-# dahl-salso = { git="https://dahl-git.byu.edu/dahl/rust-dahl-salso.git" }
+dahl-salso = "0.6.6"
+# dahl-salso = { git="https://github.com/dbdahl/rust-dahl-salso.git" }
 # dahl-salso = { path="/home/dahl/docs/devel/rust-dahl-salso" }
