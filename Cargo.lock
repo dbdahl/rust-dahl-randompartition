@@ -4,15 +4,6 @@ version = 3
 
 [[package]]
 name = "approx"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f2a05fd1bd10b2527e20a2cd32d8873d115b8b39fe219ee25f42a8aca6ba278"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
-name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6"
@@ -103,9 +94,9 @@ dependencies = [
 [[package]]
 name = "dahl-bellnumber"
 version = "0.1.1"
-source = "git+https://github.com/dbdahl/rust-dahl-bellnumber.git#941c6d28a545f8fb2d8ef4b645112364d154cfdb"
+source = "git+https://github.com/dbdahl/rust-dahl-bellnumber.git?rev=b521e67#b521e6713a32ae6ab747c8a7793e1d167bd982b8"
 dependencies = [
- "approx 0.4.0",
+ "approx",
  "num-bigint",
  "num-rational",
  "num-traits",
@@ -114,8 +105,7 @@ dependencies = [
 [[package]]
 name = "dahl-partition"
 version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f2ca91d981db9f4eef7af48c567f9e53b298503a20e19a03a06c61252f0c012"
+source = "git+https://github.com/dbdahl/rust-dahl-partition.git?rev=419ac7d#419ac7db6f2a6309fccbd2b26008a5e8b3a48444"
 dependencies = [
  "rand",
 ]
@@ -135,10 +125,9 @@ dependencies = [
 [[package]]
 name = "dahl-salso"
 version = "0.6.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1a74eff0c9a790c65e319c0565dc0d184bf69f4f6ef8209df4c7d2777fd0755"
+source = "git+https://github.com/dbdahl/rust-dahl-salso.git?rev=b438a37#b438a37d503e3f6dc75fa92a76d5527357e9a065"
 dependencies = [
- "approx 0.5.1",
+ "approx",
  "crossbeam",
  "dahl-partition",
  "ndarray",
@@ -149,9 +138,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
+checksum = "d39cd93900197114fa1fcb7ae84ca742095eed9442088988ae74fa744e930e77"
 dependencies = [
  "cfg-if",
  "libc",
@@ -209,7 +198,7 @@ version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "462fffe4002f4f2e1f6a9dcf12cc1a6fc0e15989014efc02a941d3e0f5dc2120"
 dependencies = [
- "approx 0.5.1",
+ "approx",
  "matrixmultiply",
  "nalgebra-macros",
  "num-complex",
@@ -404,7 +393,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e82063457853d00243beda9952e910b82593e4b07ae9f721b9278a99a0d3d5c"
 dependencies = [
- "approx 0.5.1",
+ "approx",
  "num-complex",
  "num-traits",
  "paste",
@@ -416,7 +405,7 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05bdbb8e4e78216a85785a85d3ec3183144f98d0097b9281802c019bb07a6f05"
 dependencies = [
- "approx 0.5.1",
+ "approx",
  "lazy_static",
  "nalgebra",
  "num-traits",
