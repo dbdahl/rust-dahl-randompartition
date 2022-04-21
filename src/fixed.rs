@@ -1,7 +1,7 @@
 // Fixed partition
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, ProbabilityMassFunction};
+use crate::distr::{PartitionSampler, ProbabilityMassFunction, FullConditional};
 
 use rand::Rng;
 
@@ -35,5 +35,22 @@ impl ProbabilityMassFunction for FixedPartitionParameters {
 
     fn is_normalized(&self) -> bool {
         true
+    }
+}
+
+impl FullConditional for FixedPartitionParameters {
+    fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
+        let current_label = clustering.get(item);
+        clustering
+            .available_labels_for_reallocation(item)
+            .map(|label| {
+                let value = if label == current_label {
+                    0.0
+                } else {
+                    f64::NEG_INFINITY
+                };
+                (label, value)
+            })
+            .collect()
     }
 }
