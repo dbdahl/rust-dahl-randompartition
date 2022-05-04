@@ -483,6 +483,9 @@ pub trait UnitIncrementor {
 impl UnitIncrementor for i32 {
     #[inline]
     fn next(x: &mut i32) {
+        if *x == i32::MAX {
+            panic!("Overflow!");
+        }
         *x += 1
     }
 }
@@ -490,6 +493,19 @@ impl UnitIncrementor for i32 {
 impl UnitIncrementor for u16 {
     #[inline]
     fn next(x: &mut u16) {
+        if *x == u16::MAX {
+            panic!("Overflow!");
+        }
+        *x += 1
+    }
+}
+
+impl UnitIncrementor for u8 {
+    #[inline]
+    fn next(x: &mut u8) {
+        if *x == u8::MAX {
+            panic!("Overflow!");
+        }
         *x += 1
     }
 }
