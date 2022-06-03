@@ -200,7 +200,7 @@ pub fn engine<T: Rng>(
         let kt = ((i as f64) - discount * qt)
             / parameters
                 .similarity
-                .sum_of_row_subset(ii, parameters.permutation.slice_until(i));
+                .sum_of_row_subset(ii, parameters.permutation.as_slice_until(i));
         let labels_and_weights = clustering
             .available_labels_for_allocation_with_target(target, ii)
             .map(|label| {

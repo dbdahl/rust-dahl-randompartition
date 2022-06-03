@@ -10,18 +10,25 @@ pub struct Permutation {
 }
 
 impl Permutation {
-    pub fn from_slice(x: &[usize]) -> Option<Self> {
-        let mut y = Vec::from(x);
-        y.sort_unstable();
-        if y.iter().enumerate().all(|(i, x)| *x == i) {
-            Some(Self {
-                x: Vec::from(x),
-                n_items: y.len(),
-                natural_and_fixed: false,
-            })
-        } else {
-            None
+    pub fn from_slice<T: Copy + Ord + TryInto<usize>>(x: &[T]) -> Option<Self> {
+        let mut y: Vec<usize> = Vec::with_capacity(x.len());
+        for &xx in x {
+            match xx.try_into() {
+                Ok(xxx) => y.push(xxx),
+                Err(_) => return None
+            }
         }
+        let mut copy = y.clone();
+        copy.sort_unstable();
+        if copy.into_iter().enumerate().any(|(i, x)| x != i) {
+            return None
+        }
+        let n_items = y.len();
+        Some(Self {
+            x: y,
+            n_items,
+            natural_and_fixed: false
+        })
     }
 
     pub fn from_vector(x: Vec<usize>) -> Option<Self> {
@@ -91,7 +98,15 @@ impl Permutation {
         }
     }
 
-    pub fn slice_until(&self, end: usize) -> &[usize] {
+    pub fn as_slice(&self) -> &[usize] {
+        if self.natural_and_fixed {
+            panic!("Not supported.");
+        } else {
+            &self.x[..]
+        }
+    }
+
+    pub fn as_slice_until(&self, end: usize) -> &[usize] {
         if self.natural_and_fixed {
             panic!("Not supported.");
         } else {
@@ -99,11 +114,12 @@ impl Permutation {
         }
     }
 
-    pub fn slice_from(&self, start: usize) -> &[usize] {
+    pub fn as_slice_from(&self, start: usize) -> &[usize] {
         if self.natural_and_fixed {
             panic!("Not supported");
         } else {
             &self.x[start..]
         }
     }
+
 }
