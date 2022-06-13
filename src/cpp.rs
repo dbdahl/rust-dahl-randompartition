@@ -9,6 +9,7 @@ use dahl_salso::clustering::WorkingClustering;
 use dahl_salso::log2cache::Log2Cache;
 use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputer};
 
+#[derive(Debug, Clone)]
 pub struct CppParameters<D: ProbabilityMassFunction> {
     baseline_partition: Clustering,
     rate: Rate,

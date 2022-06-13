@@ -40,40 +40,6 @@ pub fn update_neal_algorithm8<T, U, V>(
     mut state: Clustering,
     permutation: &Permutation,
     prior: &T,
-    log_likelihood_contribution_fn: &U,
-    rng: &mut V,
-) -> Clustering
-where
-    T: FullConditional,
-    U: Fn(usize, usize, bool) -> f64,
-    V: Rng,
-{
-    for _ in 0..n_updates {
-        for i in 0..state.n_items() {
-            let ii = permutation.get(i);
-            let labels_and_log_weights =
-                prior
-                    .log_full_conditional(ii, &state)
-                    .into_iter()
-                    .map(|(label, log_prior)| {
-                        (
-                            label,
-                            log_likelihood_contribution_fn(ii, label, state.size_of(label) == 0)
-                                + log_prior,
-                        )
-                    });
-            let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
-            state.allocate(ii, pair.0);
-        }
-    }
-    state
-}
-
-pub fn update_neal_algorithm8_v2<T, U, V>(
-    n_updates: u32,
-    mut state: Clustering,
-    permutation: &Permutation,
-    prior: &T,
     log_likelihood_contribution_fn: &mut U,
     rng: &mut V,
 ) -> Clustering
