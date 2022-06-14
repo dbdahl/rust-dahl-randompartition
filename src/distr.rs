@@ -48,6 +48,12 @@ pub trait FullConditional {
 
 //
 
+pub trait HyperparameterUpdater {
+    fn update(&mut self);
+}
+
+//
+
 pub trait PartitionSampler {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering;
 }

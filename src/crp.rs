@@ -1,10 +1,7 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{
-    FullConditional, PartitionConditionalSampler, PartitionSampler, PredictiveProbabilityFunction,
-    ProbabilityMassFunction,
-};
+use crate::distr::{FullConditional, HyperparameterUpdater, PartitionConditionalSampler, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction};
 use crate::perm::Permutation;
 use crate::prelude::*;
 
@@ -75,6 +72,12 @@ impl FullConditional for CrpParameters {
                 (label, value)
             })
             .collect()
+    }
+}
+
+impl HyperparameterUpdater for CrpParameters {
+    fn update(&mut self) {
+
     }
 }
 
