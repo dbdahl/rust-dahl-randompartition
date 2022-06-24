@@ -6,12 +6,12 @@ use rand::prelude::*;
 
 pub fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
-    mut state: Clustering,
+    state: &mut Clustering,
     permutation: &Permutation,
     prior: &T,
     log_posterior_predictive: &U,
     rng: &mut V,
-) -> Clustering
+)
 where
     T: FullConditional,
     U: Fn(usize, &[usize]) -> f64,
@@ -32,17 +32,16 @@ where
             state.allocate(ii, pair.0);
         }
     }
-    state
 }
 
 pub fn update_neal_algorithm8<T, U, V>(
     n_updates: u32,
-    mut state: Clustering,
+    state: &mut Clustering,
     permutation: &Permutation,
     prior: &T,
     log_likelihood_contribution_fn: &mut U,
     rng: &mut V,
-) -> Clustering
+)
     where
         T: FullConditional,
         U: FnMut(usize, usize, bool) -> f64,
@@ -66,7 +65,36 @@ pub fn update_neal_algorithm8<T, U, V>(
             state.allocate(ii, pair.0);
         }
     }
-    state
+}
+
+pub fn update_neal_algorithm_full<T, U, V>(
+    n_updates: u32,
+    state: &mut Clustering,
+    permutation: &Permutation,
+    prior: &T,
+    log_likelihood_contribution_fn: &mut U,
+    rng: &mut V,
+)
+    where
+        T: FullConditional,
+        U: FnMut(&Clustering) -> f64,
+        V: Rng,
+{
+    for _ in 0..n_updates {
+        for i in 0..state.n_items() {
+            let ii = permutation.get(i);
+            let labels_and_log_weights =
+                prior
+                    .log_full_conditional(ii, &state)
+                    .into_iter()
+                    .map(|(label, log_prior)| {
+                        state.allocate(ii, label);
+                        (label, log_likelihood_contribution_fn(&state) + log_prior)
+                    }).collect::<Vec<_>>().into_iter();
+            let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
+            state.allocate(ii, pair.0);
+        }
+    }
 }
 
 fn make_posterior<'a, T: 'a, U: 'a>(log_prior: T, log_likelihood: U) -> impl Fn(&Clustering) -> f64
@@ -99,9 +127,9 @@ mod tests_mcmc {
         let mut sum = 0;
         let n_samples = 10000;
         for _ in 0..n_samples {
-            current = update_neal_algorithm3(
+            update_neal_algorithm3(
                 2,
-                current,
+                &mut current,
                 &permutation,
                 &neal_functions,
                 &log_posterior_predictive,
