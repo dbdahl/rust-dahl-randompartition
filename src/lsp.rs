@@ -1,7 +1,10 @@
 // Location scale partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::{FullConditional, PartitionSampler, ProbabilityMassFunction};
+use crate::distr::{
+    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, PartitionSampler,
+    ProbabilityMassFunction,
+};
 use crate::perm::Permutation;
 use crate::prelude::*;
 
@@ -81,8 +84,16 @@ impl ProbabilityMassFunction for LspParameters {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine::<Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
-    fn is_normalized(&self) -> bool {
-        true
+}
+
+impl NormalizedProbabilityMassFunction for LspParameters {}
+
+impl HasPermutation for LspParameters {
+    fn permutation(&self) -> &Permutation {
+        &self.permutation
+    }
+    fn permutation_mut(&mut self) -> &mut Permutation {
+        &mut self.permutation
     }
 }
 

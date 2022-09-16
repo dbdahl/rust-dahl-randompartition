@@ -1,5 +1,7 @@
 use crate::clust::Clustering;
-use crate::distr::FullConditional;
+use crate::distr::{
+    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, ProbabilityMassFunction,
+};
 use crate::perm::Permutation;
 
 use rand::prelude::*;
@@ -11,8 +13,7 @@ pub fn update_neal_algorithm3<T, U, V>(
     prior: &T,
     log_posterior_predictive: &U,
     rng: &mut V,
-)
-where
+) where
     T: FullConditional,
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
@@ -41,11 +42,10 @@ pub fn update_neal_algorithm8<T, U, V>(
     prior: &T,
     log_likelihood_contribution_fn: &mut U,
     rng: &mut V,
-)
-    where
-        T: FullConditional,
-        U: FnMut(usize, usize, bool) -> f64,
-        V: Rng,
+) where
+    T: FullConditional,
+    U: FnMut(usize, usize, bool) -> f64,
+    V: Rng,
 {
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
@@ -74,25 +74,53 @@ pub fn update_neal_algorithm_full<T, U, V>(
     prior: &T,
     log_likelihood_contribution_fn: &mut U,
     rng: &mut V,
-)
-    where
-        T: FullConditional,
-        U: FnMut(&Clustering) -> f64,
-        V: Rng,
+) where
+    T: FullConditional,
+    U: FnMut(&Clustering) -> f64,
+    V: Rng,
 {
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
-            let labels_and_log_weights =
-                prior
-                    .log_full_conditional(ii, &state)
-                    .into_iter()
-                    .map(|(label, log_prior)| {
-                        state.allocate(ii, label);
-                        (label, log_likelihood_contribution_fn(&state) + log_prior)
-                    }).collect::<Vec<_>>().into_iter();
+            let labels_and_log_weights = prior
+                .log_full_conditional(ii, &state)
+                .into_iter()
+                .map(|(label, log_prior)| {
+                    state.allocate(ii, label);
+                    (label, log_likelihood_contribution_fn(&state) + log_prior)
+                })
+                .collect::<Vec<_>>()
+                .into_iter();
             let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
             state.allocate(ii, pair.0);
+        }
+    }
+}
+
+pub fn update_permutation<T, V>(
+    n_updates: u32,
+    prior: &mut T,
+    n_items_per_update: u32,
+    clustering: &Clustering,
+    rng: &mut V,
+) where
+    T: ProbabilityMassFunction + HasPermutation + NormalizedProbabilityMassFunction,
+    V: Rng,
+{
+    let n_items_per_update = n_items_per_update.try_into().unwrap();
+    let mut log_pmf_current = prior.log_pmf(clustering);
+    for _ in 0..n_updates {
+        prior
+            .permutation_mut()
+            .partial_shuffle(n_items_per_update, rng);
+        let log_pmf_proposal = prior.log_pmf(clustering);
+        let log_hastings_ratio = log_pmf_proposal - log_pmf_current;
+        if 0.0 <= log_hastings_ratio || rng.gen_range(0.0..1.0_f64).ln() < log_hastings_ratio {
+            log_pmf_current = log_pmf_proposal;
+        } else {
+            prior
+                .permutation_mut()
+                .partial_shuffle_undo(n_items_per_update);
         }
     }
 }

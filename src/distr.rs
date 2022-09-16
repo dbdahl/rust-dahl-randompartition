@@ -48,8 +48,9 @@ pub trait FullConditional {
 
 //
 
-pub trait HyperparameterUpdater {
-    fn update(&mut self);
+pub trait HasPermutation {
+    fn permutation(&self) -> &Permutation;
+    fn permutation_mut(&mut self) -> &mut Permutation;
 }
 
 //
@@ -94,9 +95,10 @@ pub(crate) fn default_partition_conditional_sampler_sample<
 
 //
 
+pub trait NormalizedProbabilityMassFunction {}
+
 pub trait ProbabilityMassFunction {
     fn log_pmf(&self, clustering: &Clustering) -> f64;
-    fn is_normalized(&self) -> bool;
 }
 
 pub(crate) fn default_probability_mass_function_log_pmf<T: PredictiveProbabilityFunction>(

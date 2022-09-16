@@ -1,7 +1,10 @@
 // Chinese restaurant process
 
 use crate::clust::Clustering;
-use crate::distr::{FullConditional, HyperparameterUpdater, PartitionConditionalSampler, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction};
+use crate::distr::{
+    FullConditional, NormalizedProbabilityMassFunction, PartitionConditionalSampler,
+    PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+};
 use crate::perm::Permutation;
 use crate::prelude::*;
 
@@ -75,12 +78,6 @@ impl FullConditional for CrpParameters {
     }
 }
 
-impl HyperparameterUpdater for CrpParameters {
-    fn update(&mut self) {
-
-    }
-}
-
 impl PartitionSampler for CrpParameters {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         crate::distr::default_partition_sampler_sample(
@@ -133,11 +130,9 @@ impl ProbabilityMassFunction for CrpParameters {
         }
         result
     }
-
-    fn is_normalized(&self) -> bool {
-        true
-    }
 }
+
+impl NormalizedProbabilityMassFunction for CrpParameters {}
 
 #[cfg(test)]
 mod tests {

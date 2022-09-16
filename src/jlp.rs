@@ -2,7 +2,8 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, PartitionSampler,
+    PredictiveProbabilityFunction, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
 use crate::prelude::Mass;
@@ -82,10 +83,18 @@ impl ProbabilityMassFunction for JlpParameters {
     fn log_pmf(&self, clustering: &Clustering) -> f64 {
         crate::distr::default_probability_mass_function_log_pmf(self, &self.permutation, clustering)
     }
-    fn is_normalized(&self) -> bool {
-        true
+}
+
+impl HasPermutation for JlpParameters {
+    fn permutation(&self) -> &Permutation {
+        &self.permutation
+    }
+    fn permutation_mut(&mut self) -> &mut Permutation {
+        &mut self.permutation
     }
 }
+
+impl NormalizedProbabilityMassFunction for JlpParameters {}
 
 mod tests {
     #[allow(unused_imports)]

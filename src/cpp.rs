@@ -65,9 +65,6 @@ impl<D: ProbabilityMassFunction> ProbabilityMassFunction for CppParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         log_pmf(partition, self)
     }
-    fn is_normalized(&self) -> bool {
-        false
-    }
 }
 
 fn log_pmf<D: ProbabilityMassFunction>(target: &Clustering, parameters: &CppParameters<D>) -> f64 {

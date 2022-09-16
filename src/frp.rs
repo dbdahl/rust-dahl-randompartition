@@ -1,7 +1,10 @@
 // Focal random partition distribution
 
 use crate::clust::Clustering;
-use crate::distr::{FullConditional, PartitionSampler, ProbabilityMassFunction};
+use crate::distr::{
+    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, PartitionSampler,
+    ProbabilityMassFunction,
+};
 use crate::perm::Permutation;
 use crate::prelude::*;
 use crate::shrink::Shrinkage;
@@ -72,8 +75,16 @@ impl ProbabilityMassFunction for FrpParameters {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine::<Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
-    fn is_normalized(&self) -> bool {
-        true
+}
+
+impl NormalizedProbabilityMassFunction for FrpParameters {}
+
+impl HasPermutation for FrpParameters {
+    fn permutation(&self) -> &Permutation {
+        &self.permutation
+    }
+    fn permutation_mut(&mut self) -> &mut Permutation {
+        &mut self.permutation
     }
 }
 

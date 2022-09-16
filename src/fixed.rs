@@ -1,7 +1,9 @@
 // Fixed partition
 
 use crate::clust::Clustering;
-use crate::distr::{PartitionSampler, ProbabilityMassFunction, FullConditional};
+use crate::distr::{
+    FullConditional, NormalizedProbabilityMassFunction, PartitionSampler, ProbabilityMassFunction,
+};
 
 use rand::Rng;
 
@@ -32,11 +34,9 @@ impl ProbabilityMassFunction for FixedPartitionParameters {
             f64::NEG_INFINITY
         }
     }
-
-    fn is_normalized(&self) -> bool {
-        true
-    }
 }
+
+impl NormalizedProbabilityMassFunction for FixedPartitionParameters {}
 
 impl FullConditional for FixedPartitionParameters {
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {

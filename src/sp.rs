@@ -2,7 +2,8 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, PartitionSampler,
+    PredictiveProbabilityFunction, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
 use crate::shrink::Shrinkage;
@@ -98,8 +99,19 @@ impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpPar
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
-    fn is_normalized(&self) -> bool {
-        true
+}
+
+impl<D: PredictiveProbabilityFunction + Clone> NormalizedProbabilityMassFunction
+    for SpParameters<D>
+{
+}
+
+impl<D: PredictiveProbabilityFunction + Clone> HasPermutation for SpParameters<D> {
+    fn permutation(&self) -> &Permutation {
+        &self.permutation
+    }
+    fn permutation_mut(&mut self) -> &mut Permutation {
+        &mut self.permutation
     }
 }
 

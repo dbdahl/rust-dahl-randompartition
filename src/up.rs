@@ -2,7 +2,8 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+    FullConditional, NormalizedProbabilityMassFunction, PartitionSampler,
+    PredictiveProbabilityFunction, ProbabilityMassFunction,
 };
 
 use crate::perm::Permutation;
@@ -82,10 +83,9 @@ impl ProbabilityMassFunction for UpParameters {
     fn log_pmf(&self, _partition: &Clustering) -> f64 {
         -self.cache.lbell(self.n_items)
     }
-    fn is_normalized(&self) -> bool {
-        true
-    }
 }
+
+impl NormalizedProbabilityMassFunction for UpParameters {}
 
 #[cfg(test)]
 mod tests {
