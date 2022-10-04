@@ -103,11 +103,13 @@ pub fn update_permutation<T, V>(
     n_items_per_update: u32,
     clustering: &Clustering,
     rng: &mut V,
-) where
+) -> u32
+where
     T: ProbabilityMassFunction + HasPermutation + NormalizedProbabilityMassFunction,
     V: Rng,
 {
     let n_items_per_update = n_items_per_update.try_into().unwrap();
+    let mut n_acceptances = 0;
     let mut log_pmf_current = prior.log_pmf(clustering);
     for _ in 0..n_updates {
         prior
@@ -116,6 +118,7 @@ pub fn update_permutation<T, V>(
         let log_pmf_proposal = prior.log_pmf(clustering);
         let log_hastings_ratio = log_pmf_proposal - log_pmf_current;
         if 0.0 <= log_hastings_ratio || rng.gen_range(0.0..1.0_f64).ln() < log_hastings_ratio {
+            n_acceptances += 1;
             log_pmf_current = log_pmf_proposal;
         } else {
             prior
@@ -123,6 +126,7 @@ pub fn update_permutation<T, V>(
                 .partial_shuffle_undo(n_items_per_update);
         }
     }
+    n_acceptances
 }
 
 fn make_posterior<'a, T: 'a, U: 'a>(log_prior: T, log_likelihood: U) -> impl Fn(&Clustering) -> f64
