@@ -2,7 +2,6 @@
 
 use crate::clust::Clustering;
 use crate::distr::{FullConditional, ProbabilityMassFunction};
-use crate::prelude::*;
 
 use dahl_salso::clustering::Clusterings;
 use dahl_salso::clustering::WorkingClustering;
@@ -12,7 +11,7 @@ use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossCompute
 #[derive(Debug, Clone)]
 pub struct CppParameters<D: ProbabilityMassFunction> {
     baseline_partition: Clustering,
-    rate: Rate,
+    rate: f64,
     baseline_pmf: D,
     use_vi: bool,
     a: f64,
@@ -23,11 +22,14 @@ pub struct CppParameters<D: ProbabilityMassFunction> {
 impl<D: ProbabilityMassFunction> CppParameters<D> {
     pub fn new(
         baseline: Clustering,
-        rate: Rate,
+        rate: f64,
         baseline_pmf: D,
         use_vi: bool,
         a: f64,
     ) -> Option<Self> {
+        if rate.is_nan() || rate.is_infinite() || rate <= 0.0 {
+            return None;
+        }
         let labels: Vec<_> = baseline.allocation().iter().map(|x| *x as i32).collect();
         let n_items = baseline.n_items();
         let baseline_as_clusterings =
@@ -88,7 +90,7 @@ fn log_pmf<D: ProbabilityMassFunction>(target: &Clustering, parameters: &CppPara
             .baseline_as_clusterings
             .make_confusion_matrices(&target_as_working),
     );
-    let log_multiplier = -parameters.rate.unwrap() * distance;
+    let log_multiplier = -parameters.rate * distance;
     let log_baseline_pmf = parameters.baseline_pmf.log_pmf(target);
     log_baseline_pmf + log_multiplier
 }
@@ -97,6 +99,7 @@ fn log_pmf<D: ProbabilityMassFunction>(target: &Clustering, parameters: &CppPara
 mod tests {
     use super::*;
     use crate::crp::CrpParameters;
+    use crate::prelude::*;
     use rand::prelude::*;
 
     #[test]
@@ -109,7 +112,12 @@ mod tests {
         let mut rng = thread_rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
-            let rate = Rate::new(rng.gen_range(0.0..10.0));
+            let rate = loop {
+                let x = rng.gen_range(0.0..10.0);
+                if x > 0.0 {
+                    break x;
+                }
+            };
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters =

@@ -1,5 +1,4 @@
 use crate::clust::Clustering;
-use crate::prelude::Rate;
 use rand::prelude::*;
 use rand_distr::{Beta, Distribution};
 
@@ -22,8 +21,11 @@ impl Shrinkage {
         Some(Shrinkage(vec![value; n_items]))
     }
 
-    pub fn from_rate(rate: Rate, n_items: usize) -> Shrinkage {
-        Shrinkage(vec![rate.unwrap(); n_items])
+    pub fn from_rate(value: f64, n_items: usize) -> Option<Shrinkage> {
+        if value.is_nan() || value.is_infinite() || value < 0.0 {
+            return None;
+        }
+        Some(Shrinkage(vec![value; n_items]))
     }
 
     pub fn from(w: &[f64]) -> Option<Shrinkage> {

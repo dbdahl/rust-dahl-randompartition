@@ -1,6 +1,4 @@
 use core::ops::{Add, Div, Mul, Sub};
-use rand::prelude::*;
-use rand_distr::Beta;
 
 macro_rules! constrained_f64 {
     ( $name:ident, $closure:tt, $msg:expr, $closure2:tt, $msg2:expr) => {
@@ -105,29 +103,6 @@ constrained_f64!(
     Temperature,
     (|x| x >= 0.0),
     "Temperature must be greater than or equal to zero.",
-    (|_x, _y| false),
-    "Not supported."
-);
-
-constrained_f64!(
-    Rate,
-    (|x| x >= 0.0),
-    "Rate must be greater than or equal to zero.",
-    (|_x, _y| false),
-    "Not supported."
-);
-
-impl Rate {
-    pub fn resample<T: Rng>(&mut self, max: f64, shape1: f64, shape2: f64, rng: &mut T) {
-        let beta = Beta::new(shape1, shape2).unwrap();
-        self.0 = max * beta.sample(rng);
-    }
-}
-
-constrained_f64!(
-    Scale,
-    (|x| x > 0.0),
-    "Scale must be greater than zero.",
     (|_x, _y| false),
     "Not supported."
 );

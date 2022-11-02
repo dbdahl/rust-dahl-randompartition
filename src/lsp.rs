@@ -2,8 +2,8 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, PartitionSampler,
-    ProbabilityMassFunction,
+    FullConditional, HasPermutation, HasScalarShrinkage, NormalizedProbabilityMassFunction,
+    PartitionSampler, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
 use crate::prelude::*;
@@ -14,7 +14,7 @@ use rand_pcg::Pcg64Mcg;
 #[derive(Debug, Clone)]
 pub struct LspParameters {
     baseline_partition: Clustering,
-    pub rate: Rate,
+    pub rate: f64,
     pub mass: Mass,
     pub permutation: Permutation,
 }
@@ -22,29 +22,25 @@ pub struct LspParameters {
 impl LspParameters {
     pub fn new_with_scale(
         baseline: Clustering,
-        scale: Scale,
+        scale: f64,
         mass: Mass,
         permutation: Permutation,
     ) -> Option<Self> {
-        if baseline.n_items() != permutation.n_items() {
-            None
-        } else {
-            Some(Self {
-                baseline_partition: baseline,
-                rate: Rate::new(1.0 / scale.unwrap()),
-                mass,
-                permutation,
-            })
-        }
+        let rate = 1.0 / scale;
+        Self::new_with_rate(baseline, rate, mass, permutation)
     }
 
     pub fn new_with_rate(
         baseline: Clustering,
-        rate: Rate,
+        rate: f64,
         mass: Mass,
         permutation: Permutation,
     ) -> Option<Self> {
-        if baseline.n_items() != permutation.n_items() {
+        if baseline.n_items() != permutation.n_items()
+            || rate.is_nan()
+            || rate.is_infinite()
+            || rate <= 0.0
+        {
             None
         } else {
             Some(Self {
@@ -94,6 +90,15 @@ impl HasPermutation for LspParameters {
     }
     fn permutation_mut(&mut self) -> &mut Permutation {
         &mut self.permutation
+    }
+}
+
+impl HasScalarShrinkage for LspParameters {
+    fn shrinkage(&self) -> &f64 {
+        &self.rate
+    }
+    fn shrinkage_mut(&mut self) -> &mut f64 {
+        &mut self.rate
     }
 }
 
@@ -183,7 +188,12 @@ mod tests {
         let mut rng = thread_rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
-            let rate = Rate::new(rng.gen_range(0.0..10.0));
+            let rate = loop {
+                let x = rng.gen_range(0.0..10.0);
+                if x > 0.0 {
+                    break x;
+                }
+            };
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
                 LspParameters::new_with_rate(baseline, rate, Mass::new(1.0), permutation).unwrap();
@@ -206,7 +216,12 @@ mod tests {
         let mut rng = thread_rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
-            let rate = Rate::new(rng.gen_range(0.0..10.0));
+            let rate = loop {
+                let x = rng.gen_range(0.0..10.0);
+                if x > 0.0 {
+                    break x;
+                }
+            };
             let permutation = Permutation::random(n_items, &mut rng);
             let parameters =
                 LspParameters::new_with_rate(baseline, rate, Mass::new(1.0), permutation).unwrap();

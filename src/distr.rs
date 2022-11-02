@@ -55,6 +55,20 @@ pub trait HasPermutation {
 
 //
 
+pub trait HasScalarShrinkage {
+    fn shrinkage(&self) -> &f64;
+    fn shrinkage_mut(&mut self) -> &mut f64;
+}
+
+//
+
+pub trait HasVectorShrinkage {
+    fn shrinkage(&self) -> &[f64];
+    fn shrinkage_mut(&mut self) -> &mut [f64];
+}
+
+//
+
 pub trait PartitionSampler {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering;
 }

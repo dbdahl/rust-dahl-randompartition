@@ -1,10 +1,12 @@
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, ProbabilityMassFunction,
+    FullConditional, HasPermutation, HasScalarShrinkage, NormalizedProbabilityMassFunction,
+    ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
-
-use rand::prelude::*;
+use crate::slice::slice_sampler;
+use rand::Rng;
+use statrs::distribution::{Continuous, Gamma};
 
 pub fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
@@ -105,7 +107,7 @@ pub fn update_permutation<T, V>(
     rng: &mut V,
 ) -> u32
 where
-    T: ProbabilityMassFunction + HasPermutation + NormalizedProbabilityMassFunction,
+    T: ProbabilityMassFunction + NormalizedProbabilityMassFunction + HasPermutation,
     V: Rng,
 {
     let n_items_per_update = n_items_per_update.try_into().unwrap();
@@ -129,6 +131,32 @@ where
     n_acceptances
 }
 
+pub fn update_scalar_shrinkage<T, V>(
+    n_updates: u32,
+    prior: &mut T,
+    w: f64,
+    shape: f64,
+    rate: f64,
+    clustering: &Clustering,
+    rng: &mut V,
+) -> u32
+where
+    T: ProbabilityMassFunction + NormalizedProbabilityMassFunction + HasScalarShrinkage,
+    V: Rng,
+{
+    let gamma_distribution = Gamma::new(shape, rate).unwrap();
+    for _ in 0..n_updates {
+        let x = *prior.shrinkage();
+        let f = |x| {
+            *prior.shrinkage_mut() = x;
+            prior.log_pmf(clustering) + gamma_distribution.ln_pdf(x)
+        };
+        let (x_new, _) = slice_sampler(x, f, w, u32::MAX, true, rng);
+        *prior.shrinkage_mut() = x_new;
+    }
+    n_updates
+}
+
 fn make_posterior<'a, T: 'a, U: 'a>(log_prior: T, log_likelihood: U) -> impl Fn(&Clustering) -> f64
 where
     T: Fn(&Clustering) -> f64,
@@ -149,6 +177,7 @@ mod tests_mcmc {
     use super::*;
     use crate::crp::CrpParameters;
     use crate::prelude::*;
+    use rand::prelude::*;
 
     #[test]
     fn test_crp_neal_algorithm3() {
