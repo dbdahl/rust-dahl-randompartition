@@ -1,7 +1,7 @@
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, HasScalarShrinkage, NormalizedProbabilityMassFunction,
-    ProbabilityMassFunction,
+    FullConditional, HasPermutation, HasScalarShrinkage, HasVectorShrinkage,
+    NormalizedProbabilityMassFunction, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
 use crate::slice::slice_sampler;
@@ -110,6 +110,9 @@ where
     T: ProbabilityMassFunction + NormalizedProbabilityMassFunction + HasPermutation,
     V: Rng,
 {
+    if n_items_per_update <= 1 {
+        return 0;
+    }
     let n_items_per_update = n_items_per_update.try_into().unwrap();
     let mut n_acceptances = 0;
     let mut log_pmf_current = prior.log_pmf(clustering);
@@ -144,6 +147,9 @@ where
     T: ProbabilityMassFunction + NormalizedProbabilityMassFunction + HasScalarShrinkage,
     V: Rng,
 {
+    if w <= 0.0 {
+        return 0;
+    }
     let gamma_distribution = Gamma::new(shape, rate).unwrap();
     for _ in 0..n_updates {
         let x = *prior.shrinkage();
@@ -151,8 +157,44 @@ where
             *prior.shrinkage_mut() = x;
             prior.log_pmf(clustering) + gamma_distribution.ln_pdf(x)
         };
-        let (x_new, _) = slice_sampler(x, f, w, u32::MAX, true, rng);
-        *prior.shrinkage_mut() = x_new;
+        slice_sampler(x, f, w, u32::MAX, true, rng);
+        // *prior.shrinkage_mut() = x_new;  // Not necessary... see implementation of slice_sampler function.
+    }
+    n_updates
+}
+
+pub fn update_vector_shrinkage<T, V>(
+    n_updates: u32,
+    prior: &mut T,
+    reference: usize,
+    w: f64,
+    shape: f64,
+    rate: f64,
+    clustering: &Clustering,
+    rng: &mut V,
+) -> u32
+where
+    T: ProbabilityMassFunction + NormalizedProbabilityMassFunction + HasVectorShrinkage,
+    V: Rng,
+{
+    if w <= 0.0 {
+        return 0;
+    }
+    if prior.shrinkage()[reference] <= 0.0 {
+        return 0;
+    }
+    let gamma_distribution = Gamma::new(shape, rate).unwrap();
+    for _ in 0..n_updates {
+        let x = prior.shrinkage()[reference];
+        let f = |x| {
+            if x <= 0.0 {
+                return f64::NEG_INFINITY;
+            }
+            prior.shrinkage_mut().rescale(x, reference);
+            prior.log_pmf(clustering) + gamma_distribution.ln_pdf(x)
+        };
+        slice_sampler(x, f, w, 100, true, rng);
+        // prior.shrinkage_mut().rescale(x_new, reference);  // Not necessary... see implementation of slice_sampler function.
     }
     n_updates
 }

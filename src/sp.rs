@@ -2,8 +2,8 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, PartitionSampler,
-    PredictiveProbabilityFunction, ProbabilityMassFunction,
+    FullConditional, HasPermutation, HasVectorShrinkage, NormalizedProbabilityMassFunction,
+    PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
 use crate::shrink::Shrinkage;
@@ -112,6 +112,15 @@ impl<D: PredictiveProbabilityFunction + Clone> HasPermutation for SpParameters<D
     }
     fn permutation_mut(&mut self) -> &mut Permutation {
         &mut self.permutation
+    }
+}
+
+impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkage for SpParameters<D> {
+    fn shrinkage(&self) -> &Shrinkage {
+        &self.shrinkage
+    }
+    fn shrinkage_mut(&mut self) -> &mut Shrinkage {
+        &mut self.shrinkage
     }
 }
 

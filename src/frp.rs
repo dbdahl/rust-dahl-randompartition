@@ -2,13 +2,12 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, NormalizedProbabilityMassFunction, PartitionSampler,
-    ProbabilityMassFunction,
+    FullConditional, HasPermutation, HasVectorShrinkage, NormalizedProbabilityMassFunction,
+    PartitionSampler, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
 use crate::prelude::*;
 use crate::shrink::Shrinkage;
-
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 
@@ -85,6 +84,15 @@ impl HasPermutation for FrpParameters {
     }
     fn permutation_mut(&mut self) -> &mut Permutation {
         &mut self.permutation
+    }
+}
+
+impl HasVectorShrinkage for FrpParameters {
+    fn shrinkage(&self) -> &Shrinkage {
+        &self.shrinkage
+    }
+    fn shrinkage_mut(&mut self) -> &mut Shrinkage {
+        &mut self.shrinkage
     }
 }
 
