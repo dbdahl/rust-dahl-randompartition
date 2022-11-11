@@ -37,21 +37,25 @@ pub fn update_neal_algorithm3<T, U, V>(
     }
 }
 
-pub fn update_neal_algorithm8<T, U, V>(
+pub fn update_neal_algorithm8<T, U, W, V, X>(
     n_updates: u32,
     state: &mut Clustering,
     permutation: &Permutation,
     prior: &T,
     log_likelihood_contribution_fn: &mut U,
+    common_item_cacher: W,
     rng: &mut V,
 ) where
     T: FullConditional,
-    U: FnMut(usize, usize, bool) -> f64,
+    U: FnMut(usize, &X, usize, bool) -> f64,
+    W: Fn(usize) -> X,
     V: Rng,
+    X: Sized,
 {
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
+            let cache = common_item_cacher(ii);
             let labels_and_log_weights =
                 prior
                     .log_full_conditional(ii, &state)
@@ -59,8 +63,12 @@ pub fn update_neal_algorithm8<T, U, V>(
                     .map(|(label, log_prior)| {
                         (
                             label,
-                            log_likelihood_contribution_fn(ii, label, state.size_of(label) == 0)
-                                + log_prior,
+                            log_likelihood_contribution_fn(
+                                ii,
+                                &cache,
+                                label,
+                                state.size_of(label) == 0,
+                            ) + log_prior,
                         )
                     });
             let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
