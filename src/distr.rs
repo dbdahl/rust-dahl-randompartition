@@ -102,7 +102,8 @@ pub(crate) fn default_partition_conditional_sampler_sample<
         let labels_and_log_weights = ppf
             .log_predictive_weight(ii, &candidate_labels, &clustering)
             .into_iter();
-        let (label, _) = clustering.select(labels_and_log_weights, true, 0, Some(rng), false);
+        let (label, _) =
+            clustering.select(labels_and_log_weights, true, false, 0, Some(rng), false);
         clustering.allocate(ii, label);
     }
     clustering
@@ -139,6 +140,7 @@ pub(crate) fn default_probability_mass_function_log_pmf<T: PredictiveProbability
         let (label, contribution) = working_clustering.select::<Pcg64Mcg, _>(
             labels_and_log_weights,
             true,
+            false,
             target[ii],
             None,
             true,

@@ -39,7 +39,7 @@ impl LspParameters {
         if baseline.n_items() != permutation.n_items()
             || rate.is_nan()
             || rate.is_infinite()
-            || rate <= 0.0
+            || rate < 0.0
         {
             None
         } else {
@@ -152,9 +152,10 @@ fn engine<T: Rng>(
                 (label, weight)
             });
         let (subset_index, log_probability_contribution) = match &mut rng {
-            Some(r) => clustering.select(labels_and_weights, false, 0, Some(r), true),
+            Some(r) => clustering.select(labels_and_weights, false, false, 0, Some(r), true),
             None => clustering.select::<Pcg64Mcg, _>(
                 labels_and_weights,
+                false,
                 false,
                 target.unwrap()[ii],
                 None,

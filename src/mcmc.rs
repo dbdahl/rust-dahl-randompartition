@@ -31,7 +31,7 @@ pub fn update_neal_algorithm3<T, U, V>(
                         let indices = &state.items_of_without(label, ii)[..];
                         (label, log_posterior_predictive(ii, indices) + log_prior)
                     });
-            let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
+            let pair = state.select(labels_and_log_weights, true, false, 0, Some(rng), false);
             state.allocate(ii, pair.0);
         }
     }
@@ -71,7 +71,7 @@ pub fn update_neal_algorithm8<T, U, W, V, X>(
                             ) + log_prior,
                         )
                     });
-            let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
+            let pair = state.select(labels_and_log_weights, true, false, 0, Some(rng), false);
             state.allocate(ii, pair.0);
         }
     }
@@ -101,7 +101,7 @@ pub fn update_neal_algorithm_full<T, U, V>(
                 })
                 .collect::<Vec<_>>()
                 .into_iter();
-            let pair = state.select(labels_and_log_weights, true, 0, Some(rng), false);
+            let pair = state.select(labels_and_log_weights, true, false, 0, Some(rng), false);
             state.allocate(ii, pair.0);
         }
     }

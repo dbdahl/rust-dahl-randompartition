@@ -146,9 +146,10 @@ fn engine<T: Rng>(
                 (label, weight)
             });
         let (subset_index, log_probability_contribution) = match &mut rng {
-            Some(r) => clustering.select(labels_and_weights, false, 0, Some(r), true),
+            Some(r) => clustering.select(labels_and_weights, false, false, 0, Some(r), true),
             None => clustering.select::<Pcg64Mcg, _>(
                 labels_and_weights,
+                false,
                 false,
                 target.unwrap()[ii],
                 None,

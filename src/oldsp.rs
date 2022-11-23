@@ -240,10 +240,11 @@ fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions,
                 (label, log_probability - scaled_shrinkage * distance)
             });
         let (label, log_probability_contribution) = match &mut rng {
-            Some(r) => clustering.select(labels_and_log_weights, true, 0, Some(r), true),
+            Some(r) => clustering.select(labels_and_log_weights, true, false, 0, Some(r), true),
             None => clustering.select::<Pcg64Mcg, _>(
                 labels_and_log_weights,
                 true,
+                false,
                 target.unwrap()[item],
                 None,
                 true,

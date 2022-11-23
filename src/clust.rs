@@ -255,6 +255,7 @@ impl Clustering {
         &self,
         labels_and_weights: S,
         weights_on_log_scale: bool,
+        weights_are_probabilities: bool,
         label: usize,
         rng: Option<&mut T>,
         with_log_probability: bool,
@@ -287,7 +288,12 @@ impl Clustering {
             }
         };
         if with_log_probability {
-            (label, (w[index] / w.iter().sum::<f64>()).ln())
+            let ww = w[index];
+            if weights_are_probabilities {
+                (label, ww.ln())
+            } else {
+                (label, (ww / w.iter().sum::<f64>()).ln())
+            }
         } else {
             (label, 0.0)
         }
