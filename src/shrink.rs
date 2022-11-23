@@ -15,14 +15,14 @@ impl Shrinkage {
     }
 
     pub fn constant(value: f64, n_items: usize) -> Option<Self> {
-        if value.is_nan() || value.is_infinite() || value < 0.0 {
+        if value.is_nan() || value < 0.0 {
             return None;
         }
         Some(Self(vec![value; n_items]))
     }
 
     pub fn from_rate(value: f64, n_items: usize) -> Option<Self> {
-        if value.is_nan() || value.is_infinite() || value < 0.0 {
+        if value.is_nan() || value < 0.0 {
             return None;
         }
         Some(Self(vec![value; n_items]))
@@ -30,7 +30,7 @@ impl Shrinkage {
 
     pub fn from(w: &[f64]) -> Option<Self> {
         for ww in w.iter() {
-            if ww.is_nan() || ww.is_infinite() || *ww < 0.0 {
+            if ww.is_nan() || *ww < 0.0 {
                 return None;
             }
         }

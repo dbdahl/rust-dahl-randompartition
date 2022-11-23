@@ -202,8 +202,7 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
-        let _label_in_baseline = parameters.baseline_partition.get(item);
-        let weight_on_baseline_ppf = 1.0 / (1.0 * parameters.shrinkage[item]);
+        let weight_on_baseline_ppf = 1.0 / (1.0 + parameters.shrinkage[item]);
         let weight_on_shrinkage_ppf = 1.0 - weight_on_baseline_ppf;
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
@@ -216,8 +215,35 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
             log_weights_to_probabilities(&mut x);
             x
         };
-        let p = (1.0 as f64) / (baseline_ppf.len() as f64);
-        let shrinkage_ppf: Vec<_> = baseline_ppf.iter().map(|&(_label, _)| p).collect();
+        let label_in_baseline = parameters.baseline_partition.get(item);
+        let mut items_in_baseline = parameters.baseline_partition.items_of(label_in_baseline);
+        items_in_baseline.sort_unstable();
+        let mut new_index = 0;
+        let mut denominator = 0.0;
+        let mut shrinkage_ppf: Vec<_> = baseline_ppf
+            .iter()
+            .enumerate()
+            .map(|(index, &(label, _))| {
+                let items = clustering.items_of(label);
+                if items.is_empty() {
+                    new_index = index;
+                    return 0.0;
+                }
+                let intersection = items
+                    .iter()
+                    .filter(|x| items_in_baseline.binary_search(x).is_ok());
+                let result = intersection.count() as f64;
+                denominator += result;
+                result
+            })
+            .collect();
+        if denominator == 0.0 {
+            shrinkage_ppf[new_index] = 1.0;
+        } else {
+            for v in shrinkage_ppf.iter_mut() {
+                *v /= denominator;
+            }
+        }
         let labels_and_probabilities: Vec<_> = baseline_ppf
             .into_iter()
             .zip(shrinkage_ppf)
