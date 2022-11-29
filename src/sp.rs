@@ -2,11 +2,12 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, HasVectorShrinkage, NormalizedProbabilityMassFunction,
-    PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+    FullConditional, HasPermutation, HasVectorShrinkageProbabilities,
+    NormalizedProbabilityMassFunction, PartitionSampler, PredictiveProbabilityFunction,
+    ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
-use crate::shrink::Shrinkage;
+use crate::shrink::ShrinkageProbabilities;
 
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
@@ -14,7 +15,7 @@ use rand_pcg::Pcg64Mcg;
 #[derive(Debug, Clone)]
 pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
     pub baseline_partition: Clustering,
-    pub shrinkage: Shrinkage,
+    pub shrinkage_probabilities: ShrinkageProbabilities,
     pub permutation: Permutation,
     baseline_ppf: D,
 }
@@ -22,7 +23,7 @@ pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
 impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
     pub fn new(
         baseline_partition: Clustering,
-        shrinkage: Shrinkage,
+        shrinkage: ShrinkageProbabilities,
         permutation: Permutation,
         baseline_ppf: D,
     ) -> Option<Self> {
@@ -33,7 +34,7 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
         } else {
             Some(Self {
                 baseline_partition: baseline_partition.standardize(),
-                shrinkage,
+                shrinkage_probabilities: shrinkage,
                 permutation,
                 baseline_ppf,
             })
@@ -146,12 +147,12 @@ impl<D: PredictiveProbabilityFunction + Clone> HasPermutation for SpParameters<D
     }
 }
 
-impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkage for SpParameters<D> {
-    fn shrinkage(&self) -> &Shrinkage {
-        &self.shrinkage
+impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkageProbabilities for SpParameters<D> {
+    fn shrinkage(&self) -> &ShrinkageProbabilities {
+        &self.shrinkage_probabilities
     }
-    fn shrinkage_mut(&mut self) -> &mut Shrinkage {
-        &mut self.shrinkage
+    fn shrinkage_mut(&mut self) -> &mut ShrinkageProbabilities {
+        &mut self.shrinkage_probabilities
     }
 }
 
@@ -200,8 +201,8 @@ fn engine_slow_implementation<'a, D: PredictiveProbabilityFunction + Clone, T: R
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
-        let weight_on_baseline_ppf = 1.0 / (1.0 + parameters.shrinkage[item]);
-        let weight_on_shrinkage_ppf = 1.0 - weight_on_baseline_ppf;
+        let probability_of_shrinkage_ppf = parameters.shrinkage_probabilities[item];
+        let probability_of_baseline_ppf = 1.0 - probability_of_shrinkage_ppf;
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -248,7 +249,7 @@ fn engine_slow_implementation<'a, D: PredictiveProbabilityFunction + Clone, T: R
             .map(|((label, p1), p2)| {
                 (
                     label,
-                    weight_on_baseline_ppf * p1 + weight_on_shrinkage_ppf * p2,
+                    probability_of_baseline_ppf * p1 + probability_of_shrinkage_ppf * p2,
                 )
             })
             .collect();
@@ -288,7 +289,7 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
         let label_in_baseline = parameters.baseline_partition.get(item);
-        let shrinkage = parameters.shrinkage[item];
+        let shrinkage = parameters.shrinkage_probabilities[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -370,9 +371,9 @@ mod tests {
             let target = Clustering::from_vector(target);
             let mut vec = Vec::with_capacity(target.n_clusters());
             for _ in 0..target.n_items() {
-                vec.push(rng.gen_range(0.0..10.0));
+                vec.push(rng.gen_range(0.0..1.0));
             }
-            let shrinkage = Shrinkage::from(&vec[..]).unwrap();
+            let shrinkage = ShrinkageProbabilities::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
@@ -402,9 +403,9 @@ mod tests {
             let target = Clustering::from_vector(target);
             let mut vec = Vec::with_capacity(target.n_clusters());
             for _ in 0..target.n_items() {
-                vec.push(rng.gen_range(0.0..10.0));
+                vec.push(rng.gen_range(0.0..1.0));
             }
-            let shrinkage = Shrinkage::from(&vec[..]).unwrap();
+            let shrinkage = ShrinkageProbabilities::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
