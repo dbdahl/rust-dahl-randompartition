@@ -41,14 +41,13 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
     }
 }
 
-fn use_mixture() -> bool {
-    match std::env::var("DBD_SP_MIXED") {
+fn use_slow_implementation() -> bool {
+    match std::env::var("DBD_SP_SLOW") {
         Ok(val) => val != "",
         Err(_) => false,
     }
 }
 
-// DBD: Old
 fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
     counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
 }
@@ -56,7 +55,7 @@ fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
 impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<D> {
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
-        if use_mixture() {
+        if use_slow_implementation() {
             let mut target = clustering.allocation().clone();
             let candidate_labels = clustering.available_labels_for_reallocation(item);
             let mut partial_clustering = clustering.clone();
@@ -68,7 +67,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
                     target[item] = label;
                     (
                         label,
-                        engine::<D, Pcg64Mcg>(
+                        engine_slow_implementation::<D, Pcg64Mcg>(
                             self,
                             partial_clustering.clone(),
                             Some(&target[..]),
@@ -105,7 +104,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
                     target[item] = label;
                     (
                         label,
-                        engine_old::<D, Pcg64Mcg>(
+                        engine::<D, Pcg64Mcg>(
                             self,
                             partial_clustering.clone(),
                             counts_marginal.clone(),
@@ -161,8 +160,8 @@ fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    if use_mixture() {
-        engine(
+    if use_slow_implementation() {
+        engine_slow_implementation(
             parameters,
             Clustering::unallocated(parameters.baseline_partition.n_items()),
             target,
@@ -170,7 +169,7 @@ fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
         )
     } else {
         let m = parameters.baseline_partition.max_label() + 1;
-        engine_old(
+        engine(
             parameters,
             Clustering::unallocated(parameters.baseline_partition.n_items()),
             vec![0; m],
@@ -192,8 +191,7 @@ fn log_weights_to_probabilities<T>(x: &mut Vec<(T, f64)>) {
     }
 }
 
-// DBD: New
-fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
+fn engine_slow_implementation<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &'a SpParameters<D>,
     mut clustering: Clustering,
     target: Option<&[usize]>,
@@ -278,8 +276,7 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     (clustering, log_probability)
 }
 
-// DBD: Old
-fn engine_old<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
+fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &'a SpParameters<D>,
     mut clustering: Clustering,
     mut counts_marginal: Vec<usize>,
