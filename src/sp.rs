@@ -57,6 +57,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         if use_slow_implementation() {
+            println!("Using slow implementation.");
             let mut target = clustering.allocation().clone();
             let candidate_labels = clustering.available_labels_for_reallocation(item);
             let mut partial_clustering = clustering.clone();
@@ -148,10 +149,10 @@ impl<D: PredictiveProbabilityFunction + Clone> HasPermutation for SpParameters<D
 }
 
 impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkageProbabilities for SpParameters<D> {
-    fn shrinkage(&self) -> &ShrinkageProbabilities {
+    fn shrinkage_probabilities(&self) -> &ShrinkageProbabilities {
         &self.shrinkage_probabilities
     }
-    fn shrinkage_mut(&mut self) -> &mut ShrinkageProbabilities {
+    fn shrinkage_probabilities_mut(&mut self) -> &mut ShrinkageProbabilities {
         &mut self.shrinkage_probabilities
     }
 }
@@ -162,6 +163,7 @@ fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
     if use_slow_implementation() {
+        println!("Using slow implementation.");
         engine_slow_implementation(
             parameters,
             Clustering::unallocated(parameters.baseline_partition.n_items()),
@@ -285,6 +287,7 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    return engine_slow_implementation(parameters, clustering, target, rng);
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);

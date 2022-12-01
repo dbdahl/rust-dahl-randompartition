@@ -37,6 +37,10 @@ impl Shrinkage {
         Some(Self(Vec::from(w)))
     }
 
+    pub fn n_items(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn as_slice(&self) -> &[f64] {
         &self.0[..]
     }
@@ -97,10 +101,6 @@ impl Shrinkage {
             }
         }
     }
-
-    pub fn n_items(&self) -> usize {
-        self.0.len()
-    }
 }
 
 impl std::ops::Index<usize> for Shrinkage {
@@ -142,6 +142,10 @@ impl ShrinkageProbabilities {
         Some(Self(Vec::from(w)))
     }
 
+    pub fn n_items(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn as_slice(&self) -> &[f64] {
         &self.0[..]
     }
@@ -157,8 +161,44 @@ impl ShrinkageProbabilities {
         self.rescale_by_shift(shift)
     }
 
-    pub fn n_items(&self) -> usize {
-        self.0.len()
+    pub fn randomize_common<T: Rng>(&mut self, shape1: f64, shape2: f64, rng: &mut T) {
+        let beta = Beta::new(shape1, shape2).unwrap();
+        let value = beta.sample(rng);
+        for x in &mut self.0 {
+            if *x > 0.0 {
+                *x = value;
+            }
+        }
+    }
+
+    pub fn randomize_common_cluster<T: Rng>(
+        &mut self,
+        shape1: f64,
+        shape2: f64,
+        clustering: &Clustering,
+        rng: &mut T,
+    ) {
+        let beta = Beta::new(shape1, shape2).unwrap();
+        for k in clustering.available_labels_for_allocation() {
+            if clustering.size_of(k) == 0 {
+                continue;
+            }
+            let value = beta.sample(rng);
+            for i in clustering.items_of(k) {
+                if self.0[i] > 0.0 {
+                    self.0[i] = value;
+                }
+            }
+        }
+    }
+
+    pub fn randomize_idiosyncratic<T: Rng>(&mut self, shape1: f64, shape2: f64, rng: &mut T) {
+        let beta = Beta::new(shape1, shape2).unwrap();
+        for x in &mut self.0 {
+            if *x > 0.0 {
+                *x = beta.sample(rng)
+            }
+        }
     }
 }
 

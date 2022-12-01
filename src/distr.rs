@@ -71,8 +71,8 @@ pub trait HasVectorShrinkage {
 //
 
 pub trait HasVectorShrinkageProbabilities {
-    fn shrinkage(&self) -> &ShrinkageProbabilities;
-    fn shrinkage_mut(&mut self) -> &mut ShrinkageProbabilities;
+    fn shrinkage_probabilities(&self) -> &ShrinkageProbabilities;
+    fn shrinkage_probabilities_mut(&mut self) -> &mut ShrinkageProbabilities;
 }
 
 //
