@@ -49,6 +49,13 @@ fn use_slow_implementation() -> bool {
     }
 }
 
+fn use_old_specification() -> bool {
+    match std::env::var("DBD_SP_OLD") {
+        Ok(val) => val != "",
+        Err(_) => false,
+    }
+}
+
 fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
     counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
 }
@@ -233,7 +240,13 @@ fn engine_slow_implementation<'a, D: PredictiveProbabilityFunction + Clone, T: R
                 let intersection = items
                     .iter()
                     .filter(|x| items_in_baseline.binary_search(x).is_ok());
-                let result = intersection.count() as f64;
+                let result = if use_old_specification() {
+                    intersection.count() as f64
+                } else {
+                    intersection
+                        .map(|j| parameters.shrinkage_probabilities[*j])
+                        .sum()
+                };
                 denominator += result;
                 result
             })
@@ -281,13 +294,14 @@ fn engine_slow_implementation<'a, D: PredictiveProbabilityFunction + Clone, T: R
 
 fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &'a SpParameters<D>,
-    mut clustering: Clustering,
-    mut counts_marginal: Vec<usize>,
-    mut counts: Vec<Vec<usize>>,
+    clustering: Clustering,
+    _counts_marginal: Vec<usize>,
+    _counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
-    mut rng: Option<&mut T>,
+    rng: Option<&mut T>,
 ) -> (Clustering, f64) {
     return engine_slow_implementation(parameters, clustering, target, rng);
+    /*
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
@@ -337,6 +351,7 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
         counts[label_in_baseline][label] += 1;
     }
     (clustering, log_probability)
+    */
 }
 
 #[cfg(test)]
