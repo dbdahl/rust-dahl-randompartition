@@ -12,6 +12,7 @@ pub mod jlp;
 pub mod lsp;
 pub mod mcmc;
 pub mod old2sp;
+pub mod old3sp;
 pub mod oldsp;
 pub mod perm;
 pub mod prelude;
