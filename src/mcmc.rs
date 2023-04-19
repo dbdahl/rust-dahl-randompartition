@@ -25,7 +25,7 @@ pub fn update_neal_algorithm3<T, U, V>(
             let ii = permutation.get(i);
             let labels_and_log_weights =
                 prior
-                    .log_full_conditional(ii, &state)
+                    .log_full_conditional(ii, state)
                     .into_iter()
                     .map(|(label, log_prior)| {
                         let indices = &state.items_of_without(label, ii)[..];
@@ -58,7 +58,7 @@ pub fn update_neal_algorithm8<T, U, W, V, X>(
             let cache = common_item_cacher(ii);
             let labels_and_log_weights =
                 prior
-                    .log_full_conditional(ii, &state)
+                    .log_full_conditional(ii, state)
                     .into_iter()
                     .map(|(label, log_prior)| {
                         (
@@ -93,11 +93,11 @@ pub fn update_neal_algorithm_full<T, U, V>(
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
             let labels_and_log_weights = prior
-                .log_full_conditional(ii, &state)
+                .log_full_conditional(ii, state)
                 .into_iter()
                 .map(|(label, log_prior)| {
                     state.allocate(ii, label);
-                    (label, log_likelihood_contribution_fn(&state) + log_prior)
+                    (label, log_likelihood_contribution_fn(state) + log_prior)
                 })
                 .collect::<Vec<_>>()
                 .into_iter();
@@ -232,7 +232,7 @@ where
     for _ in 0..n_updates {
         let x = prior.shrinkage_probabilities()[reference];
         let f = |p| {
-            if p < 0.0 || p > 1.0 {
+            if !(0.0..=1.0).contains(&p) {
                 return f64::NEG_INFINITY;
             }
             prior

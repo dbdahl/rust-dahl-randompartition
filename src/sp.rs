@@ -44,19 +44,19 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
 
 fn use_slow_implementation() -> bool {
     match std::env::var("DBD_SP_SLOW") {
-        Ok(val) => val != "",
+        Ok(val) => !val.is_empty(),
         Err(_) => false,
     }
 }
 
 fn use_old_specification() -> bool {
     match std::env::var("DBD_SP_OLD") {
-        Ok(val) => val != "",
+        Ok(val) => !val.is_empty(),
         Err(_) => false,
     }
 }
 
-fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
+fn expand_counts(counts: &mut [Vec<usize>], new_len: usize) {
     counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
 }
 
@@ -164,8 +164,8 @@ impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkageProbabilities f
     }
 }
 
-fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a SpParameters<D>,
+fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &SpParameters<D>,
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -190,7 +190,7 @@ fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     }
 }
 
-fn log_weights_to_probabilities<T>(x: &mut Vec<(T, f64)>) {
+fn log_weights_to_probabilities<T>(x: &mut [(T, f64)]) {
     let max_weight = x.iter().map(|x| x.1).fold(f64::NEG_INFINITY, f64::max);
     for (_, w) in x.iter_mut() {
         *w = (*w - max_weight).exp()
@@ -201,8 +201,8 @@ fn log_weights_to_probabilities<T>(x: &mut Vec<(T, f64)>) {
     }
 }
 
-fn engine_slow_implementation<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a SpParameters<D>,
+fn engine_slow_implementation<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &SpParameters<D>,
     mut clustering: Clustering,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
@@ -292,15 +292,15 @@ fn engine_slow_implementation<'a, D: PredictiveProbabilityFunction + Clone, T: R
     (clustering, log_probability)
 }
 
-fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a SpParameters<D>,
+fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &SpParameters<D>,
     clustering: Clustering,
     _counts_marginal: Vec<usize>,
     _counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    return engine_slow_implementation(parameters, clustering, target, rng);
+    engine_slow_implementation(parameters, clustering, target, rng)
     /*
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {

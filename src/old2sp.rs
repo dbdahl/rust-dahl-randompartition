@@ -41,7 +41,7 @@ impl<D: PredictiveProbabilityFunction + Clone> Old2SpParameters<D> {
     }
 }
 
-fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
+fn expand_counts(counts: &mut [Vec<usize>], new_len: usize) {
     counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
 }
 
@@ -124,8 +124,8 @@ impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkage for Old2SpPara
     }
 }
 
-fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a Old2SpParameters<D>,
+fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &Old2SpParameters<D>,
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -140,8 +140,8 @@ fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     )
 }
 
-fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a Old2SpParameters<D>,
+fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &Old2SpParameters<D>,
     mut clustering: Clustering,
     mut counts_marginal: Vec<usize>,
     mut counts: Vec<Vec<usize>>,
@@ -171,12 +171,10 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
                 let lp = log_probability
                     + if n_joint > 0.0 {
                         multiplier * n_joint
+                    } else if n_marginal == 0.0 && clustering.size_of(label) == 0 {
+                        shrinkage
                     } else {
-                        if n_marginal == 0.0 && clustering.size_of(label) == 0 {
-                            shrinkage
-                        } else {
-                            0.0
-                        }
+                        0.0
                     };
                 (label, lp)
             });

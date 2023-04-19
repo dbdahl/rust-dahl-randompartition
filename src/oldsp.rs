@@ -64,7 +64,7 @@ impl<D: PredictiveProbabilityFunction + Clone> OldSpParameters<D> {
     }
 }
 
-fn expand_counts(counts: &mut Vec<Vec<usize>>, new_len: usize) {
+fn expand_counts(counts: &mut [Vec<usize>], new_len: usize) {
     counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
 }
 
@@ -142,8 +142,8 @@ impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkage for OldSpParam
     }
 }
 
-fn engine_full<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a OldSpParameters<D>,
+fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &OldSpParameters<D>,
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -188,8 +188,8 @@ impl EngineFunctions for Vi {
     }
 }
 
-fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &'a OldSpParameters<D>,
+fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &OldSpParameters<D>,
     clustering: Clustering,
     counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,
@@ -206,10 +206,10 @@ fn engine<'a, D: PredictiveProbabilityFunction + Clone, T: Rng>(
     }
 }
 
-fn engine_core<'a, D: PredictiveProbabilityFunction + Clone, S: EngineFunctions, T: Rng>(
+fn engine_core<D: PredictiveProbabilityFunction + Clone, S: EngineFunctions, T: Rng>(
     functions: S,
     a_plus_one: f64,
-    parameters: &'a OldSpParameters<D>,
+    parameters: &OldSpParameters<D>,
     mut clustering: Clustering,
     mut counts: Vec<Vec<usize>>,
     target: Option<&[usize]>,

@@ -127,7 +127,7 @@ impl ShrinkageProbabilities {
     }
 
     pub fn constant(value: f64, n_items: usize) -> Option<Self> {
-        if value.is_nan() || value < 0.0 || value > 1.0 {
+        if value.is_nan() || !(0.0..=1.0).contains(&value) {
             return None;
         }
         Some(Self(vec![value; n_items]))

@@ -433,7 +433,7 @@ impl Clustering {
         }
         let mapping = if with_mapping {
             let mut pairs: Vec<_> = map.into_iter().collect();
-            pairs.sort_by(|x, y| (*x).1.partial_cmp(&y.1).unwrap());
+            pairs.sort_by(|x, y| x.1.partial_cmp(&y.1).unwrap());
             let x = (0..first_label).chain(pairs.iter().map(|x| x.0)).collect();
             Some(x)
         } else {
