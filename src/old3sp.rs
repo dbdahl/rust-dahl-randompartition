@@ -41,8 +41,8 @@ impl<D: PredictiveProbabilityFunction + Clone> Old3SpParameters<D> {
     }
 }
 
-fn expand_counts(counts: &mut [Vec<usize>], new_len: usize) {
-    counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
+fn expand_counts(counts: &mut [Vec<f64>], new_len: usize) {
+    counts.iter_mut().map(|x| x.resize(new_len, 0.0)).collect()
 }
 
 impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Old3SpParameters<D> {
@@ -56,7 +56,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Old3SpParamet
         }
         let (mut counts_marginal, mut counts) = {
             let m = self.baseline_partition.max_label() + 1;
-            (vec![0; m], vec![Vec::new(); m])
+            (vec![0.0; m], vec![Vec::new(); m])
         };
         let max_label = partial_clustering.max_label();
         if max_label >= counts[0].len() {
@@ -66,8 +66,9 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Old3SpParamet
             let item = self.permutation.get(i);
             let label_in_baseline = self.baseline_partition.get(item);
             let label = target[item];
-            counts_marginal[label_in_baseline] += 1;
-            counts[label_in_baseline][label] += 1;
+            let s = self.shrinkage[item];
+            counts_marginal[label_in_baseline] += s;
+            counts[label_in_baseline][label] += s;
         }
         candidate_labels
             .map(|label| {
@@ -133,7 +134,7 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     engine(
         parameters,
         Clustering::unallocated(parameters.baseline_partition.n_items()),
-        vec![0; m],
+        vec![0.0; m],
         vec![Vec::new(); m],
         target,
         rng,
@@ -143,8 +144,8 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
 fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &Old3SpParameters<D>,
     mut clustering: Clustering,
-    mut counts_marginal: Vec<usize>,
-    mut counts: Vec<Vec<usize>>,
+    mut counts_marginal: Vec<f64>,
+    mut counts: Vec<Vec<f64>>,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
@@ -160,14 +161,14 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         if max_candidate_label >= counts[label_in_baseline].len() {
             expand_counts(&mut counts, max_candidate_label + 1)
         }
-        let n_marginal = counts_marginal[label_in_baseline] as f64;
+        let n_marginal = counts_marginal[label_in_baseline];
         let multiplier = shrinkage / n_marginal;
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
-                let n_joint = counts[label_in_baseline][label] as f64;
+                let n_joint = counts[label_in_baseline][label];
                 let lp = log_probability
                     + if n_joint > 0.0 {
                         multiplier * n_joint
@@ -191,8 +192,9 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         };
         log_probability += log_probability_contribution;
         clustering.allocate(item, label);
-        counts_marginal[label_in_baseline] += 1;
-        counts[label_in_baseline][label] += 1;
+        let s = parameters.shrinkage[item];
+        counts_marginal[label_in_baseline] += s;
+        counts[label_in_baseline][label] += s;
     }
     (clustering, log_probability)
 }
