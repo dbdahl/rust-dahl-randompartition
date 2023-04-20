@@ -2,12 +2,11 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, HasVectorShrinkageProbabilities,
-    NormalizedProbabilityMassFunction, PartitionSampler, PredictiveProbabilityFunction,
-    ProbabilityMassFunction,
+    FullConditional, HasPermutation, HasVectorShrinkage, NormalizedProbabilityMassFunction,
+    PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
-use crate::shrink::ShrinkageProbabilities;
+use crate::shrink::Shrinkage;
 
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
@@ -15,7 +14,7 @@ use rand_pcg::Pcg64Mcg;
 #[derive(Debug, Clone)]
 pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
     pub baseline_partition: Clustering,
-    pub shrinkage_probabilities: ShrinkageProbabilities,
+    pub shrinkage: Shrinkage,
     pub permutation: Permutation,
     baseline_ppf: D,
 }
@@ -23,7 +22,7 @@ pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
 impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
     pub fn new(
         baseline_partition: Clustering,
-        shrinkage: ShrinkageProbabilities,
+        shrinkage: Shrinkage,
         permutation: Permutation,
         baseline_ppf: D,
     ) -> Option<Self> {
@@ -34,7 +33,7 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
         } else {
             Some(Self {
                 baseline_partition: baseline_partition.standardize(),
-                shrinkage_probabilities: shrinkage,
+                shrinkage,
                 permutation,
                 baseline_ppf,
             })
@@ -42,90 +41,52 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
     }
 }
 
-fn use_slow_implementation() -> bool {
-    match std::env::var("DBD_SP_SLOW") {
-        Ok(val) => !val.is_empty(),
-        Err(_) => false,
-    }
-}
-
-fn use_old_specification() -> bool {
-    match std::env::var("DBD_SP_OLD") {
-        Ok(val) => !val.is_empty(),
-        Err(_) => false,
-    }
-}
-
-fn expand_counts(counts: &mut [Vec<usize>], new_len: usize) {
-    counts.iter_mut().map(|x| x.resize(new_len, 0)).collect()
+fn expand_counts(counts: &mut [Vec<f64>], new_len: usize) {
+    counts.iter_mut().map(|x| x.resize(new_len, 0.0)).collect()
 }
 
 impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<D> {
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
-        if use_slow_implementation() {
-            println!("Using slow implementation.");
-            let mut target = clustering.allocation().clone();
-            let candidate_labels = clustering.available_labels_for_reallocation(item);
-            let mut partial_clustering = clustering.clone();
-            for i in self.permutation.n_items_before(item)..partial_clustering.n_items() {
-                partial_clustering.remove(self.permutation.get(i));
-            }
-            candidate_labels
-                .map(|label| {
-                    target[item] = label;
-                    (
-                        label,
-                        engine_slow_implementation::<D, Pcg64Mcg>(
-                            self,
-                            partial_clustering.clone(),
-                            Some(&target[..]),
-                            None,
-                        )
-                        .1,
-                    )
-                })
-                .collect()
-        } else {
-            let mut target = clustering.allocation().clone();
-            let candidate_labels = clustering.available_labels_for_reallocation(item);
-            let mut partial_clustering = clustering.clone();
-            for i in self.permutation.n_items_before(item)..partial_clustering.n_items() {
-                partial_clustering.remove(self.permutation.get(i));
-            }
-            let (mut counts_marginal, mut counts) = {
-                let m = self.baseline_partition.max_label() + 1;
-                (vec![0; m], vec![Vec::new(); m])
-            };
-            let max_label = partial_clustering.max_label();
-            if max_label >= counts[0].len() {
-                expand_counts(&mut counts, partial_clustering.max_label() + 1)
-            }
-            for i in 0..partial_clustering.n_items_allocated() {
-                let item = self.permutation.get(i);
-                let label_in_baseline = self.baseline_partition.get(item);
-                let label = target[item];
-                counts_marginal[label_in_baseline] += 1;
-                counts[label_in_baseline][label] += 1;
-            }
-            candidate_labels
-                .map(|label| {
-                    target[item] = label;
-                    (
-                        label,
-                        engine::<D, Pcg64Mcg>(
-                            self,
-                            partial_clustering.clone(),
-                            counts_marginal.clone(),
-                            counts.clone(),
-                            Some(&target[..]),
-                            None,
-                        )
-                        .1,
-                    )
-                })
-                .collect()
+        let mut target = clustering.allocation().clone();
+        let candidate_labels = clustering.available_labels_for_reallocation(item);
+        let mut partial_clustering = clustering.clone();
+        for i in self.permutation.n_items_before(item)..partial_clustering.n_items() {
+            partial_clustering.remove(self.permutation.get(i));
         }
+        let (mut counts_marginal, mut counts) = {
+            let m = self.baseline_partition.max_label() + 1;
+            (vec![0.0; m], vec![Vec::new(); m])
+        };
+        let max_label = partial_clustering.max_label();
+        if max_label >= counts[0].len() {
+            expand_counts(&mut counts, partial_clustering.max_label() + 1)
+        }
+        for i in 0..partial_clustering.n_items_allocated() {
+            let item = self.permutation.get(i);
+            let label_in_baseline = self.baseline_partition.get(item);
+            let label = target[item];
+            let s = self.shrinkage[item];
+            counts_marginal[label_in_baseline] += s;
+            counts[label_in_baseline][label] += s;
+        }
+        candidate_labels
+            .map(|label| {
+                target[item] = label;
+                (
+                    label,
+                    engine::<D, Pcg64Mcg>(
+                        self,
+                        partial_clustering.clone(),
+                        counts_marginal.clone(),
+                        counts.clone(),
+                        Some(&target[..]),
+                        None,
+                    )
+                    .1,
+                )
+            })
+            .collect()
     }
 }
 
@@ -155,12 +116,12 @@ impl<D: PredictiveProbabilityFunction + Clone> HasPermutation for SpParameters<D
     }
 }
 
-impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkageProbabilities for SpParameters<D> {
-    fn shrinkage_probabilities(&self) -> &ShrinkageProbabilities {
-        &self.shrinkage_probabilities
+impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkage for SpParameters<D> {
+    fn shrinkage(&self) -> &Shrinkage {
+        &self.shrinkage
     }
-    fn shrinkage_probabilities_mut(&mut self) -> &mut ShrinkageProbabilities {
-        &mut self.shrinkage_probabilities
+    fn shrinkage_mut(&mut self) -> &mut Shrinkage {
+        &mut self.shrinkage
     }
 }
 
@@ -169,144 +130,30 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    if use_slow_implementation() {
-        println!("Using slow implementation.");
-        engine_slow_implementation(
-            parameters,
-            Clustering::unallocated(parameters.baseline_partition.n_items()),
-            target,
-            rng,
-        )
-    } else {
-        let m = parameters.baseline_partition.max_label() + 1;
-        engine(
-            parameters,
-            Clustering::unallocated(parameters.baseline_partition.n_items()),
-            vec![0; m],
-            vec![Vec::new(); m],
-            target,
-            rng,
-        )
-    }
+    let m = parameters.baseline_partition.max_label() + 1;
+    engine(
+        parameters,
+        Clustering::unallocated(parameters.baseline_partition.n_items()),
+        vec![0.0; m],
+        vec![Vec::new(); m],
+        target,
+        rng,
+    )
 }
 
-fn log_weights_to_probabilities<T>(x: &mut [(T, f64)]) {
-    let max_weight = x.iter().map(|x| x.1).fold(f64::NEG_INFINITY, f64::max);
-    for (_, w) in x.iter_mut() {
-        *w = (*w - max_weight).exp()
-    }
-    let sum = x.iter().fold(0.0, |acc, z| acc + z.1);
-    for y in x.iter_mut().map(|z| &mut z.1) {
-        *y /= sum;
-    }
-}
-
-fn engine_slow_implementation<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &SpParameters<D>,
     mut clustering: Clustering,
+    mut counts_marginal: Vec<f64>,
+    mut counts: Vec<Vec<f64>>,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
-        let probability_of_shrinkage_ppf = parameters.shrinkage_probabilities[item];
-        let probability_of_baseline_ppf = 1.0 - probability_of_shrinkage_ppf;
-        let candidate_labels: Vec<usize> = clustering
-            .available_labels_for_allocation_with_target(target, item)
-            .collect();
-        let baseline_ppf = {
-            let mut x =
-                parameters
-                    .baseline_ppf
-                    .log_predictive_weight(item, &candidate_labels, &clustering);
-            log_weights_to_probabilities(&mut x);
-            x
-        };
         let label_in_baseline = parameters.baseline_partition.get(item);
-        let mut items_in_baseline = parameters.baseline_partition.items_of(label_in_baseline);
-        items_in_baseline.sort_unstable();
-        let mut new_index = 0;
-        let mut denominator = 0.0;
-        let mut shrinkage_ppf: Vec<_> = baseline_ppf
-            .iter()
-            .enumerate()
-            .map(|(index, &(label, _))| {
-                let items = clustering.items_of(label);
-                if items.is_empty() {
-                    new_index = index;
-                    return 0.0;
-                }
-                let intersection = items
-                    .iter()
-                    .filter(|x| items_in_baseline.binary_search(x).is_ok());
-                let result = if use_old_specification() {
-                    intersection.count() as f64
-                } else {
-                    intersection
-                        .map(|j| parameters.shrinkage_probabilities[*j])
-                        .sum()
-                };
-                denominator += result;
-                result
-            })
-            .collect();
-        if denominator == 0.0 {
-            shrinkage_ppf[new_index] = 1.0;
-        } else {
-            for v in shrinkage_ppf.iter_mut() {
-                *v /= denominator;
-            }
-        }
-        let labels_and_probabilities: Vec<_> = baseline_ppf
-            .into_iter()
-            .zip(shrinkage_ppf)
-            .map(|((label, p1), p2)| {
-                (
-                    label,
-                    probability_of_baseline_ppf * p1 + probability_of_shrinkage_ppf * p2,
-                )
-            })
-            .collect();
-        let (label, log_probability_contribution) = match &mut rng {
-            Some(r) => clustering.select(
-                labels_and_probabilities.into_iter(),
-                false,
-                true,
-                0,
-                Some(r),
-                true,
-            ),
-            None => clustering.select::<Pcg64Mcg, _>(
-                labels_and_probabilities.into_iter(),
-                false,
-                true,
-                target.unwrap()[item],
-                None,
-                true,
-            ),
-        };
-        log_probability += log_probability_contribution;
-        clustering.allocate(item, label);
-    }
-    (clustering, log_probability)
-}
-
-fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
-    parameters: &SpParameters<D>,
-    clustering: Clustering,
-    _counts_marginal: Vec<usize>,
-    _counts: Vec<Vec<usize>>,
-    target: Option<&[usize]>,
-    rng: Option<&mut T>,
-) -> (Clustering, f64) {
-    engine_slow_implementation(parameters, clustering, target, rng)
-    /*
-    let mut log_probability = 0.0;
-    for i in clustering.n_items_allocated()..clustering.n_items() {
-        let item = parameters.permutation.get(i);
-        let label_in_baseline = parameters.baseline_partition.get(item);
-        let shrinkage = parameters.shrinkage_probabilities[item];
+        let shrinkage = parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -314,23 +161,21 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         if max_candidate_label >= counts[label_in_baseline].len() {
             expand_counts(&mut counts, max_candidate_label + 1)
         }
-        let n_marginal = counts_marginal[label_in_baseline] as f64;
+        let n_marginal = counts_marginal[label_in_baseline];
         let multiplier = shrinkage / n_marginal;
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
-                let n_joint = counts[label_in_baseline][label] as f64;
+                let n_joint = counts[label_in_baseline][label];
                 let lp = log_probability
                     + if n_joint > 0.0 {
                         multiplier * n_joint
+                    } else if n_marginal == 0.0 && clustering.size_of(label) == 0 {
+                        shrinkage
                     } else {
-                        if n_marginal == 0.0 && clustering.size_of(label) == 0 {
-                            shrinkage
-                        } else {
-                            0.0
-                        }
+                        0.0
                     };
                 (label, lp)
             });
@@ -347,11 +192,11 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         };
         log_probability += log_probability_contribution;
         clustering.allocate(item, label);
-        counts_marginal[label_in_baseline] += 1;
-        counts[label_in_baseline][label] += 1;
+        let s = parameters.shrinkage[item];
+        counts_marginal[label_in_baseline] += s;
+        counts[label_in_baseline][label] += s;
     }
     (clustering, log_probability)
-    */
 }
 
 #[cfg(test)]
@@ -359,24 +204,6 @@ mod tests {
     use super::*;
     use crate::crp::CrpParameters;
     use crate::prelude::*;
-
-    #[test]
-    fn test_normalize_log_weights() {
-        let mut y = vec![(0, 1.0), (1, 4.0), (2, 5.0)];
-        let sum: f64 = y.iter().map(|x| x.1).sum();
-        y.iter_mut().map(|x| &mut x.1).for_each(|yy| {
-            *yy /= sum;
-        });
-        let mut x = y.clone();
-        x.iter_mut()
-            .map(|y| &mut y.1)
-            .for_each(|yy| *yy = (*yy).ln() + 23.0);
-        log_weights_to_probabilities(&mut x);
-        let epsilon = 0.0001;
-        for (xx, yy) in y.iter().zip(x).map(|(x, y)| (x.1, y.1)) {
-            assert!((xx - yy).abs() < epsilon);
-        }
-    }
 
     #[test]
     fn test_goodness_of_fit_constructive() {
@@ -389,9 +216,9 @@ mod tests {
             let target = Clustering::from_vector(target);
             let mut vec = Vec::with_capacity(target.n_clusters());
             for _ in 0..target.n_items() {
-                vec.push(rng.gen_range(0.0..1.0));
+                vec.push(rng.gen_range(0.0..10.0));
             }
-            let shrinkage = ShrinkageProbabilities::from(&vec[..]).unwrap();
+            let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
@@ -421,9 +248,9 @@ mod tests {
             let target = Clustering::from_vector(target);
             let mut vec = Vec::with_capacity(target.n_clusters());
             for _ in 0..target.n_items() {
-                vec.push(rng.gen_range(0.0..1.0));
+                vec.push(rng.gen_range(0.0..10.0));
             }
-            let shrinkage = ShrinkageProbabilities::from(&vec[..]).unwrap();
+            let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let baseline_distribution =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
