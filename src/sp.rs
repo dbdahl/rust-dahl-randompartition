@@ -141,13 +141,6 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     )
 }
 
-fn use_experimental_specification() -> bool {
-    match std::env::var("DBD_SP_EXPERIMENTAL") {
-        Ok(val) => !val.is_empty(),
-        Err(_) => false,
-    }
-}
-
 fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &SpParameters<D>,
     mut clustering: Clustering,
@@ -169,11 +162,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             expand_counts(&mut counts, max_candidate_label + 1)
         }
         let n_marginal = counts_marginal[label_in_baseline];
-        let multiplier = if use_experimental_specification() {
-            shrinkage - n_marginal.ln()
-        } else {
-            shrinkage / n_marginal
-        };
+        let multiplier = shrinkage - n_marginal.ln();
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
@@ -181,22 +170,12 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .map(|(label, log_probability)| {
                 let n_joint = counts[label_in_baseline][label];
                 let lp = log_probability
-                    + if use_experimental_specification() {
-                        if n_joint > 0.0 {
-                            multiplier + n_joint.ln()
-                        } else if n_marginal == 0.0 && clustering.size_of(label) == 0 {
-                            shrinkage
-                        } else {
-                            0.0
-                        }
+                    + if n_joint > 0.0 {
+                        multiplier + n_joint.ln()
+                    } else if n_marginal == 0.0 && clustering.size_of(label) == 0 {
+                        shrinkage
                     } else {
-                        if n_joint > 0.0 {
-                            multiplier * n_joint
-                        } else if n_marginal == 0.0 && clustering.size_of(label) == 0 {
-                            shrinkage
-                        } else {
-                            0.0
-                        }
+                        0.0
                     };
                 (label, lp)
             });
