@@ -13,7 +13,7 @@ use rand_pcg::Pcg64Mcg;
 
 #[derive(Debug, Clone)]
 pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
-    pub baseline_partition: Clustering,
+    pub anchor_partition: Clustering,
     pub shrinkage: Shrinkage,
     pub permutation: Permutation,
     baseline_ppf: D,
@@ -21,18 +21,18 @@ pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
 
 impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
     pub fn new(
-        baseline_partition: Clustering,
+        anchor_partition: Clustering,
         shrinkage: Shrinkage,
         permutation: Permutation,
         baseline_ppf: D,
     ) -> Option<Self> {
-        if (shrinkage.n_items() != baseline_partition.n_items())
-            || (baseline_partition.n_items() != permutation.n_items())
+        if (shrinkage.n_items() != anchor_partition.n_items())
+            || (anchor_partition.n_items() != permutation.n_items())
         {
             None
         } else {
             Some(Self {
-                baseline_partition: baseline_partition.standardize(),
+                anchor_partition: anchor_partition.standardize(),
                 shrinkage,
                 permutation,
                 baseline_ppf,
@@ -55,7 +55,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
             partial_clustering.remove(self.permutation.get(i));
         }
         let (mut counts_marginal, mut counts) = {
-            let m = self.baseline_partition.max_label() + 1;
+            let m = self.anchor_partition.max_label() + 1;
             (vec![0.0; m], vec![Vec::new(); m])
         };
         let max_label = partial_clustering.max_label();
@@ -64,11 +64,11 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
         }
         for i in 0..partial_clustering.n_items_allocated() {
             let item = self.permutation.get(i);
-            let label_in_baseline = self.baseline_partition.get(item);
+            let label_in_anchor = self.anchor_partition.get(item);
             let label = target[item];
             let s = self.shrinkage[item];
-            counts_marginal[label_in_baseline] += s;
-            counts[label_in_baseline][label] += s;
+            counts_marginal[label_in_anchor] += s;
+            counts[label_in_anchor][label] += s;
         }
         candidate_labels
             .map(|label| {
@@ -130,10 +130,10 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let m = parameters.baseline_partition.max_label() + 1;
+    let m = parameters.anchor_partition.max_label() + 1;
     engine(
         parameters,
-        Clustering::unallocated(parameters.baseline_partition.n_items()),
+        Clustering::unallocated(parameters.anchor_partition.n_items()),
         vec![0.0; m],
         vec![Vec::new(); m],
         target,
@@ -152,23 +152,23 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
-        let label_in_baseline = parameters.baseline_partition.get(item);
+        let label_in_anchor = parameters.anchor_partition.get(item);
         let shrinkage = parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
         let max_candidate_label = *candidate_labels.iter().max().unwrap();
-        if max_candidate_label >= counts[label_in_baseline].len() {
+        if max_candidate_label >= counts[label_in_anchor].len() {
             expand_counts(&mut counts, max_candidate_label + 1)
         }
-        let n_marginal = counts_marginal[label_in_baseline];
+        let n_marginal = counts_marginal[label_in_anchor];
         let log_common_bonus = shrinkage - n_marginal.ln();
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
             .into_iter()
             .map(|(label, log_probability)| {
-                let n_joint = counts[label_in_baseline][label];
+                let n_joint = counts[label_in_anchor][label];
                 let lp = log_probability
                     + if n_joint > 0.0 {
                         log_common_bonus + n_joint.ln()
@@ -193,8 +193,8 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         log_probability += log_probability_contribution;
         clustering.allocate(item, label);
         let s = parameters.shrinkage[item];
-        counts_marginal[label_in_baseline] += s;
-        counts[label_in_baseline][label] += s;
+        counts_marginal[label_in_anchor] += s;
+        counts[label_in_anchor][label] += s;
     }
     (clustering, log_probability)
 }
