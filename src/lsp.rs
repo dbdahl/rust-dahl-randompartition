@@ -13,7 +13,7 @@ use rand_pcg::Pcg64Mcg;
 
 #[derive(Debug, Clone)]
 pub struct LspParameters {
-    baseline_partition: Clustering,
+    anchor: Clustering,
     pub rate: f64,
     pub mass: Mass,
     pub permutation: Permutation,
@@ -21,13 +21,13 @@ pub struct LspParameters {
 
 impl LspParameters {
     pub fn new_with_scale(
-        baseline: Clustering,
+        anchor: Clustering,
         scale: f64,
         mass: Mass,
         permutation: Permutation,
     ) -> Option<Self> {
         let rate = 1.0 / scale;
-        Self::new_with_rate(baseline, rate, mass, permutation)
+        Self::new_with_rate(anchor, rate, mass, permutation)
     }
 
     pub fn new_with_rate(
@@ -44,7 +44,7 @@ impl LspParameters {
             None
         } else {
             Some(Self {
-                baseline_partition: baseline,
+                anchor: baseline,
                 rate,
                 mass,
                 permutation,
@@ -107,10 +107,10 @@ fn engine<T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let ni = parameters.baseline_partition.n_items();
+    let ni = parameters.anchor.n_items();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
-    let mut total_counter = vec![0.0; parameters.baseline_partition.max_label() + 1];
+    let mut total_counter = vec![0.0; parameters.anchor.max_label() + 1];
     let mut intersection_counter = Vec::with_capacity(total_counter.len());
     for _ in 0..total_counter.len() {
         intersection_counter.push(Vec::new())
@@ -119,7 +119,7 @@ fn engine<T: Rng>(
     let mut visited_subsets_indicator = vec![false; total_counter.len()];
     for i in 0..clustering.n_items() {
         let ii = parameters.permutation.get(i);
-        let baseline_subset_index = parameters.baseline_partition.get(ii);
+        let baseline_subset_index = parameters.anchor.get(ii);
         let n_occupied_subsets = clustering.n_clusters() as f64;
         let labels_and_weights = clustering
             .available_labels_for_allocation_with_target(target, ii)

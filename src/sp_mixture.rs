@@ -14,7 +14,7 @@ use rand_pcg::Pcg64Mcg;
 
 #[derive(Debug, Clone)]
 pub struct SpMixtureParameters<D: PredictiveProbabilityFunction + Clone> {
-    pub baseline_partition: Clustering,
+    pub anchor: Clustering,
     pub shrinkage_probabilities: ShrinkageProbabilities,
     pub permutation: Permutation,
     baseline_ppf: D,
@@ -22,18 +22,18 @@ pub struct SpMixtureParameters<D: PredictiveProbabilityFunction + Clone> {
 
 impl<D: PredictiveProbabilityFunction + Clone> SpMixtureParameters<D> {
     pub fn new(
-        baseline_partition: Clustering,
+        anchor: Clustering,
         shrinkage: ShrinkageProbabilities,
         permutation: Permutation,
         baseline_ppf: D,
     ) -> Option<Self> {
-        if (shrinkage.n_items() != baseline_partition.n_items())
-            || (baseline_partition.n_items() != permutation.n_items())
+        if (shrinkage.n_items() != anchor.n_items())
+            || (anchor.n_items() != permutation.n_items())
         {
             None
         } else {
             Some(Self {
-                baseline_partition: baseline_partition.standardize(),
+                anchor: anchor.standardize(),
                 shrinkage_probabilities: shrinkage,
                 permutation,
                 baseline_ppf,
@@ -94,7 +94,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpMixturePara
                 partial_clustering.remove(self.permutation.get(i));
             }
             let (mut counts_marginal, mut counts) = {
-                let m = self.baseline_partition.max_label() + 1;
+                let m = self.anchor.max_label() + 1;
                 (vec![0; m], vec![Vec::new(); m])
             };
             let max_label = partial_clustering.max_label();
@@ -103,7 +103,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpMixturePara
             }
             for i in 0..partial_clustering.n_items_allocated() {
                 let item = self.permutation.get(i);
-                let label_in_baseline = self.baseline_partition.get(item);
+                let label_in_baseline = self.anchor.get(item);
                 let label = target[item];
                 counts_marginal[label_in_baseline] += 1;
                 counts[label_in_baseline][label] += 1;
@@ -175,15 +175,15 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         println!("Using slow implementation.");
         engine_slow_implementation(
             parameters,
-            Clustering::unallocated(parameters.baseline_partition.n_items()),
+            Clustering::unallocated(parameters.anchor.n_items()),
             target,
             rng,
         )
     } else {
-        let m = parameters.baseline_partition.max_label() + 1;
+        let m = parameters.anchor.max_label() + 1;
         engine(
             parameters,
-            Clustering::unallocated(parameters.baseline_partition.n_items()),
+            Clustering::unallocated(parameters.anchor.n_items()),
             vec![0; m],
             vec![Vec::new(); m],
             target,
@@ -225,8 +225,8 @@ fn engine_slow_implementation<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             log_weights_to_probabilities(&mut x);
             x
         };
-        let label_in_baseline = parameters.baseline_partition.get(item);
-        let mut items_in_baseline = parameters.baseline_partition.items_of(label_in_baseline);
+        let label_in_baseline = parameters.anchor.get(item);
+        let mut items_in_baseline = parameters.anchor.items_of(label_in_baseline);
         items_in_baseline.sort_unstable();
         let mut new_index = 0;
         let mut denominator = 0.0;
@@ -307,7 +307,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
-        let label_in_baseline = parameters.baseline_partition.get(item);
+        let label_in_baseline = parameters.anchor.get(item);
         let shrinkage = parameters.shrinkage_probabilities[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
@@ -395,10 +395,10 @@ mod tests {
             }
             let shrinkage = ShrinkageProbabilities::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let baseline_distribution =
+            let baseline =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters =
-                SpMixtureParameters::new(target, shrinkage, permutation, baseline_distribution)
+                SpMixtureParameters::new(target, shrinkage, permutation, baseline)
                     .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
@@ -428,10 +428,10 @@ mod tests {
             }
             let shrinkage = ShrinkageProbabilities::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let baseline_distribution =
+            let baseline =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters =
-                SpMixtureParameters::new(target, shrinkage, permutation, baseline_distribution)
+                SpMixtureParameters::new(target, shrinkage, permutation, baseline)
                     .unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);

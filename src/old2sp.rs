@@ -13,7 +13,7 @@ use rand_pcg::Pcg64Mcg;
 
 #[derive(Debug, Clone)]
 pub struct Old2SpParameters<D: PredictiveProbabilityFunction + Clone> {
-    pub baseline_partition: Clustering,
+    pub anchor: Clustering,
     pub shrinkage: Shrinkage,
     pub permutation: Permutation,
     baseline_ppf: D,
@@ -21,18 +21,18 @@ pub struct Old2SpParameters<D: PredictiveProbabilityFunction + Clone> {
 
 impl<D: PredictiveProbabilityFunction + Clone> Old2SpParameters<D> {
     pub fn new(
-        baseline_partition: Clustering,
+        anchor: Clustering,
         shrinkage: Shrinkage,
         permutation: Permutation,
         baseline_ppf: D,
     ) -> Option<Self> {
-        if (shrinkage.n_items() != baseline_partition.n_items())
-            || (baseline_partition.n_items() != permutation.n_items())
+        if (shrinkage.n_items() != anchor.n_items())
+            || (anchor.n_items() != permutation.n_items())
         {
             None
         } else {
             Some(Self {
-                baseline_partition: baseline_partition.standardize(),
+                anchor: anchor.standardize(),
                 shrinkage,
                 permutation,
                 baseline_ppf,
@@ -55,7 +55,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Old2SpParamet
             partial_clustering.remove(self.permutation.get(i));
         }
         let (mut counts_marginal, mut counts) = {
-            let m = self.baseline_partition.max_label() + 1;
+            let m = self.anchor.max_label() + 1;
             (vec![0; m], vec![Vec::new(); m])
         };
         let max_label = partial_clustering.max_label();
@@ -64,7 +64,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for Old2SpParamet
         }
         for i in 0..partial_clustering.n_items_allocated() {
             let item = self.permutation.get(i);
-            let label_in_baseline = self.baseline_partition.get(item);
+            let label_in_baseline = self.anchor.get(item);
             let label = target[item];
             counts_marginal[label_in_baseline] += 1;
             counts[label_in_baseline][label] += 1;
@@ -129,10 +129,10 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
-    let m = parameters.baseline_partition.max_label() + 1;
+    let m = parameters.anchor.max_label() + 1;
     engine(
         parameters,
-        Clustering::unallocated(parameters.baseline_partition.n_items()),
+        Clustering::unallocated(parameters.anchor.n_items()),
         vec![0; m],
         vec![Vec::new(); m],
         target,
@@ -151,7 +151,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
-        let label_in_baseline = parameters.baseline_partition.get(item);
+        let label_in_baseline = parameters.anchor.get(item);
         let shrinkage = parameters.shrinkage[item];
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
@@ -218,10 +218,10 @@ mod tests {
             }
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let baseline_distribution =
+            let baseline =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters =
-                Old2SpParameters::new(target, shrinkage, permutation, baseline_distribution)
+                Old2SpParameters::new(target, shrinkage, permutation, baseline)
                     .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
@@ -251,10 +251,10 @@ mod tests {
             }
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let baseline_distribution =
+            let baseline =
                 CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters =
-                Old2SpParameters::new(target, shrinkage, permutation, baseline_distribution)
+                Old2SpParameters::new(target, shrinkage, permutation, baseline)
                     .unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);

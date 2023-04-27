@@ -10,7 +10,7 @@ use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossCompute
 
 #[derive(Debug, Clone)]
 pub struct CppParameters<D: ProbabilityMassFunction> {
-    baseline_partition: Clustering,
+    anchor: Clustering,
     rate: f64,
     baseline_pmf: D,
     use_vi: bool,
@@ -21,7 +21,7 @@ pub struct CppParameters<D: ProbabilityMassFunction> {
 
 impl<D: ProbabilityMassFunction> CppParameters<D> {
     pub fn new(
-        baseline: Clustering,
+        anchor: Clustering,
         rate: f64,
         baseline_pmf: D,
         use_vi: bool,
@@ -30,12 +30,12 @@ impl<D: ProbabilityMassFunction> CppParameters<D> {
         if rate.is_nan() || rate.is_infinite() || rate <= 0.0 {
             return None;
         }
-        let labels: Vec<_> = baseline.allocation().iter().map(|x| *x as i32).collect();
-        let n_items = baseline.n_items();
+        let labels: Vec<_> = anchor.allocation().iter().map(|x| *x as i32).collect();
+        let n_items = anchor.n_items();
         let baseline_as_clusterings =
             Clusterings::from_i32_column_major_order(&labels[..], n_items);
         Some(Self {
-            baseline_partition: baseline,
+            anchor,
             rate,
             baseline_pmf,
             use_vi,
@@ -110,18 +110,16 @@ mod tests {
         let mass = Mass::new_with_variable_constraint(2.0, discount);
         let discount = Discount::new(discount);
         let mut rng = thread_rng();
-        for baseline in Clustering::iter(n_items) {
-            let baseline = Clustering::from_vector(baseline);
+        for anchor in Clustering::iter(n_items) {
+            let anchor = Clustering::from_vector(anchor);
             let rate = loop {
                 let x = rng.gen_range(0.0..10.0);
                 if x > 0.0 {
                     break x;
                 }
             };
-            let baseline_distribution =
-                CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
-            let parameters =
-                CppParameters::new(baseline, rate, baseline_distribution, true, 1.0).unwrap();
+            let baseline = CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
+            let parameters = CppParameters::new(anchor, rate, baseline, true, 1.0).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
