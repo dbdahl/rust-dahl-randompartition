@@ -149,6 +149,11 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    let exponent = std::env::var("DBD_SP_EXP")
+        .unwrap_or_else(|_| "1.0".to_owned())
+        .parse()
+        .unwrap_or(1.0);
+    println!("exp: {exponent}");
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
@@ -161,8 +166,14 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         if max_candidate_label >= counts[label_in_baseline].len() {
             expand_counts(&mut counts, max_candidate_label + 1)
         }
-        let n_marginal = counts_marginal[label_in_baseline];
-        let multiplier = shrinkage - n_marginal.ln();
+        let denominator = if exponent == 1.0 {
+            counts_marginal[label_in_baseline]
+        } else {
+            counts[label_in_baseline]
+                .iter()
+                .fold(0.0, |acc: f64, x| acc + x.powf(exponent))
+        };
+        let multiplier = shrinkage - denominator.ln();
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
@@ -171,8 +182,8 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
                 let n_joint = counts[label_in_baseline][label];
                 let lp = log_probability
                     + if n_joint > 0.0 {
-                        multiplier + n_joint.ln()
-                    } else if n_marginal == 0.0 && clustering.size_of(label) == 0 {
+                        multiplier + exponent * n_joint.ln()
+                    } else if denominator == 0.0 && clustering.size_of(label) == 0 {
                         shrinkage
                     } else {
                         0.0
