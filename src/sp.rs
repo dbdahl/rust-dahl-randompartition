@@ -153,7 +153,6 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         .unwrap_or_else(|_| "1.0".to_owned())
         .parse()
         .unwrap_or(1.0);
-    println!("exp: {exponent}");
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
