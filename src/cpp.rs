@@ -27,7 +27,7 @@ impl<D: ProbabilityMassFunction> CppParameters<D> {
         use_vi: bool,
         a: f64,
     ) -> Option<Self> {
-        if rate.is_nan() || rate.is_infinite() || rate <= 0.0 {
+        if rate.is_nan() || rate.is_infinite() || rate < 0.0 {
             return None;
         }
         let labels: Vec<_> = anchor.allocation().iter().map(|x| *x as i32).collect();
