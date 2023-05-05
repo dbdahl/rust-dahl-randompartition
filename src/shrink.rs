@@ -46,12 +46,14 @@ impl Shrinkage {
     }
 
     pub fn rescale_by_reference(&mut self, reference: usize, new_value: f64) {
-        if new_value <= 0.0 {
-            panic!("'value' must be nonnegative.");
-        }
         let multiplicative_factor = new_value / self.0[reference];
-        for y in &mut self.0 {
-            *y *= multiplicative_factor;
+        if (1.0 - multiplicative_factor).abs() > 0.000_000_1 {
+            if new_value <= 0.0 {
+                panic!("'value' must be nonnegative.");
+            }
+            for y in &mut self.0 {
+                *y *= multiplicative_factor;
+            }
         }
     }
 
