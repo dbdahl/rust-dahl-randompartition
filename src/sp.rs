@@ -161,7 +161,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             expand_counts(&mut counts, max_candidate_label + 1)
         }
         let n_marginal = counts_marginal[label_in_anchor];
-        let log_common_bonus = shrinkage - n_marginal.ln();
+        let log_common_bonus = shrinkage / n_marginal;
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
@@ -170,7 +170,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
                 let n_joint = counts[label_in_anchor][label];
                 let lp = log_probability
                     + if n_joint > 0.0 {
-                        log_common_bonus + n_joint.ln()
+                        log_common_bonus * n_joint
                     } else if n_marginal == 0.0 && clustering.size_of(label) == 0 {
                         shrinkage
                     } else {
