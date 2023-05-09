@@ -8,6 +8,42 @@ use crate::slice::slice_sampler;
 use rand::Rng;
 use statrs::distribution::{Continuous, Gamma};
 
+pub fn update_partition_gibbs<T, U, V>(
+    n_updates: u32,
+    state: &mut Clustering,
+    permutation: &Permutation,
+    prior: &T,
+    log_likelihood: &mut U,
+    rng: &mut V,
+) where
+    T: FullConditional,
+    U: FnMut(&Clustering) -> f64,
+    V: Rng,
+{
+    for _ in 0..n_updates {
+        for i in 0..state.n_items() {
+            let ii = permutation.get(i);
+            let labels_and_log_weights: Vec<_> = prior
+                .log_full_conditional(ii, state)
+                .into_iter()
+                .map(|(label, log_prior)| {
+                    state.allocate(ii, label);
+                    (label, log_likelihood(state) + log_prior)
+                })
+                .collect();
+            let pair = state.select(
+                labels_and_log_weights.into_iter(),
+                true,
+                false,
+                0,
+                Some(rng),
+                false,
+            );
+            state.allocate(ii, pair.0);
+        }
+    }
+}
+
 pub fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     state: &mut Clustering,

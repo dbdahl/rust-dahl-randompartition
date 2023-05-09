@@ -16,7 +16,7 @@ pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
     pub anchor: Clustering,
     pub shrinkage: Shrinkage,
     pub permutation: Permutation,
-    baseline_ppf: D,
+    pub baseline_ppf: D,
 }
 
 impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
