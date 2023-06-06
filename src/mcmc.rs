@@ -17,7 +17,7 @@ pub fn update_partition_gibbs<T, U, V>(
     rng: &mut V,
 ) where
     T: FullConditional,
-    U: FnMut(&Clustering) -> f64,
+    U: FnMut(usize, &Clustering) -> f64,
     V: Rng,
 {
     for _ in 0..n_updates {
@@ -28,7 +28,7 @@ pub fn update_partition_gibbs<T, U, V>(
                 .into_iter()
                 .map(|(label, log_prior)| {
                     state.allocate(ii, label);
-                    (label, log_likelihood(state) + log_prior)
+                    (label, log_likelihood(ii, state) + log_prior)
                 })
                 .collect();
             let pair = state.select(

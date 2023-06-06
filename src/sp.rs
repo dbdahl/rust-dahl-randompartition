@@ -4,6 +4,7 @@ use crate::clust::Clustering;
 use crate::distr::{
     FullConditional, HasPermutation, HasVectorShrinkage, NormalizedProbabilityMassFunction,
     PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
+    ProbabilityMassFunctionPartial,
 };
 use crate::perm::Permutation;
 use crate::shrink::Shrinkage;
@@ -38,17 +39,12 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
             })
         }
     }
-}
 
-fn expand_counts(counts: &mut [Vec<f64>], new_len: usize) {
-    counts.iter_mut().map(|x| x.resize(new_len, 0.0)).collect()
-}
-
-impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<D> {
-    // Implement starting only at item and subsequent items.
-    fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
-        let mut target = clustering.allocation().clone();
-        let candidate_labels = clustering.available_labels_for_reallocation(item);
+    fn prepare_for_partial(
+        &self,
+        item: usize,
+        clustering: &Clustering,
+    ) -> (Clustering, Vec<f64>, Vec<Vec<f64>>) {
         let mut partial_clustering = clustering.clone();
         for i in self.permutation.n_items_before(item)..partial_clustering.n_items() {
             partial_clustering.remove(self.permutation.get(i));
@@ -64,11 +60,26 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
         for i in 0..partial_clustering.n_items_allocated() {
             let item = self.permutation.get(i);
             let label_in_anchor = self.anchor.get(item);
-            let label = target[item];
+            let label = clustering.allocation()[item];
             let s = self.shrinkage[item];
             counts_marginal[label_in_anchor] += s;
             counts[label_in_anchor][label] += s;
         }
+        (partial_clustering, counts_marginal, counts)
+    }
+}
+
+fn expand_counts(counts: &mut [Vec<f64>], new_len: usize) {
+    counts.iter_mut().map(|x| x.resize(new_len, 0.0)).collect()
+}
+
+impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<D> {
+    // Implement starting only at item and subsequent items.
+    fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
+        let mut target = clustering.allocation().clone();
+        let (partial_clustering, counts_marginal, counts) =
+            self.prepare_for_partial(item, clustering);
+        let candidate_labels = clustering.available_labels_for_reallocation(item);
         candidate_labels
             .map(|label| {
                 target[item] = label;
@@ -98,6 +109,22 @@ impl<D: PredictiveProbabilityFunction + Clone> PartitionSampler for SpParameters
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
+    }
+}
+
+impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunctionPartial for SpParameters<D> {
+    fn log_pmf_partial(&self, item: usize, partition: &Clustering) -> f64 {
+        let (partial_clustering, counts_marginal, counts) =
+            self.prepare_for_partial(item, partition);
+        engine::<D, Pcg64Mcg>(
+            self,
+            partial_clustering,
+            counts_marginal,
+            counts,
+            Some(&partition.allocation()[..]),
+            None,
+        )
+        .1
     }
 }
 

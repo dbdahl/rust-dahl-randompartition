@@ -124,6 +124,10 @@ pub trait ProbabilityMassFunction {
     fn log_pmf(&self, clustering: &Clustering) -> f64;
 }
 
+pub trait ProbabilityMassFunctionPartial {
+    fn log_pmf_partial(&self, item: usize, clustering: &Clustering) -> f64;
+}
+
 pub(crate) fn default_probability_mass_function_log_pmf<T: PredictiveProbabilityFunction>(
     ppf: &T,
     permutation: &Permutation,
