@@ -21,13 +21,6 @@ impl Shrinkage {
         Some(Self(vec![value; n_items]))
     }
 
-    pub fn from_rate(value: f64, n_items: usize) -> Option<Self> {
-        if value.is_nan() || value < 0.0 {
-            return None;
-        }
-        Some(Self(vec![value; n_items]))
-    }
-
     pub fn from(w: &[f64]) -> Option<Self> {
         for ww in w.iter() {
             if ww.is_nan() || *ww < 0.0 {
@@ -43,6 +36,12 @@ impl Shrinkage {
 
     pub fn as_slice(&self) -> &[f64] {
         &self.0[..]
+    }
+
+    pub fn set_constant(&mut self, new_value: f64) {
+        for y in &mut self.0 {
+            *y = new_value;
+        }
     }
 
     pub fn rescale_by_reference(&mut self, reference: usize, new_value: f64) {
