@@ -181,6 +181,87 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     )
 }
 
+fn engine_rand<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &SpParameters<D>,
+    mut clustering: Clustering,
+    mut counts_marginal: Vec<f64>,
+    mut counts_marginal2: Vec<f64>,
+    mut counts: Vec<Vec<f64>>,
+    target: Option<&[usize]>,
+    mut rng: Option<&mut T>,
+) -> (Clustering, f64) {
+    let no_divisor = std::env::var("DBD_SP_NODIVISOR").map_or(false, |x| x == "TRUE");
+    let mut log_probability = 0.0;
+    for i in clustering.n_items_allocated()..clustering.n_items() {
+        let item = parameters.permutation.get(i);
+        let label_in_anchor = parameters.anchor.get(item);
+        let shrinkage = parameters.shrinkage[item];
+        let candidate_labels: Vec<usize> = clustering
+            .available_labels_for_allocation_with_target(target, item)
+            .collect();
+        let max_candidate_label = *candidate_labels.iter().max().unwrap();
+        if max_candidate_label >= counts[label_in_anchor].len() {
+            expand_counts(&mut counts_marginal2, &mut counts, max_candidate_label + 1)
+        }
+        let n_marginal = counts_marginal[label_in_anchor];
+        let labels_and_log_weights = parameters
+            .baseline_ppf
+            .log_predictive_weight(item, &candidate_labels, &clustering)
+            .into_iter()
+            .map(|(label, log_probability)| {
+                let s1 = (0..i).into_iter().fold(0.0, |s, j| {
+                    let item_j = parameters.permutation.get(j);
+                    s + if label_in_anchor == parameters.anchor.get(item_j)
+                        && clustering.get(item_j) == label
+                    {
+                        parameters.shrinkage[item_j]
+                    } else {
+                        0.0
+                    }
+                });
+                let s2 = (0..i).into_iter().fold(0.0, |s, j| {
+                    let item_j = parameters.permutation.get(j);
+                    s + if label_in_anchor != parameters.anchor.get(item_j)
+                        && clustering.get(item_j) == label
+                    {
+                        parameters.shrinkage[item_j]
+                    } else {
+                        0.0
+                    }
+                });
+                let divisor = if no_divisor { 1.0 } else { s1 + s2 };
+                let coefficient = if divisor == 0.0 {
+                    if n_marginal == 0.0 {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                } else {
+                    (s1 - s2) / divisor
+                };
+                let lp = log_probability + shrinkage * coefficient;
+                (label, lp)
+            });
+        let (label, log_probability_contribution) = match &mut rng {
+            Some(r) => clustering.select(labels_and_log_weights, true, false, 0, Some(r), true),
+            None => clustering.select::<Pcg64Mcg, _>(
+                labels_and_log_weights,
+                true,
+                false,
+                target.unwrap()[item],
+                None,
+                true,
+            ),
+        };
+        log_probability += log_probability_contribution;
+        clustering.allocate(item, label);
+        counts_marginal[label_in_anchor] += shrinkage;
+        counts_marginal2[label] += shrinkage;
+        counts[label_in_anchor][label] += shrinkage;
+    }
+    (clustering, log_probability)
+}
+
 fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &SpParameters<D>,
     mut clustering: Clustering,
@@ -190,7 +271,19 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    if std::env::var("DBD_SP_RAND").map_or(false, |x| x == "TRUE") {
+        return engine_rand(
+            parameters,
+            clustering,
+            counts_marginal,
+            counts_marginal2,
+            counts,
+            target,
+            rng,
+        );
+    }
     let new_version = std::env::var("DBD_SP_NEWVERSION").map_or(false, |x| x == "TRUE");
+    let no_divisor = std::env::var("DBD_SP_NODIVISOR").map_or(false, |x| x == "TRUE");
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
@@ -213,7 +306,11 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         } else {
             0.0
         };
-        let log_common_bonus = shrinkage / n_marginal;
+        let log_common_bonus = if no_divisor {
+            shrinkage
+        } else {
+            shrinkage / n_marginal
+        };
         let labels_and_log_weights = parameters
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
