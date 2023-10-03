@@ -189,6 +189,7 @@ fn engine_new<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    let scale = std::env::var("DBD_SP_SCALE").map_or(false, |x| x == "TRUE");
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
@@ -208,7 +209,8 @@ fn engine_new<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .map(|(label, log_probability)| {
                 let s1 = counts[label_in_anchor][label];
                 let s2 = counts_marginal2[label] - s1;
-                let lp = log_probability + shrinkage * (s1 - s2);
+                let lp = log_probability
+                    + shrinkage * (s1 - s2) / if scale { (i + 1) as f64 } else { 1.0 };
                 (label, lp)
             });
         let (label, log_probability_contribution) = match &mut rng {
