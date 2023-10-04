@@ -232,6 +232,107 @@ fn engine_new<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     (clustering, log_probability)
 }
 
+fn engine_new2<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &SpParameters<D>,
+    mut clustering: Clustering,
+    mut counts_marginal2: Vec<f64>,
+    mut counts: Vec<Vec<f64>>,
+    target: Option<&[usize]>,
+    mut rng: Option<&mut T>,
+) -> (Clustering, f64) {
+    let mut log_probability = 0.0;
+    for i in clustering.n_items_allocated()..clustering.n_items() {
+        let item = parameters.permutation.get(i);
+        let label_in_anchor = parameters.anchor.get(item);
+        let shrinkage = parameters.shrinkage[item];
+        let candidate_labels: Vec<usize> = clustering
+            .available_labels_for_allocation_with_target(target, item)
+            .collect();
+        let max_candidate_label = *candidate_labels.iter().max().unwrap();
+        if max_candidate_label >= counts[label_in_anchor].len() {
+            expand_counts(&mut counts_marginal2, &mut counts, max_candidate_label + 1)
+        }
+        let labels_and_log_weights = parameters
+            .baseline_ppf
+            .log_predictive_weight(item, &candidate_labels, &clustering)
+            .into_iter()
+            .map(|(label, log_probability)| {
+                let log_anchor_fidelity = shrinkage
+                    * (2.0 * counts[label_in_anchor][label].powi(2)
+                        - counts_marginal2[label].powi(2))
+                    / ((i + 1) as f64).powi(2);
+                let lp = log_probability + log_anchor_fidelity;
+                (label, lp)
+            });
+        let (label, log_probability_contribution) = match &mut rng {
+            Some(r) => clustering.select(labels_and_log_weights, true, false, 0, Some(r), true),
+            None => clustering.select::<Pcg64Mcg, _>(
+                labels_and_log_weights,
+                true,
+                false,
+                target.unwrap()[item],
+                None,
+                true,
+            ),
+        };
+        log_probability += log_probability_contribution;
+        clustering.allocate(item, label);
+        counts_marginal2[label] += shrinkage;
+        counts[label_in_anchor][label] += shrinkage;
+    }
+    (clustering, log_probability)
+}
+
+fn engine_new3<D: PredictiveProbabilityFunction + Clone, T: Rng>(
+    parameters: &SpParameters<D>,
+    mut clustering: Clustering,
+    mut counts_marginal2: Vec<f64>,
+    mut counts: Vec<Vec<f64>>,
+    target: Option<&[usize]>,
+    mut rng: Option<&mut T>,
+) -> (Clustering, f64) {
+    let mut log_probability = 0.0;
+    for i in clustering.n_items_allocated()..clustering.n_items() {
+        let item = parameters.permutation.get(i);
+        let label_in_anchor = parameters.anchor.get(item);
+        let shrinkage = parameters.shrinkage[item];
+        let candidate_labels: Vec<usize> = clustering
+            .available_labels_for_allocation_with_target(target, item)
+            .collect();
+        let max_candidate_label = *candidate_labels.iter().max().unwrap();
+        if max_candidate_label >= counts[label_in_anchor].len() {
+            expand_counts(&mut counts_marginal2, &mut counts, max_candidate_label + 1)
+        }
+        let labels_and_log_weights = parameters
+            .baseline_ppf
+            .log_predictive_weight(item, &candidate_labels, &clustering)
+            .into_iter()
+            .map(|(label, log_probability)| {
+                let e1 = counts[label_in_anchor][label] / (i + 1) as f64;
+                let e2 = counts_marginal2[label] / (i + 1) as f64;
+                let log_anchor_fidelity = shrinkage * (2.0 * e1 * e1.log2() - e2 * e2.log2());
+                let lp = log_probability + log_anchor_fidelity;
+                (label, lp)
+            });
+        let (label, log_probability_contribution) = match &mut rng {
+            Some(r) => clustering.select(labels_and_log_weights, true, false, 0, Some(r), true),
+            None => clustering.select::<Pcg64Mcg, _>(
+                labels_and_log_weights,
+                true,
+                false,
+                target.unwrap()[item],
+                None,
+                true,
+            ),
+        };
+        log_probability += log_probability_contribution;
+        clustering.allocate(item, label);
+        counts_marginal2[label] += shrinkage;
+        counts[label_in_anchor][label] += shrinkage;
+    }
+    (clustering, log_probability)
+}
+
 fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &SpParameters<D>,
     mut clustering: Clustering,
@@ -243,6 +344,26 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
 ) -> (Clustering, f64) {
     if std::env::var("DBD_SP_RAND").map_or(false, |x| x == "TRUE") {
         return engine_new(
+            parameters,
+            clustering,
+            counts_marginal2,
+            counts,
+            target,
+            rng,
+        );
+    }
+    if std::env::var("DBD_SP_RAND").map_or(false, |x| x == "2") {
+        return engine_new2(
+            parameters,
+            clustering,
+            counts_marginal2,
+            counts,
+            target,
+            rng,
+        );
+    }
+    if std::env::var("DBD_SP_RAND").map_or(false, |x| x == "3") {
+        return engine_new3(
             parameters,
             clustering,
             counts_marginal2,
