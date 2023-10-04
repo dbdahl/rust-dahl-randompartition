@@ -430,7 +430,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         );
     }
     if std::env::var("DBD_SP_RAND").map_or(false, |x| x == "4") {
-        return engine_new3(
+        return engine_new4(
             parameters,
             clustering,
             counts_marginal2,
