@@ -310,7 +310,14 @@ fn engine_new3<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .map(|(label, log_probability)| {
                 let e1 = counts[label_in_anchor][label] / (i + 1) as f64;
                 let e2 = counts_marginal2[label] / (i + 1) as f64;
-                let log_anchor_fidelity = shrinkage * (2.0 * e1 * e1.log2() - e2 * e2.log2());
+                fn f(x: f64) -> f64 {
+                    if x == 0.0 {
+                        0.0
+                    } else {
+                        x * x.log2()
+                    }
+                }
+                let log_anchor_fidelity = shrinkage * (2.0 * f(e1) - f(e2));
                 let lp = log_probability + log_anchor_fidelity;
                 (label, lp)
             });
