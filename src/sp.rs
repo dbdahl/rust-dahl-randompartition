@@ -82,23 +82,23 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
-        let (partial_clustering, mut counts_marginal, mut counts_joint) =
+        let (partial_clustering, counts_marginal, counts_joint) =
             self.prepare_for_partial(item, clustering);
         let candidate_labels = clustering.available_labels_for_reallocation(item);
         candidate_labels
             .map(|label| {
                 target[item] = label;
-                let mut scratch_clustering = partial_clustering.clone();
                 (
                     label,
                     engine::<D, Pcg64Mcg>(
                         self,
-                        &mut scratch_clustering,
-                        &mut counts_marginal,
-                        &mut counts_joint,
+                        partial_clustering.clone(),
+                        counts_marginal.clone(),
+                        counts_joint.clone(),
                         Some(&target[..]),
                         None,
-                    ),
+                    )
+                    .1,
                 )
             })
             .collect()
@@ -119,16 +119,17 @@ impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpPar
 
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunctionPartial for SpParameters<D> {
     fn log_pmf_partial(&self, item: usize, partition: &Clustering) -> f64 {
-        let (mut partial_clustering, mut counts_marginal, mut counts_joint) =
+        let (partial_clustering, counts_marginal, counts_joint) =
             self.prepare_for_partial(item, partition);
         engine::<D, Pcg64Mcg>(
             self,
-            &mut partial_clustering,
-            &mut counts_marginal,
-            &mut counts_joint,
+            partial_clustering,
+            counts_marginal,
+            counts_joint,
             Some(&partition.allocation()[..]),
             None,
         )
+        .1
     }
 }
 
@@ -161,30 +162,24 @@ fn engine_full<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     rng: Option<&mut T>,
 ) -> (Clustering, f64) {
     let m = parameters.anchor.max_label() + 1;
-    let (mut clustering, mut counts_marginal, mut counts_joint) = (
+    engine(
+        parameters,
         Clustering::unallocated(parameters.anchor.n_items()),
         Vec::new(),
         vec![Vec::new(); m],
-    );
-    let log_probability = engine(
-        parameters,
-        &mut clustering,
-        &mut counts_marginal,
-        &mut counts_joint,
         target,
         rng,
-    );
-    (clustering, log_probability)
+    )
 }
 
 fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     parameters: &SpParameters<D>,
-    clustering: &mut Clustering,
-    counts_marginal: &mut Vec<f64>,
-    counts_joint: &mut Vec<Vec<f64>>,
+    mut clustering: Clustering,
+    mut counts_marginal: Vec<f64>,
+    mut counts_joint: Vec<Vec<f64>>,
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
-) -> f64 {
+) -> (Clustering, f64) {
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
@@ -196,7 +191,11 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .collect();
         let max_candidate_label = *candidate_labels.iter().max().unwrap();
         if max_candidate_label >= counts_joint[label_in_anchor].len() {
-            expand_counts(counts_marginal, counts_joint, max_candidate_label + 1)
+            expand_counts(
+                &mut counts_marginal,
+                &mut counts_joint,
+                max_candidate_label + 1,
+            )
         }
         let labels_and_log_weights = parameters
             .baseline_ppf
@@ -225,7 +224,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         counts_marginal[label] += shrinkage;
         counts_joint[label_in_anchor][label] += shrinkage;
     }
-    log_probability
+    (clustering, log_probability)
 }
 
 #[cfg(test)]
