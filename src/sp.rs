@@ -82,17 +82,18 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
-        let (mut partial_clustering, mut counts_marginal, mut counts_joint) =
+        let (partial_clustering, mut counts_marginal, mut counts_joint) =
             self.prepare_for_partial(item, clustering);
         let candidate_labels = clustering.available_labels_for_reallocation(item);
         candidate_labels
             .map(|label| {
                 target[item] = label;
+                let mut scratch_clustering = partial_clustering.clone();
                 (
                     label,
                     engine::<D, Pcg64Mcg>(
                         self,
-                        &mut partial_clustering,
+                        &mut scratch_clustering,
                         &mut counts_marginal,
                         &mut counts_joint,
                         Some(&target[..]),
