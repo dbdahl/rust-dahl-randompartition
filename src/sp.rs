@@ -180,12 +180,20 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
     target: Option<&[usize]>,
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
+    let coef: f64 = std::env::var("DBD_SP_COEF")
+        .unwrap_or_else(|_| "1.0".to_string())
+        .parse()
+        .unwrap();
+    let pow: f64 = std::env::var("DBD_SP_POW")
+        .unwrap_or_else(|_| "2.0".to_string())
+        .parse()
+        .unwrap();
     let mut log_probability = 0.0;
     for i in clustering.n_items_allocated()..clustering.n_items() {
         let item = parameters.permutation.get(i);
         let label_in_anchor = parameters.anchor.get(item);
         let shrinkage = parameters.shrinkage[item];
-        let shrinkage_scaled = shrinkage / ((i + 1) as f64).powi(2);
+        let shrinkage_scaled = shrinkage / ((i + 1) as f64).powf(pow);
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -203,8 +211,8 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .into_iter()
             .map(|(label, log_probability)| {
                 let log_anchor_fidelity = shrinkage_scaled
-                    * (2.0 * counts_joint[label_in_anchor][label].powi(2)
-                        - counts_marginal[label].powi(2));
+                    * (2.0 * counts_joint[label_in_anchor][label].powf(pow)
+                        - coef * counts_marginal[label].powf(pow));
                 let lp = log_probability + log_anchor_fidelity;
                 (label, lp)
             });
