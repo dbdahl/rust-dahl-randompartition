@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod clust;
+pub mod cost;
 pub mod cpp;
 pub mod crp;
 pub mod distr;
