@@ -1,7 +1,7 @@
 use crate::clust::Clustering;
 use crate::perm::Permutation;
 
-use crate::shrink::{Shrinkage, ShrinkageProbabilities};
+use crate::shrink::Shrinkage;
 use rand::Rng;
 use rand_pcg::Pcg64Mcg;
 
@@ -66,13 +66,6 @@ pub trait HasScalarShrinkage {
 pub trait HasVectorShrinkage {
     fn shrinkage(&self) -> &Shrinkage;
     fn shrinkage_mut(&mut self) -> &mut Shrinkage;
-}
-
-//
-
-pub trait HasVectorShrinkageProbabilities {
-    fn shrinkage_probabilities(&self) -> &ShrinkageProbabilities;
-    fn shrinkage_probabilities_mut(&mut self) -> &mut ShrinkageProbabilities;
 }
 
 //
