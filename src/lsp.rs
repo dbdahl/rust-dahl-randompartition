@@ -14,7 +14,7 @@ use rand_pcg::Pcg64Mcg;
 #[derive(Debug, Clone)]
 pub struct LspParameters {
     anchor: Clustering,
-    pub rate: f64,
+    pub shrinkage: ScalarShrinkage,
     pub mass: Mass,
     pub permutation: Permutation,
 }
@@ -22,30 +22,25 @@ pub struct LspParameters {
 impl LspParameters {
     pub fn new_with_scale(
         anchor: Clustering,
-        scale: f64,
+        scale: Scale,
         mass: Mass,
         permutation: Permutation,
     ) -> Option<Self> {
-        let rate = 1.0 / scale;
-        Self::new_with_rate(anchor, rate, mass, permutation)
+        Self::new_with_shrinkage(anchor, scale.to_shrinkage(), mass, permutation)
     }
 
-    pub fn new_with_rate(
+    pub fn new_with_shrinkage(
         baseline: Clustering,
-        rate: f64,
+        shrinkage: ScalarShrinkage,
         mass: Mass,
         permutation: Permutation,
     ) -> Option<Self> {
-        if baseline.n_items() != permutation.n_items()
-            || rate.is_nan()
-            || rate.is_infinite()
-            || rate < 0.0
-        {
+        if baseline.n_items() != permutation.n_items() {
             None
         } else {
             Some(Self {
                 anchor: baseline,
-                rate,
+                shrinkage,
                 mass,
                 permutation,
             })
@@ -94,11 +89,11 @@ impl HasPermutation for LspParameters {
 }
 
 impl HasScalarShrinkage for LspParameters {
-    fn shrinkage(&self) -> &f64 {
-        &self.rate
+    fn shrinkage(&self) -> &ScalarShrinkage {
+        &self.shrinkage
     }
-    fn shrinkage_mut(&mut self) -> &mut f64 {
-        &mut self.rate
+    fn shrinkage_mut(&mut self) -> &mut ScalarShrinkage {
+        &mut self.shrinkage
     }
 }
 
@@ -127,27 +122,28 @@ fn engine<T: Rng>(
                 let n_items_in_cluster = clustering.size_of(label);
                 let weight = if n_items_in_cluster == 0 {
                     if n_occupied_subsets == 0.0 {
-                        parameters.mass.unwrap()
+                        parameters.mass.get()
                     } else {
                         {
                             if total_counter[baseline_subset_index] == 0.0 {
-                                (parameters.mass.unwrap() + parameters.rate)
-                                    / (parameters.mass.unwrap()
+                                (parameters.mass + parameters.shrinkage.get())
+                                    / (parameters.mass
                                         + (n_visited_subsets as f64)
-                                        + parameters.rate)
+                                        + parameters.shrinkage)
                             } else {
-                                parameters.mass.unwrap()
-                                    / (parameters.mass.unwrap()
+                                parameters.mass
+                                    / (parameters.mass
                                         + (n_visited_subsets as f64)
-                                        + parameters.rate)
+                                        + parameters.shrinkage)
                             }
                         }
                     }
                 } else {
-                    (1.0 + parameters.rate * intersection_counter[baseline_subset_index][label])
-                        / (parameters.mass.unwrap()
+                    (1.0 + parameters.shrinkage
+                        * intersection_counter[baseline_subset_index][label])
+                        / (parameters.mass
                             + (n_visited_subsets as f64)
-                            + parameters.rate * (n_items_in_cluster as f64))
+                            + parameters.shrinkage * (n_items_in_cluster as f64))
                 };
                 (label, weight)
             });
@@ -189,15 +185,20 @@ mod tests {
         let mut rng = thread_rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
-            let rate = loop {
+            let shrinkage = loop {
                 let x = rng.gen_range(0.0..10.0);
                 if x > 0.0 {
-                    break x;
+                    break ScalarShrinkage::new(x).unwrap();
                 }
             };
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters =
-                LspParameters::new_with_rate(baseline, rate, Mass::new(1.0), permutation).unwrap();
+            let parameters = LspParameters::new_with_shrinkage(
+                baseline,
+                shrinkage,
+                Mass::new(1.0).unwrap(),
+                permutation,
+            )
+            .unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
@@ -217,15 +218,20 @@ mod tests {
         let mut rng = thread_rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
-            let rate = loop {
+            let shrinkage = loop {
                 let x = rng.gen_range(0.0..10.0);
                 if x > 0.0 {
-                    break x;
+                    break ScalarShrinkage::new(x).unwrap();
                 }
             };
             let permutation = Permutation::random(n_items, &mut rng);
-            let parameters =
-                LspParameters::new_with_rate(baseline, rate, Mass::new(1.0), permutation).unwrap();
+            let parameters = LspParameters::new_with_shrinkage(
+                baseline,
+                shrinkage,
+                Mass::new(1.0).unwrap(),
+                permutation,
+            )
+            .unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }

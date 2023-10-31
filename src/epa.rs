@@ -201,8 +201,8 @@ pub fn engine<T: Rng>(
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
     let ni = parameters.similarity.n_items();
-    let mass = parameters.mass.unwrap();
-    let discount = parameters.discount.unwrap();
+    let mass = parameters.mass.get();
+    let discount = parameters.discount.get();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
     for i in 0..ni {
@@ -251,9 +251,8 @@ mod tests {
         let n_items = 4;
         let mut rng = thread_rng();
         let permutation = Permutation::random(n_items, &mut rng);
-        let discount = 0.3;
-        let mass = Mass::new_with_variable_constraint(1.5, discount);
-        let discount = Discount::new(discount);
+        let discount = Discount::new(0.3).unwrap();
+        let mass = Mass::new_with_discount(1.5, discount).unwrap();
         let mut similarity = SquareMatrix::zeros(n_items);
         {
             let data = similarity.data_mut();
@@ -294,9 +293,8 @@ mod tests {
         let n_items = 4;
         let mut rng = thread_rng();
         let permutation = Permutation::random(n_items, &mut rng);
-        let discount = 0.3;
-        let mass = Mass::new_with_variable_constraint(1.5, discount);
-        let discount = Discount::new(discount);
+        let discount = Discount::new(0.3).unwrap();
+        let mass = Mass::new_with_discount(1.5, discount).unwrap();
         let mut similarity = SquareMatrix::zeros(n_items);
         {
             let data = similarity.data_mut();

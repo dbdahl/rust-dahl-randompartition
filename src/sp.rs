@@ -1,15 +1,14 @@
 // Shrinkage partition distribution
 
 use crate::clust::Clustering;
-use crate::cost::Cost;
 use crate::distr::{
     FullConditional, HasPermutation, HasVectorShrinkage, NormalizedProbabilityMassFunction,
     PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
     ProbabilityMassFunctionPartial,
 };
 use crate::perm::Permutation;
+use crate::prelude::*;
 use crate::shrink::Shrinkage;
-
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 
@@ -235,14 +234,12 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
 mod tests {
     use super::*;
     use crate::crp::CrpParameters;
-    use crate::prelude::*;
 
     #[test]
     fn test_goodness_of_fit_constructive() {
         let n_items = 4;
-        let discount = 0.1;
-        let mass = Mass::new_with_variable_constraint(2.0, discount);
-        let discount = Discount::new(discount);
+        let discount = Discount::new(0.1).unwrap();
+        let mass = Mass::new_with_discount(2.0, discount).unwrap();
         let mut rng = thread_rng();
         for target in Clustering::iter(n_items) {
             let target = Clustering::from_vector(target);
@@ -252,7 +249,7 @@ mod tests {
             }
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let cost = Cost::new(1.0).unwrap();
+            let cost = Cost::one();
             let baseline = CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters =
                 SpParameters::new(target, shrinkage, permutation, cost, baseline).unwrap();
@@ -272,9 +269,8 @@ mod tests {
     #[test]
     fn test_pmf() {
         let n_items = 5;
-        let discount = 0.1;
-        let mass = Mass::new_with_variable_constraint(2.0, discount);
-        let discount = Discount::new(discount);
+        let discount = Discount::new(0.1).unwrap();
+        let mass = Mass::new_with_discount(2.0, discount).unwrap();
         let mut rng = thread_rng();
         for target in Clustering::iter(n_items) {
             let target = Clustering::from_vector(target);
@@ -284,7 +280,7 @@ mod tests {
             }
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let cost = Cost::new(1.0).unwrap();
+            let cost = Cost::one();
             let baseline = CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
             let parameters =
                 SpParameters::new(target, shrinkage, permutation, cost, baseline).unwrap();

@@ -1,14 +1,12 @@
 #![allow(dead_code)]
 
 pub mod clust;
-pub mod cost;
 pub mod cpp;
 pub mod crp;
 pub mod distr;
 pub mod epa;
 pub mod ffi;
 pub mod fixed;
-pub mod frp;
 pub mod jlp;
 pub mod lsp;
 pub mod mcmc;

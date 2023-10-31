@@ -1,4 +1,5 @@
 use crate::clust::Clustering;
+use crate::prelude::*;
 use rand::prelude::*;
 use rand_distr::{Beta, Distribution};
 
@@ -56,8 +57,14 @@ impl Shrinkage {
         }
     }
 
-    pub fn randomize_common<T: Rng>(&mut self, max: f64, shape1: f64, shape2: f64, rng: &mut T) {
-        let beta = Beta::new(shape1, shape2).unwrap();
+    pub fn randomize_common<T: Rng>(
+        &mut self,
+        max: f64,
+        shape1: Shape,
+        shape2: Shape,
+        rng: &mut T,
+    ) {
+        let beta = Beta::new(shape1.get(), shape2.get()).unwrap();
         let value = max * beta.sample(rng);
         for x in &mut self.0 {
             if *x > 0.0 {
@@ -69,12 +76,12 @@ impl Shrinkage {
     pub fn randomize_common_cluster<T: Rng>(
         &mut self,
         max: f64,
-        shape1: f64,
-        shape2: f64,
+        shape1: Shape,
+        shape2: Shape,
         clustering: &Clustering,
         rng: &mut T,
     ) {
-        let beta = Beta::new(shape1, shape2).unwrap();
+        let beta = Beta::new(shape1.get(), shape2.get()).unwrap();
         for k in clustering.available_labels_for_allocation() {
             if clustering.size_of(k) == 0 {
                 continue;
@@ -91,11 +98,11 @@ impl Shrinkage {
     pub fn randomize_idiosyncratic<T: Rng>(
         &mut self,
         max: f64,
-        shape1: f64,
-        shape2: f64,
+        shape1: Shape,
+        shape2: Shape,
         rng: &mut T,
     ) {
-        let beta = Beta::new(shape1, shape2).unwrap();
+        let beta = Beta::new(shape1.get(), shape2.get()).unwrap();
         for x in &mut self.0 {
             if *x > 0.0 {
                 *x = max * beta.sample(rng)

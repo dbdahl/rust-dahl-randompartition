@@ -102,8 +102,12 @@ mod tests {
 
     #[test]
     fn test_pmf() {
-        let parameters =
-            JlpParameters::new(5, Mass::new(2.0), Permutation::natural_and_fixed(5)).unwrap();
+        let parameters = JlpParameters::new(
+            5,
+            Mass::new(2.0).unwrap(),
+            Permutation::natural_and_fixed(5),
+        )
+        .unwrap();
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }

@@ -106,9 +106,8 @@ mod tests {
     #[should_panic]
     fn test_pmf() {
         let n_items = 5;
-        let discount = 0.1;
-        let mass = Mass::new_with_variable_constraint(2.0, discount);
-        let discount = Discount::new(discount);
+        let discount = Discount::new(0.1).unwrap();
+        let mass = Mass::new_with_discount(2.0, discount).unwrap();
         let mut rng = thread_rng();
         for anchor in Clustering::iter(n_items) {
             let anchor = Clustering::from_vector(anchor);

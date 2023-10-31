@@ -1,12 +1,13 @@
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, HasScalarShrinkage, HasVectorShrinkage,
+    FullConditional, HasCost, HasPermutation, HasScalarShrinkage, HasVectorShrinkage,
     NormalizedProbabilityMassFunction, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
+use crate::prelude::*;
 use crate::slice::slice_sampler;
 use rand::Rng;
-use statrs::distribution::{Continuous, Gamma};
+use statrs::distribution::{Beta, Continuous, Gamma};
 
 pub fn update_partition_gibbs<T, U, V>(
     n_updates: u32,
@@ -182,8 +183,8 @@ pub fn update_scalar_shrinkage<T, V>(
     n_updates: u32,
     prior: &mut T,
     w: f64,
-    shape: f64,
-    rate: f64,
+    shape: Shape,
+    rate: Rate,
     clustering: &Clustering,
     rng: &mut V,
 ) -> u32
@@ -194,15 +195,15 @@ where
     if w <= 0.0 {
         return 0;
     }
-    let gamma_distribution = Gamma::new(shape, rate).unwrap();
+    let gamma_distribution = Gamma::new(shape.get(), rate.get()).unwrap();
     for _ in 0..n_updates {
-        let x = *prior.shrinkage();
-        let f = |new_value| {
-            *prior.shrinkage_mut() = new_value;
-            prior.log_pmf(clustering) + gamma_distribution.ln_pdf(new_value)
+        let x = prior.shrinkage().get();
+        let f = |new_value| match prior.shrinkage_mut().set(new_value) {
+            None => f64::NEG_INFINITY,
+            _ => prior.log_pmf(clustering) + gamma_distribution.ln_pdf(new_value),
         };
         let (_x_new, _) = slice_sampler(x, f, w, u32::MAX, true, rng);
-        // *prior.shrinkage_mut() = _x_new; // Not necessary... see implementation of slice_sampler function.
+        // prior.shrinkage_mut().set(_x_new); // Not necessary... see implementation of slice_sampler function.
     }
     n_updates
 }
@@ -212,8 +213,8 @@ pub fn update_vector_shrinkage<T, V>(
     prior: &mut T,
     reference: usize,
     w: f64,
-    shape: f64,
-    rate: f64,
+    shape: Shape,
+    rate: Rate,
     clustering: &Clustering,
     rng: &mut V,
 ) -> u32
@@ -227,7 +228,7 @@ where
     if prior.shrinkage()[reference] <= 0.0 {
         return 0;
     }
-    let gamma_distribution = Gamma::new(shape, rate).unwrap();
+    let gamma_distribution = Gamma::new(shape.get(), rate.get()).unwrap();
     for _ in 0..n_updates {
         let x = prior.shrinkage()[reference];
         let f = |new_value| {
@@ -241,6 +242,35 @@ where
         };
         let (_x_new, _) = slice_sampler(x, f, w, 100, true, rng);
         // prior.shrinkage_mut().rescale_by_reference(reference, _x_new); // Not necessary... see implementation of slice_sampler function.
+    }
+    n_updates
+}
+
+pub fn update_cost<T, V>(
+    n_updates: u32,
+    prior: &mut T,
+    w: f64,
+    shape1: Shape,
+    shape2: Shape,
+    clustering: &Clustering,
+    rng: &mut V,
+) -> u32
+where
+    T: ProbabilityMassFunction + NormalizedProbabilityMassFunction + HasCost,
+    V: Rng,
+{
+    if w <= 0.0 {
+        return 0;
+    }
+    let beta_distribution = Beta::new(shape1.get(), shape2.get()).unwrap();
+    for _ in 0..n_updates {
+        let x = prior.cost().get();
+        let f = |new_value| match prior.cost_mut().set(new_value) {
+            None => f64::NEG_INFINITY,
+            _ => prior.log_pmf(clustering) + beta_distribution.ln_pdf(new_value / 2.0),
+        };
+        let (_x_new, _) = slice_sampler(x, f, w, u32::MAX, true, rng);
+        // prior.shrinkage_mut().set(_x_new); // Not necessary... see implementation of slice_sampler function.
     }
     n_updates
 }
@@ -264,13 +294,13 @@ where
 mod tests_mcmc {
     use super::*;
     use crate::crp::CrpParameters;
-    use crate::prelude::*;
     use rand::prelude::*;
 
     #[test]
     fn test_crp_neal_algorithm3() {
         let mut current = Clustering::one_cluster(5);
-        let neal_functions = CrpParameters::new_with_mass(current.n_items(), Mass::new(1.0));
+        let neal_functions =
+            CrpParameters::new_with_mass(current.n_items(), Mass::new(1.0).unwrap());
         let permutation = Permutation::natural_and_fixed(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;

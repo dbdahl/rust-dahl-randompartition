@@ -20,7 +20,7 @@ pub struct CrpParameters {
 
 impl CrpParameters {
     pub fn new_with_mass(n_items: usize, mass: Mass) -> Self {
-        Self::new_with_mass_and_discount(n_items, mass, Discount::new(0.0))
+        Self::new_with_mass_and_discount(n_items, mass, Discount::zero())
     }
 
     pub fn new_with_mass_and_discount(n_items: usize, mass: Mass, discount: Discount) -> Self {
@@ -42,13 +42,13 @@ impl PredictiveProbabilityFunction for CrpParameters {
         if candidate_labels.len() == 1 {
             return vec![(candidate_labels[0], 0.0)];
         }
-        let discount = self.discount.unwrap();
+        let discount = self.discount.get();
         candidate_labels
             .iter()
             .map(|label| {
                 let size = clustering.size_of(*label);
                 let value = if size == 0 {
-                    self.mass.unwrap() + (clustering.n_clusters() as f64) * discount
+                    self.mass + (clustering.n_clusters() as f64) * discount
                 } else {
                     size as f64 - discount
                 }
@@ -61,13 +61,13 @@ impl PredictiveProbabilityFunction for CrpParameters {
 
 impl FullConditional for CrpParameters {
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
-        let discount = self.discount.unwrap();
+        let discount = self.discount.get();
         clustering
             .available_labels_for_reallocation(item)
             .map(|label| {
                 let size = clustering.size_of_without(label, item);
                 let value = if size == 0 {
-                    self.mass.unwrap() + (clustering.n_clusters_without(item) as f64) * discount
+                    self.mass + (clustering.n_clusters_without(item) as f64) * discount
                 } else {
                     size as f64 - discount
                 }
@@ -101,8 +101,8 @@ impl PartitionConditionalSampler for CrpParameters {
 
 impl ProbabilityMassFunction for CrpParameters {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
-        let m = self.mass.unwrap();
-        let d = self.discount.unwrap();
+        let m = self.mass.get();
+        let d = self.discount.get();
         let mut result = 0.0;
         if m > 0.0 {
             result -= ln_gamma(m + (partition.n_items_allocated() as f64)) - ln_gamma(m + 1.0)
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_constructive() {
-        let parameters = CrpParameters::new_with_mass(5, Mass::new(2.0));
+        let parameters = CrpParameters::new_with_mass(5, Mass::new(2.0).unwrap());
         let sample_closure = || parameters.sample(&mut thread_rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
@@ -156,15 +156,18 @@ mod tests {
 
     #[test]
     fn test_pmf_without_discount() {
-        let parameters = CrpParameters::new_with_mass(5, Mass::new(1.5));
+        let parameters = CrpParameters::new_with_mass(5, Mass::new(1.5).unwrap());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
 
     #[test]
     fn test_pmf_with_discount() {
-        let parameters =
-            CrpParameters::new_with_mass_and_discount(5, Mass::new(1.5), Discount::new(0.1));
+        let parameters = CrpParameters::new_with_mass_and_discount(
+            5,
+            Mass::new(1.5).unwrap(),
+            Discount::new(0.1).unwrap(),
+        );
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }

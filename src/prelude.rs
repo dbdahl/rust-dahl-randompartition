@@ -1,26 +1,37 @@
-use core::ops::{Add, Div, Mul, Sub};
+use core::ops::{Add, Div, Mul, Neg, Sub};
 
-macro_rules! constrained_f64 {
-    ( $name:ident, $closure:tt, $msg:expr, $closure2:tt, $msg2:expr) => {
+macro_rules! simple_constrained_f64 {
+    ( $name:ident, $closure:tt ) => {
         #[derive(Debug, Copy, Clone)]
         pub struct $name(f64);
 
         impl $name {
-            pub fn new(x: f64) -> Self {
-                assert!(($closure)(x), $msg);
-                Self(x)
+            pub fn new(x: f64) -> Option<Self> {
+                if !x.is_finite() {
+                    None
+                } else if ($closure)(x) {
+                    Some(Self(x))
+                } else {
+                    None
+                }
             }
 
-            pub fn new_with_variable_constraint(x: f64, y: f64) -> Self {
-                assert!(($closure2)(x, y), $msg2);
-                Self(x)
+            pub fn set(&mut self, x: f64) -> Option<()> {
+                if !x.is_finite() {
+                    None
+                } else if ($closure)(x) {
+                    self.0 = x;
+                    Some(())
+                } else {
+                    None
+                }
             }
 
-            pub fn unwrap(self) -> f64 {
+            pub fn get(&self) -> f64 {
                 self.0
             }
 
-            pub fn ln(self) -> f64 {
+            pub fn ln(&self) -> f64 {
                 self.0.ln()
             }
         }
@@ -88,45 +99,59 @@ macro_rules! constrained_f64 {
                 self / other.0
             }
         }
+
+        impl Neg for $name {
+            type Output = f64;
+
+            fn neg(self) -> f64 {
+                -self.0
+            }
+        }
     };
 }
 
-constrained_f64!(
-    Mass,
-    (|x| x > 0.0),
-    "Mass must be greater than zero.",
-    (|x, y: f64| x > -y),
-    "Mass must be greater than the negative of the discount."
-);
+simple_constrained_f64!(Mass, (|x| x > 0.0));
+simple_constrained_f64!(Discount, (|x| (0.0..1.0).contains(&x)));
+simple_constrained_f64!(Shape, (|x| x > 0.0));
+simple_constrained_f64!(Rate, (|x| x > 0.0));
+simple_constrained_f64!(Scale, (|x| x > 0.0));
+simple_constrained_f64!(ScalarShrinkage, (|x| x > 0.0));
+simple_constrained_f64!(Temperature, (|x| x >= 0.0));
+simple_constrained_f64!(Cost, (|x| (0.0..=2.0).contains(&x)));
 
-constrained_f64!(
-    Temperature,
-    (|x| x >= 0.0),
-    "Temperature must be greater than or equal to zero.",
-    (|_x, _y| false),
-    "Not supported."
-);
+impl Mass {
+    pub fn new_with_discount(x: f64, discount: Discount) -> Option<Self> {
+        if x > -discount {
+            Some(Self(x))
+        } else {
+            None
+        }
+    }
+}
 
-constrained_f64!(
-    Reinforcement,
-    (|x| (0.0..1.0).contains(&x)),
-    "Reinforcement must be in [0,1).",
-    (|_x, _y| false),
-    "Not supported."
-);
+impl Scale {
+    pub fn to_rate(self) -> Rate {
+        Rate(1.0 / self.0)
+    }
+    pub fn to_shrinkage(self) -> ScalarShrinkage {
+        ScalarShrinkage(1.0 / self.0)
+    }
+}
 
-constrained_f64!(
-    Discount,
-    (|x| (0.0..1.0).contains(&x)),
-    "Discount must be in [0,1).",
-    (|_x, _y| false),
-    "Not supported."
-);
+impl Rate {
+    pub fn to_scale(self) -> Scale {
+        Scale(1.0 / self.0)
+    }
+}
 
-constrained_f64!(
-    Power,
-    (|x: f64| !x.is_nan()),
-    "Power may not be NaN.",
-    (|_x, _y| false),
-    "Not supported."
-);
+impl Discount {
+    pub fn zero() -> Self {
+        Self(0.0)
+    }
+}
+
+impl Cost {
+    pub fn one() -> Self {
+        Self(1.0)
+    }
+}
