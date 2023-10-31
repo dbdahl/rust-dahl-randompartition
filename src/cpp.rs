@@ -107,7 +107,7 @@ mod tests {
     fn test_pmf() {
         let n_items = 5;
         let discount = Discount::new(0.1).unwrap();
-        let mass = Mass::new_with_discount(2.0, discount).unwrap();
+        let concentration = Concentration::new_with_discount(2.0, discount).unwrap();
         let mut rng = thread_rng();
         for anchor in Clustering::iter(n_items) {
             let anchor = Clustering::from_vector(anchor);
@@ -117,7 +117,8 @@ mod tests {
                     break x;
                 }
             };
-            let baseline = CrpParameters::new_with_discount(n_items, mass, discount).unwrap();
+            let baseline =
+                CrpParameters::new_with_discount(n_items, concentration, discount).unwrap();
             let parameters = CppParameters::new(anchor, rate, baseline, true, 1.0).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.

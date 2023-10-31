@@ -208,6 +208,7 @@ where
     n_updates
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn update_vector_shrinkage<T, V>(
     n_updates: u32,
     prior: &mut T,
@@ -299,7 +300,8 @@ mod tests_mcmc {
     #[test]
     fn test_crp_neal_algorithm3() {
         let mut current = Clustering::one_cluster(5);
-        let neal_functions = CrpParameters::new(current.n_items(), Mass::new(1.0).unwrap());
+        let neal_functions =
+            CrpParameters::new(current.n_items(), Concentration::new(1.0).unwrap());
         let permutation = Permutation::natural_and_fixed(current.n_items());
         let log_posterior_predictive = |_i: usize, _indices: &[usize]| 0.0;
         let mut sum = 0;

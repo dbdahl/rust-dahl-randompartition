@@ -6,7 +6,7 @@ use crate::distr::{
     ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
-use crate::prelude::{Discount, Mass};
+use crate::prelude::{Concentration, Discount};
 
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
@@ -18,7 +18,7 @@ type SimilarityBorrower<'a> = SquareMatrixBorrower<'a>;
 pub struct EpaParameters<'a> {
     similarity: SimilarityBorrower<'a>,
     pub permutation: Permutation,
-    pub mass: Mass,
+    pub concentration: Concentration,
     pub discount: Discount,
 }
 
@@ -26,7 +26,7 @@ impl<'a> EpaParameters<'a> {
     pub fn new(
         similarity: SimilarityBorrower<'a>,
         permutation: Permutation,
-        mass: Mass,
+        concentration: Concentration,
         discount: Discount,
     ) -> Option<Self> {
         if similarity.n_items() != permutation.n_items() {
@@ -35,7 +35,7 @@ impl<'a> EpaParameters<'a> {
             Some(Self {
                 similarity,
                 permutation,
-                mass,
+                concentration,
                 discount,
             })
         }
@@ -201,7 +201,7 @@ pub fn engine<T: Rng>(
     mut rng: Option<&mut T>,
 ) -> (Clustering, f64) {
     let ni = parameters.similarity.n_items();
-    let mass = parameters.mass.get();
+    let concentration = parameters.concentration.get();
     let discount = parameters.discount.get();
     let mut log_probability = 0.0;
     let mut clustering = Clustering::unallocated(ni);
@@ -217,7 +217,7 @@ pub fn engine<T: Rng>(
             .map(|label| {
                 let n_items_in_cluster = clustering.size_of(label);
                 let weight = if n_items_in_cluster == 0 {
-                    mass + discount * qt
+                    concentration + discount * qt
                 } else {
                     kt * parameters
                         .similarity
@@ -252,7 +252,7 @@ mod tests {
         let mut rng = thread_rng();
         let permutation = Permutation::random(n_items, &mut rng);
         let discount = Discount::new(0.3).unwrap();
-        let mass = Mass::new_with_discount(1.5, discount).unwrap();
+        let concentration = Concentration::new_with_discount(1.5, discount).unwrap();
         let mut similarity = SquareMatrix::zeros(n_items);
         {
             let data = similarity.data_mut();
@@ -275,7 +275,7 @@ mod tests {
         }
         let similarity_borrower = similarity.view();
         let parameters =
-            EpaParameters::new(similarity_borrower, permutation, mass, discount).unwrap();
+            EpaParameters::new(similarity_borrower, permutation, concentration, discount).unwrap();
         let sample_closure = || parameters.sample(&mut thread_rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
@@ -294,7 +294,7 @@ mod tests {
         let mut rng = thread_rng();
         let permutation = Permutation::random(n_items, &mut rng);
         let discount = Discount::new(0.3).unwrap();
-        let mass = Mass::new_with_discount(1.5, discount).unwrap();
+        let concentration = Concentration::new_with_discount(1.5, discount).unwrap();
         let mut similarity = SquareMatrix::zeros(n_items);
         {
             let data = similarity.data_mut();
@@ -317,7 +317,7 @@ mod tests {
         }
         let similarity_borrower = similarity.view();
         let parameters =
-            EpaParameters::new(similarity_borrower, permutation, mass, discount).unwrap();
+            EpaParameters::new(similarity_borrower, permutation, concentration, discount).unwrap();
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
     }

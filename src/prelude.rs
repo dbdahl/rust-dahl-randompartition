@@ -111,16 +111,16 @@ macro_rules! constrained_f64 {
     };
 }
 
-constrained_f64!(Mass, x, x > 0.0);
+constrained_f64!(Concentration, x, x > 0.0);
 constrained_f64!(Discount, x, (0.0..1.0).contains(&x));
 constrained_f64!(Shape, x, x > 0.0);
 constrained_f64!(Rate, x, x > 0.0);
 constrained_f64!(Scale, x, x > 0.0);
-constrained_f64!(ScalarShrinkage, x, x > 0.0);
+constrained_f64!(ScalarShrinkage, x, x >= 0.0);
 constrained_f64!(Temperature, x, x >= 0.0);
 constrained_f64!(Cost, x, (0.0..=2.0).contains(&x));
 
-impl Mass {
+impl Concentration {
     pub fn new_with_discount(x: f64, discount: Discount) -> Option<Self> {
         if x > -discount {
             Some(Self(x))
