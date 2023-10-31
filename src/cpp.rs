@@ -117,7 +117,7 @@ mod tests {
                     break x;
                 }
             };
-            let baseline = CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
+            let baseline = CrpParameters::new_with_discount(n_items, mass, discount).unwrap();
             let parameters = CppParameters::new(anchor, rate, baseline, true, 1.0).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             // Their method does NOT sum to one!  Hence "#[should_panic]" above.

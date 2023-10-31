@@ -34,7 +34,7 @@ pub trait PredictiveProbabilityFunction {
         let sum: f64 = weights.iter().sum();
         labels
             .into_iter()
-            .zip(weights.into_iter())
+            .zip(weights)
             .map(|(label, x)| (label, x / sum))
             .collect()
     }

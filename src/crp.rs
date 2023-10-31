@@ -19,16 +19,20 @@ pub struct CrpParameters {
 }
 
 impl CrpParameters {
-    pub fn new_with_mass(n_items: usize, mass: Mass) -> Self {
-        Self::new_with_mass_and_discount(n_items, mass, Discount::zero())
-    }
-
-    pub fn new_with_mass_and_discount(n_items: usize, mass: Mass, discount: Discount) -> Self {
+    pub fn new(n_items: usize, mass: Mass) -> Self {
         Self {
             n_items,
             mass,
-            discount,
+            discount: Discount::zero(),
         }
+    }
+
+    pub fn new_with_discount(n_items: usize, mass: Mass, discount: Discount) -> Option<Self> {
+        Mass::new_with_discount(mass.get(), discount).map(|mass| Self {
+            n_items,
+            mass,
+            discount,
+        })
     }
 }
 
@@ -141,7 +145,7 @@ mod tests {
 
     #[test]
     fn test_goodness_of_fit_constructive() {
-        let parameters = CrpParameters::new_with_mass(5, Mass::new(2.0).unwrap());
+        let parameters = CrpParameters::new(5, Mass::new(2.0).unwrap());
         let sample_closure = || parameters.sample(&mut thread_rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
@@ -156,18 +160,19 @@ mod tests {
 
     #[test]
     fn test_pmf_without_discount() {
-        let parameters = CrpParameters::new_with_mass(5, Mass::new(1.5).unwrap());
+        let parameters = CrpParameters::new(5, Mass::new(1.5).unwrap());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }
 
     #[test]
     fn test_pmf_with_discount() {
-        let parameters = CrpParameters::new_with_mass_and_discount(
+        let parameters = CrpParameters::new_with_discount(
             5,
             Mass::new(1.5).unwrap(),
             Discount::new(0.1).unwrap(),
-        );
+        )
+        .unwrap();
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_pmf_sums_to_one(parameters.n_items, log_prob_closure, 0.0000001);
     }

@@ -250,7 +250,7 @@ mod tests {
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let cost = Cost::one();
-            let baseline = CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
+            let baseline = CrpParameters::new_with_discount(n_items, mass, discount).unwrap();
             let parameters =
                 SpParameters::new(target, shrinkage, permutation, cost, baseline).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
@@ -281,7 +281,7 @@ mod tests {
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let cost = Cost::one();
-            let baseline = CrpParameters::new_with_mass_and_discount(n_items, mass, discount);
+            let baseline = CrpParameters::new_with_discount(n_items, mass, discount).unwrap();
             let parameters =
                 SpParameters::new(target, shrinkage, permutation, cost, baseline).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
