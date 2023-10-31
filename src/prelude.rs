@@ -1,26 +1,27 @@
 use core::ops::{Add, Div, Mul, Neg, Sub};
 
+#[allow(clippy::redundant_closure_call)]
 macro_rules! constrained_f64 {
-    ( $name:ident, $closure:tt ) => {
+    ( $name:ident, $x:ident, $closure:expr ) => {
         #[derive(Debug, Copy, Clone)]
         pub struct $name(f64);
 
         impl $name {
-            pub fn new(x: f64) -> Option<Self> {
-                if !x.is_finite() {
+            pub fn new($x: f64) -> Option<Self> {
+                if !$x.is_finite() {
                     None
-                } else if ($closure)(x) {
-                    Some(Self(x))
+                } else if $closure {
+                    Some(Self($x))
                 } else {
                     None
                 }
             }
 
-            pub fn set(&mut self, x: f64) -> Option<()> {
-                if !x.is_finite() {
+            pub fn set(&mut self, $x: f64) -> Option<()> {
+                if !$x.is_finite() {
                     None
-                } else if ($closure)(x) {
-                    self.0 = x;
+                } else if $closure {
+                    self.0 = $x;
                     Some(())
                 } else {
                     None
@@ -110,14 +111,14 @@ macro_rules! constrained_f64 {
     };
 }
 
-constrained_f64!(Mass, (|x| x > 0.0));
-constrained_f64!(Discount, (|x| (0.0..1.0).contains(&x)));
-constrained_f64!(Shape, (|x| x > 0.0));
-constrained_f64!(Rate, (|x| x > 0.0));
-constrained_f64!(Scale, (|x| x > 0.0));
-constrained_f64!(ScalarShrinkage, (|x| x > 0.0));
-constrained_f64!(Temperature, (|x| x >= 0.0));
-constrained_f64!(Cost, (|x| (0.0..=2.0).contains(&x)));
+constrained_f64!(Mass, x, x > 0.0);
+constrained_f64!(Discount, x, (0.0..1.0).contains(&x));
+constrained_f64!(Shape, x, x > 0.0);
+constrained_f64!(Rate, x, x > 0.0);
+constrained_f64!(Scale, x, x > 0.0);
+constrained_f64!(ScalarShrinkage, x, x > 0.0);
+constrained_f64!(Temperature, x, x >= 0.0);
+constrained_f64!(Cost, x, (0.0..=2.0).contains(&x));
 
 impl Mass {
     pub fn new_with_discount(x: f64, discount: Discount) -> Option<Self> {
