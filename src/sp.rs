@@ -239,7 +239,7 @@ mod tests {
     fn test_goodness_of_fit_constructive() {
         let n_items = 4;
         let discount = Discount::new(0.1).unwrap();
-        let mass = Mass::new_with_discount(2.0, discount).unwrap();
+        let concentration = Concentration::new_with_discount(2.0, discount).unwrap();
         let mut rng = thread_rng();
         for target in Clustering::iter(n_items) {
             let target = Clustering::from_vector(target);
@@ -250,7 +250,8 @@ mod tests {
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let cost = Cost::one();
-            let baseline = CrpParameters::new_with_discount(n_items, mass, discount).unwrap();
+            let baseline =
+                CrpParameters::new_with_discount(n_items, concentration, discount).unwrap();
             let parameters =
                 SpParameters::new(target, shrinkage, permutation, cost, baseline).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
@@ -270,7 +271,7 @@ mod tests {
     fn test_pmf() {
         let n_items = 5;
         let discount = Discount::new(0.1).unwrap();
-        let mass = Mass::new_with_discount(2.0, discount).unwrap();
+        let concentration = Concentration::new_with_discount(2.0, discount).unwrap();
         let mut rng = thread_rng();
         for target in Clustering::iter(n_items) {
             let target = Clustering::from_vector(target);
@@ -281,7 +282,8 @@ mod tests {
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
             let cost = Cost::one();
-            let baseline = CrpParameters::new_with_discount(n_items, mass, discount).unwrap();
+            let baseline =
+                CrpParameters::new_with_discount(n_items, concentration, discount).unwrap();
             let parameters =
                 SpParameters::new(target, shrinkage, permutation, cost, baseline).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);

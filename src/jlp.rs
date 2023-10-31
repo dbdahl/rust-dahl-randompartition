@@ -6,25 +6,29 @@ use crate::distr::{
     PredictiveProbabilityFunction, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
-use crate::prelude::Mass;
+use crate::prelude::Concentration;
 
 use rand::Rng;
 
 #[derive(Debug, Clone)]
 pub struct JlpParameters {
     n_items: usize,
-    mass: Mass,
+    concentration: Concentration,
     pub permutation: Permutation,
 }
 
 impl JlpParameters {
-    pub fn new(n_items: usize, mass: Mass, permutation: Permutation) -> Option<Self> {
+    pub fn new(
+        n_items: usize,
+        concentration: Concentration,
+        permutation: Permutation,
+    ) -> Option<Self> {
         if n_items != permutation.n_items() {
             None
         } else {
             Some(Self {
                 n_items,
-                mass,
+                concentration,
                 permutation,
             })
         }
@@ -44,7 +48,7 @@ impl PredictiveProbabilityFunction for JlpParameters {
                 (
                     *label,
                     if clustering.size_of(*label) == 0 {
-                        self.mass.ln()
+                        self.concentration.ln()
                     } else {
                         0.0
                     },
@@ -104,7 +108,7 @@ mod tests {
     fn test_pmf() {
         let parameters = JlpParameters::new(
             5,
-            Mass::new(2.0).unwrap(),
+            Concentration::new(2.0).unwrap(),
             Permutation::natural_and_fixed(5),
         )
         .unwrap();

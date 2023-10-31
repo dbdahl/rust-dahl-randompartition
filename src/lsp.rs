@@ -15,7 +15,7 @@ use rand_pcg::Pcg64Mcg;
 pub struct LspParameters {
     anchor: Clustering,
     pub shrinkage: ScalarShrinkage,
-    pub mass: Mass,
+    pub concentration: Concentration,
     pub permutation: Permutation,
 }
 
@@ -23,16 +23,16 @@ impl LspParameters {
     pub fn new_with_scale(
         anchor: Clustering,
         scale: Scale,
-        mass: Mass,
+        concentration: Concentration,
         permutation: Permutation,
     ) -> Option<Self> {
-        Self::new_with_shrinkage(anchor, scale.to_shrinkage(), mass, permutation)
+        Self::new_with_shrinkage(anchor, scale.to_shrinkage(), concentration, permutation)
     }
 
     pub fn new_with_shrinkage(
         baseline: Clustering,
         shrinkage: ScalarShrinkage,
-        mass: Mass,
+        concentration: Concentration,
         permutation: Permutation,
     ) -> Option<Self> {
         if baseline.n_items() != permutation.n_items() {
@@ -41,7 +41,7 @@ impl LspParameters {
             Some(Self {
                 anchor: baseline,
                 shrinkage,
-                mass,
+                concentration,
                 permutation,
             })
         }
@@ -122,17 +122,17 @@ fn engine<T: Rng>(
                 let n_items_in_cluster = clustering.size_of(label);
                 let weight = if n_items_in_cluster == 0 {
                     if n_occupied_subsets == 0.0 {
-                        parameters.mass.get()
+                        parameters.concentration.get()
                     } else {
                         {
                             if total_counter[baseline_subset_index] == 0.0 {
-                                (parameters.mass + parameters.shrinkage.get())
-                                    / (parameters.mass
+                                (parameters.concentration + parameters.shrinkage.get())
+                                    / (parameters.concentration
                                         + (n_visited_subsets as f64)
                                         + parameters.shrinkage)
                             } else {
-                                parameters.mass
-                                    / (parameters.mass
+                                parameters.concentration
+                                    / (parameters.concentration
                                         + (n_visited_subsets as f64)
                                         + parameters.shrinkage)
                             }
@@ -141,7 +141,7 @@ fn engine<T: Rng>(
                 } else {
                     (1.0 + parameters.shrinkage
                         * intersection_counter[baseline_subset_index][label])
-                        / (parameters.mass
+                        / (parameters.concentration
                             + (n_visited_subsets as f64)
                             + parameters.shrinkage * (n_items_in_cluster as f64))
                 };
@@ -195,7 +195,7 @@ mod tests {
             let parameters = LspParameters::new_with_shrinkage(
                 baseline,
                 shrinkage,
-                Mass::new(1.0).unwrap(),
+                Concentration::new(1.0).unwrap(),
                 permutation,
             )
             .unwrap();
@@ -228,7 +228,7 @@ mod tests {
             let parameters = LspParameters::new_with_shrinkage(
                 baseline,
                 shrinkage,
-                Mass::new(1.0).unwrap(),
+                Concentration::new(1.0).unwrap(),
                 permutation,
             )
             .unwrap();
