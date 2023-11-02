@@ -1,26 +1,26 @@
-use core::ops::{Add, Div, Mul, Neg, Sub};
+use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[allow(clippy::redundant_closure_call)]
 macro_rules! constrained_f64 {
     ( $name:ident, $x:ident, $closure:expr ) => {
-        #[derive(Debug, Copy, Clone)]
+        #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
         pub struct $name(f64);
 
         impl $name {
             pub fn new($x: f64) -> Option<Self> {
-                if !$x.is_finite() {
-                    None
-                } else if $closure {
+                if $closure {
                     Some(Self($x))
                 } else {
                     None
                 }
             }
 
+            pub(crate) fn new_unchecked(x: f64) -> Self {
+                Self(x)
+            }
+
             pub fn set(&mut self, $x: f64) -> Option<()> {
-                if !$x.is_finite() {
-                    None
-                } else if $closure {
+                if $closure {
                     self.0 = $x;
                     Some(())
                 } else {
@@ -53,6 +53,12 @@ macro_rules! constrained_f64 {
             }
         }
 
+        impl AddAssign<$name> for f64 {
+            fn add_assign(&mut self, other: $name) {
+                *self += other.0
+            }
+        }
+
         impl Sub<f64> for $name {
             type Output = f64;
 
@@ -66,6 +72,12 @@ macro_rules! constrained_f64 {
 
             fn sub(self, other: $name) -> f64 {
                 self - other.0
+            }
+        }
+
+        impl SubAssign<$name> for f64 {
+            fn sub_assign(&mut self, other: $name) {
+                *self -= other.0
             }
         }
 
@@ -85,6 +97,12 @@ macro_rules! constrained_f64 {
             }
         }
 
+        impl MulAssign<$name> for f64 {
+            fn mul_assign(&mut self, other: $name) {
+                *self *= other.0
+            }
+        }
+
         impl Div<f64> for $name {
             type Output = f64;
 
@@ -98,6 +116,12 @@ macro_rules! constrained_f64 {
 
             fn div(self, other: $name) -> f64 {
                 self / other.0
+            }
+        }
+
+        impl DivAssign<$name> for f64 {
+            fn div_assign(&mut self, other: $name) {
+                *self /= other.0
             }
         }
 

@@ -4,70 +4,63 @@ use rand::prelude::*;
 use rand_distr::{Beta, Distribution};
 
 #[derive(Debug, Clone)]
-pub struct Shrinkage(Vec<f64>);
+pub struct Shrinkage(Vec<ScalarShrinkage>);
 
 impl Shrinkage {
     pub fn zero(n_items: usize) -> Self {
-        Self(vec![0.0; n_items])
+        Self(vec![ScalarShrinkage::new_unchecked(0.0); n_items])
     }
 
     pub fn one(n_items: usize) -> Self {
-        Self(vec![1.0; n_items])
+        Self(vec![ScalarShrinkage::new_unchecked(1.0); n_items])
     }
 
-    pub fn constant(value: f64, n_items: usize) -> Option<Self> {
-        if value.is_nan() || value < 0.0 {
-            return None;
-        }
-        Some(Self(vec![value; n_items]))
+    pub fn constant(value: ScalarShrinkage, n_items: usize) -> Self {
+        Self(vec![value; n_items])
     }
 
     pub fn from(w: &[f64]) -> Option<Self> {
+        let mut vec = Vec::with_capacity(w.len());
         for ww in w.iter() {
-            if ww.is_nan() || *ww < 0.0 {
-                return None;
-            }
+            vec.push(ScalarShrinkage::new(*ww)?);
         }
-        Some(Self(Vec::from(w)))
+        Some(Self(vec))
     }
 
     pub fn n_items(&self) -> usize {
         self.0.len()
     }
 
-    pub fn as_slice(&self) -> &[f64] {
+    pub fn as_slice(&self) -> &[ScalarShrinkage] {
         &self.0[..]
     }
 
-    pub fn set_constant(&mut self, new_value: f64) {
+    pub fn set_constant(&mut self, new_value: ScalarShrinkage) {
         for y in &mut self.0 {
             *y = new_value;
         }
     }
 
-    pub fn rescale_by_reference(&mut self, reference: usize, new_value: f64) {
-        let multiplicative_factor = new_value / self.0[reference];
+    pub fn rescale_by_reference(&mut self, reference: usize, new_value: ScalarShrinkage) {
+        let multiplicative_factor = new_value.get() / self.0[reference];
         if (1.0 - multiplicative_factor).abs() > 0.000_000_1 {
-            if new_value <= 0.0 {
-                panic!("'value' must be nonnegative.");
-            }
             for y in &mut self.0 {
-                *y *= multiplicative_factor;
+                *y = ScalarShrinkage::new_unchecked(*y * multiplicative_factor);
             }
         }
     }
 
     pub fn randomize_common<T: Rng>(
         &mut self,
-        max: f64,
+        max: ScalarShrinkage,
         shape1: Shape,
         shape2: Shape,
         rng: &mut T,
     ) {
         let beta = Beta::new(shape1.get(), shape2.get()).unwrap();
-        let value = max * beta.sample(rng);
+        let value = ScalarShrinkage::new_unchecked(max * beta.sample(rng));
         for x in &mut self.0 {
-            if *x > 0.0 {
+            if x.get() > 0.0 {
                 *x = value;
             }
         }
@@ -75,7 +68,7 @@ impl Shrinkage {
 
     pub fn randomize_common_cluster<T: Rng>(
         &mut self,
-        max: f64,
+        max: ScalarShrinkage,
         shape1: Shape,
         shape2: Shape,
         clustering: &Clustering,
@@ -86,9 +79,9 @@ impl Shrinkage {
             if clustering.size_of(k) == 0 {
                 continue;
             }
-            let value = max * beta.sample(rng);
+            let value = ScalarShrinkage::new_unchecked(max * beta.sample(rng));
             for i in clustering.items_of(k) {
-                if self.0[i] > 0.0 {
+                if self.0[i].get() > 0.0 {
                     self.0[i] = value;
                 }
             }
@@ -97,31 +90,23 @@ impl Shrinkage {
 
     pub fn randomize_idiosyncratic<T: Rng>(
         &mut self,
-        max: f64,
+        max: ScalarShrinkage,
         shape1: Shape,
         shape2: Shape,
         rng: &mut T,
     ) {
         let beta = Beta::new(shape1.get(), shape2.get()).unwrap();
         for x in &mut self.0 {
-            if *x > 0.0 {
-                *x = max * beta.sample(rng)
+            if x.get() > 0.0 {
+                *x = ScalarShrinkage::new_unchecked(max * beta.sample(rng))
             }
         }
     }
 }
 
 impl std::ops::Index<usize> for Shrinkage {
-    type Output = f64;
+    type Output = ScalarShrinkage;
     fn index(&self, i: usize) -> &Self::Output {
         &self.0[i]
     }
-}
-
-fn logit(p: f64) -> f64 {
-    (p / (1.0 - p)).ln()
-}
-
-fn logistic(x: f64) -> f64 {
-    1.0 / (1.0 + (-x).exp())
 }
