@@ -175,6 +175,12 @@ impl Discount {
     }
 }
 
+impl ScalarShrinkage {
+    pub fn zero() -> Self {
+        Self(0.0)
+    }
+}
+
 impl Cost {
     pub fn one() -> Self {
         Self(1.0)
