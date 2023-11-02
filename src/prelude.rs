@@ -8,9 +8,7 @@ macro_rules! constrained_f64 {
 
         impl $name {
             pub fn new($x: f64) -> Option<Self> {
-                if !$x.is_finite() {
-                    None
-                } else if $closure {
+                if $closure {
                     Some(Self($x))
                 } else {
                     None
@@ -18,9 +16,7 @@ macro_rules! constrained_f64 {
             }
 
             pub fn set(&mut self, $x: f64) -> Option<()> {
-                if !$x.is_finite() {
-                    None
-                } else if $closure {
+                if $closure {
                     self.0 = $x;
                     Some(())
                 } else {

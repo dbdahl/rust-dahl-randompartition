@@ -232,14 +232,14 @@ where
     let gamma_distribution = Gamma::new(shape.get(), rate.get()).unwrap();
     for _ in 0..n_updates {
         let x = prior.shrinkage()[reference];
-        let f = |new_value| {
-            if new_value <= 0.0 {
-                return f64::NEG_INFINITY;
+        let f = |new_value: f64| match ScalarShrinkage::new(new_value) {
+            None => f64::NEG_INFINITY,
+            Some(new_value) => {
+                prior
+                    .shrinkage_mut()
+                    .rescale_by_reference(reference, new_value);
+                prior.log_pmf(clustering) + gamma_distribution.ln_pdf(new_value.get())
             }
-            prior
-                .shrinkage_mut()
-                .rescale_by_reference(reference, new_value);
-            prior.log_pmf(clustering) + gamma_distribution.ln_pdf(new_value)
         };
         let (_x_new, _) = slice_sampler(x, f, w, 100, true, rng);
         // prior.shrinkage_mut().rescale_by_reference(reference, _x_new); // Not necessary... see implementation of slice_sampler function.

@@ -15,18 +15,13 @@ impl Shrinkage {
         Self(vec![1.0; n_items])
     }
 
-    pub fn constant(value: f64, n_items: usize) -> Option<Self> {
-        if value.is_nan() || value < 0.0 {
-            return None;
-        }
-        Some(Self(vec![value; n_items]))
+    pub fn constant(value: ScalarShrinkage, n_items: usize) -> Self {
+        Self(vec![value.get(); n_items])
     }
 
     pub fn from(w: &[f64]) -> Option<Self> {
         for ww in w.iter() {
-            if ww.is_nan() || *ww < 0.0 {
-                return None;
-            }
+            ScalarShrinkage::new(*ww)?;
         }
         Some(Self(Vec::from(w)))
     }
@@ -39,18 +34,15 @@ impl Shrinkage {
         &self.0[..]
     }
 
-    pub fn set_constant(&mut self, new_value: f64) {
+    pub fn set_constant(&mut self, new_value: ScalarShrinkage) {
         for y in &mut self.0 {
-            *y = new_value;
+            *y = new_value.get();
         }
     }
 
-    pub fn rescale_by_reference(&mut self, reference: usize, new_value: f64) {
-        let multiplicative_factor = new_value / self.0[reference];
+    pub fn rescale_by_reference(&mut self, reference: usize, new_value: ScalarShrinkage) {
+        let multiplicative_factor = new_value.get() / self.0[reference];
         if (1.0 - multiplicative_factor).abs() > 0.000_000_1 {
-            if new_value <= 0.0 {
-                panic!("'value' must be nonnegative.");
-            }
             for y in &mut self.0 {
                 *y *= multiplicative_factor;
             }
@@ -59,7 +51,7 @@ impl Shrinkage {
 
     pub fn randomize_common<T: Rng>(
         &mut self,
-        max: f64,
+        max: ScalarShrinkage,
         shape1: Shape,
         shape2: Shape,
         rng: &mut T,
@@ -75,7 +67,7 @@ impl Shrinkage {
 
     pub fn randomize_common_cluster<T: Rng>(
         &mut self,
-        max: f64,
+        max: ScalarShrinkage,
         shape1: Shape,
         shape2: Shape,
         clustering: &Clustering,
@@ -97,7 +89,7 @@ impl Shrinkage {
 
     pub fn randomize_idiosyncratic<T: Rng>(
         &mut self,
-        max: f64,
+        max: ScalarShrinkage,
         shape1: Shape,
         shape2: Shape,
         rng: &mut T,
@@ -116,12 +108,4 @@ impl std::ops::Index<usize> for Shrinkage {
     fn index(&self, i: usize) -> &Self::Output {
         &self.0[i]
     }
-}
-
-fn logit(p: f64) -> f64 {
-    (p / (1.0 - p)).ln()
-}
-
-fn logistic(x: f64) -> f64 {
-    1.0 / (1.0 + (-x).exp())
 }
