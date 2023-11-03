@@ -5,8 +5,10 @@ use crate::distr::{
 };
 use crate::perm::Permutation;
 use crate::prelude::*;
-use crate::slice::slice_sampler;
 use rand::Rng;
+use slice_sampler::univariate::stepping_out::{
+    univariate_slice_sampler_stepping_out_and_shrinkage as slice_sampler, TuningParameters,
+};
 use statrs::distribution::{Beta, Continuous, Gamma};
 
 pub fn update_partition_gibbs<T, U, V>(
@@ -195,6 +197,8 @@ where
     if w <= 0.0 {
         return 0;
     }
+    let tuning_parameters = TuningParameters::new().width(w);
+    let rng = &mut Some(fastrand::Rng::with_seed(rng.next_u64()));
     let gamma_distribution = Gamma::new(shape.get(), rate.get()).unwrap();
     for _ in 0..n_updates {
         let x = prior.shrinkage().get();
@@ -202,7 +206,7 @@ where
             None => f64::NEG_INFINITY,
             _ => prior.log_pmf(clustering) + gamma_distribution.ln_pdf(new_value),
         };
-        let (_x_new, _) = slice_sampler(x, f, w, u32::MAX, true, rng);
+        let (_x_new, _) = slice_sampler(x, f, true, &tuning_parameters, rng);
         // prior.shrinkage_mut().set(_x_new); // Not necessary... see implementation of slice_sampler function.
     }
     n_updates
@@ -226,9 +230,11 @@ where
     if w <= 0.0 {
         return 0;
     }
+    let tuning_parameters = TuningParameters::new().width(w);
+    let rng = &mut Some(fastrand::Rng::with_seed(rng.next_u64()));
     let gamma_distribution = Gamma::new(shape.get(), rate.get()).unwrap();
     for _ in 0..n_updates {
-        let x = prior.shrinkage()[reference];
+        let x = prior.shrinkage()[reference].get();
         let f = |new_value: f64| match ScalarShrinkage::new(new_value) {
             None => f64::NEG_INFINITY,
             Some(new_value) => {
@@ -238,7 +244,7 @@ where
                 prior.log_pmf(clustering) + gamma_distribution.ln_pdf(new_value.get())
             }
         };
-        let (_x_new, _) = slice_sampler(x.get(), f, w, 100, true, rng);
+        let (_x_new, _) = slice_sampler(x, f, true, &tuning_parameters, rng);
         // prior.shrinkage_mut().rescale_by_reference(reference, _x_new); // Not necessary... see implementation of slice_sampler function.
     }
     n_updates
@@ -260,6 +266,8 @@ where
     if w <= 0.0 {
         return 0;
     }
+    let tuning_parameters = TuningParameters::new().width(w);
+    let rng = &mut Some(fastrand::Rng::with_seed(rng.next_u64()));
     let beta_distribution = Beta::new(shape1.get(), shape2.get()).unwrap();
     for _ in 0..n_updates {
         let x = prior.cost().get();
@@ -267,7 +275,7 @@ where
             None => f64::NEG_INFINITY,
             _ => prior.log_pmf(clustering) + beta_distribution.ln_pdf(new_value / 2.0),
         };
-        let (_x_new, _) = slice_sampler(x, f, w, u32::MAX, true, rng);
+        let (_x_new, _) = slice_sampler(x, f, true, &tuning_parameters, rng);
         // prior.shrinkage_mut().set(_x_new); // Not necessary... see implementation of slice_sampler function.
     }
     n_updates

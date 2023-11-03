@@ -13,7 +13,6 @@ pub mod mcmc;
 pub mod perm;
 pub mod prelude;
 pub mod shrink;
-pub mod slice;
 pub mod sp;
 pub mod testing;
 pub mod up;
