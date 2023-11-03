@@ -213,7 +213,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn update_vector_shrinkage<T, V>(
+pub fn update_shrinkage<T, V>(
     n_updates: u32,
     prior: &mut T,
     reference: usize,
