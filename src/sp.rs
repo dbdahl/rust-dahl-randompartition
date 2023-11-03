@@ -2,9 +2,9 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasPermutation, HasVectorShrinkage, NormalizedProbabilityMassFunction,
-    PartitionSampler, PredictiveProbabilityFunction, ProbabilityMassFunction,
-    ProbabilityMassFunctionPartial,
+    FullConditional, HasCost, HasPermutation, HasVectorShrinkage,
+    NormalizedProbabilityMassFunction, PartitionSampler, PredictiveProbabilityFunction,
+    ProbabilityMassFunction, ProbabilityMassFunctionPartial,
 };
 use crate::perm::Permutation;
 use crate::prelude::*;
@@ -156,6 +156,15 @@ impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkage for SpParamete
     }
     fn shrinkage_mut(&mut self) -> &mut Shrinkage {
         &mut self.shrinkage
+    }
+}
+
+impl<D: PredictiveProbabilityFunction + Clone> HasCost for SpParameters<D> {
+    fn cost(&self) -> &Cost {
+        &self.cost
+    }
+    fn cost_mut(&mut self) -> &mut Cost {
+        &mut self.cost
     }
 }
 
