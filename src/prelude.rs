@@ -142,7 +142,7 @@ constrained_f64!(Rate, x, x > 0.0);
 constrained_f64!(Scale, x, x > 0.0);
 constrained_f64!(ScalarShrinkage, x, x >= 0.0);
 constrained_f64!(Temperature, x, x >= 0.0);
-constrained_f64!(Cost, x, (0.0..=2.0).contains(&x));
+constrained_f64!(Cost, x, true);
 
 impl Concentration {
     pub fn new_with_discount(x: f64, discount: Discount) -> Option<Self> {
