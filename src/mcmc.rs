@@ -1,6 +1,6 @@
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasCost, HasPermutation, HasScalarShrinkage, HasVectorShrinkage,
+    FullConditional, HasGrit, HasPermutation, HasScalarShrinkage, HasVectorShrinkage,
     NormalizedProbabilityMassFunction, ProbabilityMassFunction,
 };
 use crate::perm::Permutation;
@@ -250,7 +250,7 @@ where
     n_updates
 }
 
-pub fn update_cost<T, V>(
+pub fn update_grit<T, V>(
     n_updates: u32,
     prior: &mut T,
     w: f64,
@@ -260,7 +260,7 @@ pub fn update_cost<T, V>(
     rng: &mut V,
 ) -> u32
 where
-    T: ProbabilityMassFunction + NormalizedProbabilityMassFunction + HasCost,
+    T: ProbabilityMassFunction + NormalizedProbabilityMassFunction + HasGrit,
     V: Rng,
 {
     if w <= 0.0 {
@@ -270,10 +270,10 @@ where
     let rng = &mut Some(fastrand::Rng::with_seed(rng.next_u64()));
     let beta_distribution = Beta::new(shape1.get(), shape2.get()).unwrap();
     for _ in 0..n_updates {
-        let x = prior.cost().get();
-        let f = |new_value| match prior.cost_mut().set(new_value) {
+        let x = prior.grit().get();
+        let f = |new_value| match prior.grit_mut().set(new_value) {
             None => f64::NEG_INFINITY,
-            _ => prior.log_pmf(clustering) + beta_distribution.ln_pdf(new_value / 2.0),
+            _ => prior.log_pmf(clustering) + beta_distribution.ln_pdf(new_value),
         };
         let (_x_new, _) = slice_sampler(x, f, true, &tuning_parameters, rng);
         // prior.shrinkage_mut().set(_x_new); // Not necessary... see implementation of slice_sampler function.

@@ -142,7 +142,7 @@ constrained_f64!(Rate, x, x > 0.0);
 constrained_f64!(Scale, x, x > 0.0);
 constrained_f64!(ScalarShrinkage, x, x >= 0.0);
 constrained_f64!(Temperature, x, x >= 0.0);
-constrained_f64!(Cost, x, true);
+constrained_f64!(Grit, x, true);
 
 impl Concentration {
     pub fn new_with_discount(x: f64, discount: Discount) -> Option<Self> {
@@ -181,7 +181,7 @@ impl ScalarShrinkage {
     }
 }
 
-impl Cost {
+impl Grit {
     pub fn one() -> Self {
         Self(1.0)
     }

@@ -70,9 +70,9 @@ pub trait HasVectorShrinkage {
 
 //
 
-pub trait HasCost {
-    fn cost(&self) -> &Cost;
-    fn cost_mut(&mut self) -> &mut Cost;
+pub trait HasGrit {
+    fn grit(&self) -> &Grit;
+    fn grit_mut(&mut self) -> &mut Grit;
 }
 
 //

@@ -2,7 +2,7 @@
 
 use crate::clust::Clustering;
 use crate::distr::{
-    FullConditional, HasCost, HasPermutation, HasVectorShrinkage,
+    FullConditional, HasGrit, HasPermutation, HasVectorShrinkage,
     NormalizedProbabilityMassFunction, PartitionSampler, PredictiveProbabilityFunction,
     ProbabilityMassFunction, ProbabilityMassFunctionPartial,
 };
@@ -17,7 +17,7 @@ pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
     pub anchor: Clustering,
     pub shrinkage: Shrinkage,
     pub permutation: Permutation,
-    pub cost: Cost,
+    pub grit: Grit,
     pub baseline_ppf: D,
 }
 
@@ -26,7 +26,7 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
         anchor: Clustering,
         shrinkage: Shrinkage,
         permutation: Permutation,
-        cost: Cost,
+        grit: Grit,
         baseline_ppf: D,
     ) -> Option<Self> {
         if (shrinkage.n_items() != anchor.n_items()) || (anchor.n_items() != permutation.n_items())
@@ -37,7 +37,7 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
                 anchor: anchor.standardize(),
                 shrinkage,
                 permutation,
-                cost,
+                grit,
                 baseline_ppf,
             })
         }
@@ -159,12 +159,12 @@ impl<D: PredictiveProbabilityFunction + Clone> HasVectorShrinkage for SpParamete
     }
 }
 
-impl<D: PredictiveProbabilityFunction + Clone> HasCost for SpParameters<D> {
-    fn cost(&self) -> &Cost {
-        &self.cost
+impl<D: PredictiveProbabilityFunction + Clone> HasGrit for SpParameters<D> {
+    fn grit(&self) -> &Grit {
+        &self.grit
     }
-    fn cost_mut(&mut self) -> &mut Cost {
-        &mut self.cost
+    fn grit_mut(&mut self) -> &mut Grit {
+        &mut self.grit
     }
 }
 
@@ -197,7 +197,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         let item = parameters.permutation.get(i);
         let label_in_anchor = parameters.anchor.get(item);
         let shrinkage = parameters.shrinkage[item];
-        let shrinkage_scaled = shrinkage / ((i + 1) as f64).powi(2);
+        let shrinkage_scaled = 2.0 * shrinkage / ((i + 1) as f64).powi(2);
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -215,8 +215,8 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .into_iter()
             .map(|(label, log_probability)| {
                 let log_anchor_fidelity = shrinkage_scaled
-                    * (2.0 * counts_joint[label_in_anchor][label].powi(2)
-                        - parameters.cost * counts_marginal[label].powi(2));
+                    * (counts_joint[label_in_anchor][label].powi(2)
+                        - parameters.grit * counts_marginal[label].powi(2));
                 let lp = log_probability + log_anchor_fidelity;
                 (label, lp)
             });
@@ -258,11 +258,11 @@ mod tests {
             }
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let cost = Cost::one();
+            let grit = Grit::one();
             let baseline =
                 CrpParameters::new_with_discount(n_items, concentration, discount).unwrap();
             let parameters =
-                SpParameters::new(target, shrinkage, permutation, cost, baseline).unwrap();
+                SpParameters::new(target, shrinkage, permutation, grit, baseline).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
@@ -290,11 +290,11 @@ mod tests {
             }
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
-            let cost = Cost::one();
+            let grit = Grit::one();
             let baseline =
                 CrpParameters::new_with_discount(n_items, concentration, discount).unwrap();
             let parameters =
-                SpParameters::new(target, shrinkage, permutation, cost, baseline).unwrap();
+                SpParameters::new(target, shrinkage, permutation, grit, baseline).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }
