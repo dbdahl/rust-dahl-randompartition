@@ -4,6 +4,7 @@ use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAss
 macro_rules! constrained_f64 {
     ( $name:ident, $x:ident, $closure:expr ) => {
         #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+        #[cfg_attr(feature = "use_serde", derive(serde::Deserialize))]
         pub struct $name(f64);
 
         impl $name {

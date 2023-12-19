@@ -7,6 +7,9 @@ description = "An efficient representation of a set partition."
 homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
 
+[features]
+use_serde = ["dep:serde", "dep:serde_json"]
+
 [dependencies]
 rand = "0.8.3"
 rand_pcg = "0.3.0"
@@ -22,3 +25,6 @@ dahl-salso = { git="https://github.com/dbdahl/rust-dahl-salso.git", rev="b438a37
 
 slice_sampler = { git="https://github.com/dbdahl/rust_slice_sampler.git", rev="bacf2b5" }
 fastrand = "2.0"
+
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
