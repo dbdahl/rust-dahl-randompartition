@@ -261,8 +261,9 @@ impl Clustering {
         with_log_probability: bool,
     ) -> (usize, f64) {
         let (labels, weights): (Vec<_>, Vec<_>) = labels_and_weights.unzip();
+	let max_log_weight: f64;
         let w = if weights_on_log_scale {
-            let max_log_weight = if !weights_are_probabilities {
+            max_log_weight = if !weights_are_probabilities {
                 weights.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
             } else {
                 0.0
@@ -272,6 +273,7 @@ impl Clustering {
                 .map(|x| (*x - max_log_weight).exp())
                 .collect::<Vec<_>>()
         } else {
+	    max_log_weight = 0.0;
             weights.clone()
         };
         let (label, index) = match rng {
@@ -296,7 +298,7 @@ impl Clustering {
                 if weights_are_probabilities {
                     weights[index]
                 } else {
-                    weights[index] - w.iter().sum::<f64>().ln()
+                    (weights[index] - max_log_weight) - w.iter().sum::<f64>().ln()
                 }
             } else {
                 if weights_are_probabilities {
