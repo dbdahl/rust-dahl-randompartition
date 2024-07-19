@@ -262,13 +262,17 @@ impl Clustering {
     ) -> (usize, f64) {
         let (labels, weights): (Vec<_>, Vec<_>) = labels_and_weights.unzip();
         let w = if weights_on_log_scale {
-            let max_log_weight = weights.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let max_log_weight = if !weights_are_probabilities {
+                weights.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+            } else {
+                0.0
+            };
             weights
                 .iter()
                 .map(|x| (*x - max_log_weight).exp())
                 .collect::<Vec<_>>()
         } else {
-            weights
+            weights.clone()
         };
         let (label, index) = match rng {
             Some(r) => {
@@ -287,16 +291,24 @@ impl Clustering {
                 }
             }
         };
-        if with_log_probability {
-            let ww = w[index];
-            if weights_are_probabilities {
-                (label, ww.ln())
+        let log_probability = if with_log_probability {
+            if weights_on_log_scale {
+                if weights_are_probabilities {
+                    weights[index]
+                } else {
+                    weights[index] - w.iter().sum::<f64>().ln()
+                }
             } else {
-                (label, (ww / w.iter().sum::<f64>()).ln())
+                if weights_are_probabilities {
+                    weights[index].ln()
+                } else {
+                    weights[index].ln() - w.iter().sum::<f64>().ln()
+                }
             }
         } else {
-            (label, 0.0)
-        }
+            0.0
+        };
+        (label, log_probability)
     }
 
     pub fn get(&self, item: usize) -> usize {

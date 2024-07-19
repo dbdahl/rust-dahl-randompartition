@@ -213,11 +213,11 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .baseline_ppf
             .log_predictive_weight(item, &candidate_labels, &clustering)
             .into_iter()
-            .map(|(label, log_probability)| {
+            .map(|(label, log_probability_from_baseline)| {
                 let log_anchor_fidelity = shrinkage_scaled
                     * (counts_joint[label_in_anchor][label].powi(2)
                         - parameters.grit * counts_marginal[label].powi(2));
-                let lp = log_probability + log_anchor_fidelity;
+                let lp = log_probability_from_baseline + log_anchor_fidelity;
                 (label, lp)
             });
         let (label, log_probability_contribution) = match &mut rng {
