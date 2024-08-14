@@ -281,7 +281,7 @@ where
     n_updates
 }
 
-fn make_posterior<'a, T: 'a, U: 'a>(log_prior: T, log_likelihood: U) -> impl Fn(&Clustering) -> f64
+fn make_posterior<T, U>(log_prior: T, log_likelihood: U) -> impl Fn(&Clustering) -> f64
 where
     T: Fn(&Clustering) -> f64,
     U: Fn(&[usize]) -> f64,

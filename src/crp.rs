@@ -65,6 +65,10 @@ impl PredictiveProbabilityFunction for CrpParameters {
             })
             .collect()
     }
+
+    fn crp_concentration_ln(&self) -> f64 {
+        self.concentration.ln()
+    }
 }
 
 impl FullConditional for CrpParameters {

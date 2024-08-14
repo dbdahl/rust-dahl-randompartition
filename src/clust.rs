@@ -261,7 +261,7 @@ impl Clustering {
         with_log_probability: bool,
     ) -> (usize, f64) {
         let (labels, weights): (Vec<_>, Vec<_>) = labels_and_weights.unzip();
-	let max_log_weight: f64;
+        let max_log_weight: f64;
         let w = if weights_on_log_scale {
             max_log_weight = if !weights_are_probabilities {
                 weights.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
@@ -273,7 +273,7 @@ impl Clustering {
                 .map(|x| (*x - max_log_weight).exp())
                 .collect::<Vec<_>>()
         } else {
-	    max_log_weight = 0.0;
+            max_log_weight = 0.0;
             weights.clone()
         };
         let (label, index) = match rng {
@@ -300,12 +300,10 @@ impl Clustering {
                 } else {
                     (weights[index] - max_log_weight) - w.iter().sum::<f64>().ln()
                 }
+            } else if weights_are_probabilities {
+                weights[index].ln()
             } else {
-                if weights_are_probabilities {
-                    weights[index].ln()
-                } else {
-                    weights[index].ln() - w.iter().sum::<f64>().ln()
-                }
+                weights[index].ln() - w.iter().sum::<f64>().ln()
             }
         } else {
             0.0
@@ -402,29 +400,30 @@ impl Clustering {
     }
 
     pub fn standardize(&self) -> Self {
-        self.relabel(0, None, false).0
+        Self::relabel(&self.allocation, 0, None, false).0
     }
 
     pub fn standardize_by(&self, permutation: &Permutation) -> Self {
         if permutation.natural_and_fixed {
-            self.relabel(0, None, false).0
+            Self::relabel(&self.allocation, 0, None, false).0
         } else {
-            self.relabel(0, Some(permutation), false).0
+            Self::relabel(&self.allocation, 0, Some(permutation), false).0
         }
     }
 
     pub fn relabel(
-        &self,
+        original_labels: &[usize],
         first_label: usize,
         permutation: Option<&Permutation>,
         with_mapping: bool,
     ) -> (Self, Option<Vec<usize>>) {
-        let n_items = self.n_items();
+        let n_items = original_labels.len();
         if let Some(p) = permutation {
             assert_eq!(n_items, p.n_items());
         };
-        let mut labels = Vec::with_capacity(n_items);
-        let mut sizes = Vec::with_capacity(first_label + self.active_labels.len() + 1);
+        let mut labels = vec![0; n_items];
+        // let mut sizes = Vec::with_capacity(first_label + self.active_labels.len() + 1);
+        let mut sizes = Vec::new();
         let mut map = HashMap::new();
         let mut next_new_label = first_label;
         for i in 0..n_items {
@@ -432,12 +431,12 @@ impl Clustering {
                 None => i,
                 Some(p) => p.get(i),
             };
-            let c = *map.entry(self.allocation[ii]).or_insert_with(|| {
+            let c = *map.entry(original_labels[ii]).or_insert_with(|| {
                 let c = next_new_label;
                 next_new_label += 1;
                 c
             });
-            labels.push(c);
+            labels[ii] = c;
             if c >= sizes.len() {
                 sizes.resize(c, 0);
                 sizes.push(1);
@@ -632,7 +631,7 @@ mod tests {
             &clustering,
             "Clustering { allocation: [2, 2, 4, 3, 4], sizes: [0, 0, 2, 1, 2], active_labels: [2, 3, 4], available_labels: [0, 1] }",
         );
-        let (clustering, map) = clustering.relabel(1, None, true);
+        let (clustering, map) = Clustering::relabel(clustering.allocation(), 1, None, true);
         check_output(
             &clustering,
             "Clustering { allocation: [1, 1, 2, 3, 2], sizes: [0, 2, 2, 1], active_labels: [1, 2, 3], available_labels: [] }",

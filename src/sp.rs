@@ -19,6 +19,7 @@ pub struct SpParameters<D: PredictiveProbabilityFunction + Clone> {
     pub permutation: Permutation,
     pub grit: Grit,
     pub baseline_ppf: D,
+    shortcut: bool,
 }
 
 impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
@@ -28,6 +29,7 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
         permutation: Permutation,
         grit: Grit,
         baseline_ppf: D,
+        shortcut: bool,
     ) -> Option<Self> {
         if (shrinkage.n_items() != anchor.n_items()) || (anchor.n_items() != permutation.n_items())
         {
@@ -39,6 +41,7 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
                 permutation,
                 grit,
                 baseline_ppf,
+                shortcut,
             })
         }
     }
@@ -85,26 +88,36 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
-        let (partial_clustering, counts_marginal, counts_joint) =
-            self.prepare_for_partial(item, clustering);
-        let candidate_labels = clustering.available_labels_for_reallocation(item);
-        candidate_labels
-            .map(|label| {
-                target[item] = label;
-                (
-                    label,
-                    engine::<D, Pcg64Mcg>(
-                        self,
-                        partial_clustering.clone(),
-                        counts_marginal.clone(),
-                        counts_joint.clone(),
-                        Some(&target[..]),
-                        None,
+        if self.shortcut {
+            let candidate_labels = clustering.available_labels_for_reallocation(item);
+            candidate_labels
+                .map(|label| {
+                    target[item] = label;
+                    (label, log_pmf_spcrp(self, &target))
+                })
+                .collect()
+        } else {
+            let (partial_clustering, counts_marginal, counts_joint) =
+                self.prepare_for_partial(item, clustering);
+            let candidate_labels = clustering.available_labels_for_reallocation(item);
+            candidate_labels
+                .map(|label| {
+                    target[item] = label;
+                    (
+                        label,
+                        engine::<D, Pcg64Mcg>(
+                            self,
+                            partial_clustering.clone(),
+                            counts_marginal.clone(),
+                            counts_joint.clone(),
+                            Some(&target[..]),
+                            None,
+                        )
+                        .1,
                     )
-                    .1,
-                )
-            })
-            .collect()
+                })
+                .collect()
+        }
     }
 }
 
@@ -114,25 +127,99 @@ impl<D: PredictiveProbabilityFunction + Clone> PartitionSampler for SpParameters
     }
 }
 
+fn tabulate_cluster_counts(clustering: &[usize]) -> Result<Vec<usize>, &'static str> {
+    let mut cluster_sizes = Vec::new();
+    for &label in clustering.iter() {
+        if label >= cluster_sizes.len() {
+            cluster_sizes.resize(label + 1, 0_usize);
+        }
+        cluster_sizes[label] += 1;
+    }
+    if cluster_sizes.iter().any(|&count| count == 0) {
+        return Err("Cluster labels are not contiguous.");
+    }
+    Ok(cluster_sizes)
+}
+
+fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
+    lf: &SpParameters<D>,
+    partition: &[usize],
+) -> f64 {
+    let concentration_ln = lf.baseline_ppf.crp_concentration_ln();
+    let anchor = Clustering::relabel(lf.anchor.allocation(), 0, Some(&lf.permutation), false).0;
+    let clustering = Clustering::relabel(partition, 0, Some(&lf.permutation), false).0;
+    let cluster_sizes = tabulate_cluster_counts(clustering.allocation()).unwrap();
+    let mut joint: Vec<f64> = vec![0.0; cluster_sizes.len() * anchor.n_clusters()];
+    let mut marginal: Vec<f64> = vec![0.0; cluster_sizes.len()];
+    let mut marginal_counts: Vec<usize> = vec![0; cluster_sizes.len()];
+    let mut weights_ln: Vec<f64> = vec![0.0; cluster_sizes.len() + 1];
+    let mut n_clusters = 0;
+    let mut log_pmf = 0.0;
+    for k in 0..anchor.n_items() {
+        let mut max_weight_ln = f64::NEG_INFINITY;
+        let i = lf.permutation.get(k);
+        let shrink = lf.shrinkage[i].get();
+        // DBD bug BUG
+        // let multiplier = shrink / (k as f64).powi(2);
+        let multiplier = 2.0 * shrink / ((k + 1) as f64).powi(2);
+        let label_in_anchor = anchor.get(i);
+        let offset = cluster_sizes.len() * label_in_anchor;
+        for label in 0..n_clusters {
+            let joint_sum_squared = joint[offset + label].powi(2);
+            let marginal_sum_squared = marginal[label].powi(2);
+            let weight_ln = multiplier * (joint_sum_squared - lf.grit * marginal_sum_squared)
+                + (marginal_counts[label] as f64).ln();
+            max_weight_ln = max_weight_ln.max(weight_ln);
+            weights_ln[label] = weight_ln;
+        }
+        max_weight_ln = max_weight_ln.max(concentration_ln);
+        weights_ln[n_clusters] = concentration_ln;
+        let weights_sum_ln = weights_ln
+            .iter()
+            .take(n_clusters + 1)
+            .map(|weight_ln| (weight_ln - max_weight_ln).exp())
+            .sum::<f64>()
+            .ln();
+        let label = clustering.get(i);
+        let contribution = weights_ln[label] - max_weight_ln - weights_sum_ln;
+        log_pmf += contribution;
+        if label == n_clusters {
+            n_clusters += 1;
+        }
+        joint[offset + label] += shrink;
+        marginal[label] += shrink;
+        marginal_counts[label] += 1;
+    }
+    log_pmf
+}
+
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
-        engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
+        if self.shortcut {
+            log_pmf_spcrp(self, partition.allocation())
+        } else {
+            engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
+        }
     }
 }
 
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunctionPartial for SpParameters<D> {
     fn log_pmf_partial(&self, item: usize, partition: &Clustering) -> f64 {
-        let (partial_clustering, counts_marginal, counts_joint) =
-            self.prepare_for_partial(item, partition);
-        engine::<D, Pcg64Mcg>(
-            self,
-            partial_clustering,
-            counts_marginal,
-            counts_joint,
-            Some(&partition.allocation()[..]),
-            None,
-        )
-        .1
+        if self.shortcut {
+            log_pmf_spcrp(self, partition.allocation())
+        } else {
+            let (partial_clustering, counts_marginal, counts_joint) =
+                self.prepare_for_partial(item, partition);
+            engine::<D, Pcg64Mcg>(
+                self,
+                partial_clustering,
+                counts_marginal,
+                counts_joint,
+                Some(&partition.allocation()[..]),
+                None,
+            )
+            .1
+        }
     }
 }
 
@@ -262,7 +349,7 @@ mod tests {
             let baseline =
                 CrpParameters::new_with_discount(n_items, concentration, discount).unwrap();
             let parameters =
-                SpParameters::new(target, shrinkage, permutation, grit, baseline).unwrap();
+                SpParameters::new(target, shrinkage, permutation, grit, baseline, false).unwrap();
             let sample_closure = || parameters.sample(&mut thread_rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
@@ -294,7 +381,7 @@ mod tests {
             let baseline =
                 CrpParameters::new_with_discount(n_items, concentration, discount).unwrap();
             let parameters =
-                SpParameters::new(target, shrinkage, permutation, grit, baseline).unwrap();
+                SpParameters::new(target, shrinkage, permutation, grit, baseline, false).unwrap();
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
         }

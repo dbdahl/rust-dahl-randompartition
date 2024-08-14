@@ -38,6 +38,10 @@ pub trait PredictiveProbabilityFunction {
             .map(|(label, x)| (label, x / sum))
             .collect()
     }
+
+    fn crp_concentration_ln(&self) -> f64 {
+        f64::NEG_INFINITY
+    }
 }
 
 //
