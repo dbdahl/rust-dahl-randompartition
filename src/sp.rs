@@ -93,7 +93,7 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
             candidate_labels
                 .map(|label| {
                     target[item] = label;
-                    (label, log_pmf_spcrp(self, &target))
+                    (label, log_pmf_spcrp(self, item, &target))
                 })
                 .collect()
         } else {
@@ -143,6 +143,7 @@ fn tabulate_cluster_counts(clustering: &[usize]) -> Result<Vec<usize>, &'static 
 
 fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
     lf: &SpParameters<D>,
+    skip_until: usize,
     partition: &[usize],
 ) -> f64 {
     let concentration_ln = lf.baseline_ppf.crp_concentration_ln();
@@ -155,34 +156,40 @@ fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
     let mut weights_ln: Vec<f64> = vec![0.0; cluster_sizes.len() + 1];
     let mut n_clusters = 0;
     let mut log_pmf = 0.0;
+    let mut skip = true;
     for k in 0..anchor.n_items() {
-        let mut max_weight_ln = f64::NEG_INFINITY;
         let i = lf.permutation.get(k);
         let shrink = lf.shrinkage[i].get();
         // DBD bug BUG
         // let multiplier = shrink / (k as f64).powi(2);
-        let multiplier = 2.0 * shrink / ((k + 1) as f64).powi(2);
+        if i == skip_until {
+            skip = false;
+        }
+        let label = clustering.get(i);
         let label_in_anchor = anchor.get(i);
         let offset = cluster_sizes.len() * label_in_anchor;
-        for label in 0..n_clusters {
-            let joint_sum_squared = joint[offset + label].powi(2);
-            let marginal_sum_squared = marginal[label].powi(2);
-            let weight_ln = multiplier * (joint_sum_squared - lf.grit * marginal_sum_squared)
-                + (marginal_counts[label] as f64).ln();
-            max_weight_ln = max_weight_ln.max(weight_ln);
-            weights_ln[label] = weight_ln;
+        if !skip {
+            let mut max_weight_ln = f64::NEG_INFINITY;
+            let multiplier = 2.0 * shrink / ((k + 1) as f64).powi(2);
+            for label in 0..n_clusters {
+                let joint_sum_squared = joint[offset + label].powi(2);
+                let marginal_sum_squared = marginal[label].powi(2);
+                let weight_ln = multiplier * (joint_sum_squared - lf.grit * marginal_sum_squared)
+                    + (marginal_counts[label] as f64).ln();
+                max_weight_ln = max_weight_ln.max(weight_ln);
+                weights_ln[label] = weight_ln;
+            }
+            max_weight_ln = max_weight_ln.max(concentration_ln);
+            weights_ln[n_clusters] = concentration_ln;
+            let weights_sum_ln = weights_ln
+                .iter()
+                .take(n_clusters + 1)
+                .map(|weight_ln| (weight_ln - max_weight_ln).exp())
+                .sum::<f64>()
+                .ln();
+            let contribution = weights_ln[label] - max_weight_ln - weights_sum_ln;
+            log_pmf += contribution;
         }
-        max_weight_ln = max_weight_ln.max(concentration_ln);
-        weights_ln[n_clusters] = concentration_ln;
-        let weights_sum_ln = weights_ln
-            .iter()
-            .take(n_clusters + 1)
-            .map(|weight_ln| (weight_ln - max_weight_ln).exp())
-            .sum::<f64>()
-            .ln();
-        let label = clustering.get(i);
-        let contribution = weights_ln[label] - max_weight_ln - weights_sum_ln;
-        log_pmf += contribution;
         if label == n_clusters {
             n_clusters += 1;
         }
@@ -196,7 +203,7 @@ fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         if self.shortcut {
-            log_pmf_spcrp(self, partition.allocation())
+            log_pmf_spcrp(self, self.permutation.get(0), partition.allocation())
         } else {
             engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
         }
@@ -206,7 +213,7 @@ impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpPar
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunctionPartial for SpParameters<D> {
     fn log_pmf_partial(&self, item: usize, partition: &Clustering) -> f64 {
         if self.shortcut {
-            log_pmf_spcrp(self, partition.allocation())
+            log_pmf_spcrp(self, item, partition.allocation())
         } else {
             let (partial_clustering, counts_marginal, counts_joint) =
                 self.prepare_for_partial(item, partition);
