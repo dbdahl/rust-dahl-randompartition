@@ -167,8 +167,6 @@ fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
     for k in 0..anchor.len() {
         let i = lf.permutation.get(k);
         let shrink = lf.shrinkage[i].get();
-        // DBD bug BUG
-        // let multiplier = shrink / (k as f64).powi(2);
         if i == skip_until {
             skip = false;
         }
@@ -177,7 +175,8 @@ fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
         let offset = partition_n_clusters * label_in_anchor;
         if !skip {
             let mut max_weight_ln = f64::NEG_INFINITY;
-            let multiplier = 2.0 * shrink / ((k + 1) as f64).powi(2);
+            let multiplier = shrink / (k as f64).powi(2);
+            // let multiplier = 2.0 * shrink / ((k + 1) as f64).powi(2);
             for label in 0..n_clusters {
                 let joint_sum_squared = joint[offset + label].powi(2);
                 let marginal_sum_squared = marginal[label].powi(2);
@@ -318,7 +317,11 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         let item = parameters.permutation.get(i);
         let label_in_anchor = parameters.anchor.get(item);
         let shrinkage = parameters.shrinkage[item];
-        let shrinkage_scaled = 2.0 * shrinkage / ((i + 1) as f64).powi(2);
+        let shrinkage_scaled = if i == 0 {
+            1.0
+        } else {
+            shrinkage / (i as f64).powi(2)
+        };
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
