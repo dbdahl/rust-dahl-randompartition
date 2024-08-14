@@ -89,11 +89,31 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
         if self.shortcut {
+            let anchor =
+                Clustering::relabel(self.anchor.allocation(), 0, Some(&self.permutation), false).0;
+            let concentration_ln = self.baseline_ppf.crp_concentration_ln();
             let candidate_labels = clustering.available_labels_for_reallocation(item);
+            let n_clusters = clustering.n_clusters();
+            let new_label = clustering.new_label();
             candidate_labels
                 .map(|label| {
                     target[item] = label;
-                    (label, log_pmf_spcrp(self, item, &target))
+                    (
+                        label,
+                        log_pmf_spcrp(
+                            self,
+                            item,
+                            &target,
+                            if label == new_label {
+                                n_clusters + 1
+                            } else {
+                                n_clusters
+                            },
+                            anchor.allocation(),
+                            anchor.n_clusters(),
+                            concentration_ln,
+                        ),
+                    )
                 })
                 .collect()
         } else {
@@ -127,37 +147,24 @@ impl<D: PredictiveProbabilityFunction + Clone> PartitionSampler for SpParameters
     }
 }
 
-fn tabulate_cluster_counts(clustering: &[usize]) -> Result<Vec<usize>, &'static str> {
-    let mut cluster_sizes = Vec::new();
-    for &label in clustering.iter() {
-        if label >= cluster_sizes.len() {
-            cluster_sizes.resize(label + 1, 0_usize);
-        }
-        cluster_sizes[label] += 1;
-    }
-    if cluster_sizes.iter().any(|&count| count == 0) {
-        return Err("Cluster labels are not contiguous.");
-    }
-    Ok(cluster_sizes)
-}
-
 fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
     lf: &SpParameters<D>,
     skip_until: usize,
     partition: &[usize],
+    partition_n_clusters: usize,
+    anchor: &[usize],
+    anchor_n_clusters: usize,
+    concentration_ln: f64,
 ) -> f64 {
-    let concentration_ln = lf.baseline_ppf.crp_concentration_ln();
-    let anchor = Clustering::relabel(lf.anchor.allocation(), 0, Some(&lf.permutation), false).0;
     let clustering = Clustering::relabel(partition, 0, Some(&lf.permutation), false).0;
-    let cluster_sizes = tabulate_cluster_counts(clustering.allocation()).unwrap();
-    let mut joint: Vec<f64> = vec![0.0; cluster_sizes.len() * anchor.n_clusters()];
-    let mut marginal: Vec<f64> = vec![0.0; cluster_sizes.len()];
-    let mut marginal_counts: Vec<usize> = vec![0; cluster_sizes.len()];
-    let mut weights_ln: Vec<f64> = vec![0.0; cluster_sizes.len() + 1];
+    let mut joint: Vec<f64> = vec![0.0; partition_n_clusters * anchor_n_clusters];
+    let mut marginal: Vec<f64> = vec![0.0; partition_n_clusters];
+    let mut marginal_counts: Vec<usize> = vec![0; partition_n_clusters];
+    let mut weights_ln: Vec<f64> = vec![0.0; partition_n_clusters + 1];
     let mut n_clusters = 0;
     let mut log_pmf = 0.0;
     let mut skip = true;
-    for k in 0..anchor.n_items() {
+    for k in 0..anchor.len() {
         let i = lf.permutation.get(k);
         let shrink = lf.shrinkage[i].get();
         // DBD bug BUG
@@ -166,8 +173,8 @@ fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
             skip = false;
         }
         let label = clustering.get(i);
-        let label_in_anchor = anchor.get(i);
-        let offset = cluster_sizes.len() * label_in_anchor;
+        let label_in_anchor = anchor[i];
+        let offset = partition_n_clusters * label_in_anchor;
         if !skip {
             let mut max_weight_ln = f64::NEG_INFINITY;
             let multiplier = 2.0 * shrink / ((k + 1) as f64).powi(2);
@@ -203,7 +210,17 @@ fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         if self.shortcut {
-            log_pmf_spcrp(self, self.permutation.get(0), partition.allocation())
+            let anchor =
+                Clustering::relabel(self.anchor.allocation(), 0, Some(&self.permutation), false).0;
+            log_pmf_spcrp(
+                self,
+                self.permutation.get(0),
+                partition.allocation(),
+                partition.n_clusters(),
+                anchor.allocation(),
+                anchor.n_clusters(),
+                self.baseline_ppf.crp_concentration_ln(),
+            )
         } else {
             engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
         }
@@ -213,7 +230,17 @@ impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpPar
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunctionPartial for SpParameters<D> {
     fn log_pmf_partial(&self, item: usize, partition: &Clustering) -> f64 {
         if self.shortcut {
-            log_pmf_spcrp(self, item, partition.allocation())
+            let anchor =
+                Clustering::relabel(self.anchor.allocation(), 0, Some(&self.permutation), false).0;
+            log_pmf_spcrp(
+                self,
+                item,
+                partition.allocation(),
+                partition.n_clusters(),
+                anchor.allocation(),
+                anchor.n_clusters(),
+                self.baseline_ppf.crp_concentration_ln(),
+            )
         } else {
             let (partial_clustering, counts_marginal, counts_joint) =
                 self.prepare_for_partial(item, partition);
