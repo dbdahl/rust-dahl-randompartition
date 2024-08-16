@@ -175,12 +175,11 @@ fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
         let offset = partition_n_clusters * label_in_anchor;
         if !skip {
             let mut max_weight_ln = f64::NEG_INFINITY;
-            let multiplier = shrink / (k as f64).powi(2);
-            // let multiplier = 2.0 * shrink / ((k + 1) as f64).powi(2);
+            let multiplier = shrink / (k as f64);
             for label in 0..n_clusters {
-                let joint_sum_squared = joint[offset + label].powi(2);
-                let marginal_sum_squared = marginal[label].powi(2);
-                let weight_ln = multiplier * (joint_sum_squared - lf.grit * marginal_sum_squared)
+                let joint_sum = joint[offset + label];
+                let marginal_sum = marginal[label];
+                let weight_ln = multiplier * (joint_sum - lf.grit * marginal_sum)
                     + (marginal_counts[label] as f64).ln();
                 max_weight_ln = max_weight_ln.max(weight_ln);
                 weights_ln[label] = weight_ln;
@@ -317,11 +316,7 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
         let item = parameters.permutation.get(i);
         let label_in_anchor = parameters.anchor.get(item);
         let shrinkage = parameters.shrinkage[item];
-        let shrinkage_scaled = if i == 0 {
-            1.0
-        } else {
-            shrinkage / (i as f64).powi(2)
-        };
+        let shrinkage_scaled = if i == 0 { 1.0 } else { shrinkage / (i as f64) };
         let candidate_labels: Vec<usize> = clustering
             .available_labels_for_allocation_with_target(target, item)
             .collect();
@@ -339,8 +334,8 @@ fn engine<D: PredictiveProbabilityFunction + Clone, T: Rng>(
             .into_iter()
             .map(|(label, log_probability_from_baseline)| {
                 let log_anchor_fidelity = shrinkage_scaled
-                    * (counts_joint[label_in_anchor][label].powi(2)
-                        - parameters.grit * counts_marginal[label].powi(2));
+                    * (counts_joint[label_in_anchor][label]
+                        - parameters.grit * counts_marginal[label]);
                 let lp = log_probability_from_baseline + log_anchor_fidelity;
                 (label, lp)
             });
