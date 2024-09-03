@@ -10,7 +10,7 @@ use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossCompute
 
 #[derive(Debug, Clone)]
 pub struct CppParameters<D: ProbabilityMassFunction> {
-    anchor: Clustering,
+    pub anchor: Clustering,
     rate: f64,
     baseline_pmf: D,
     use_vi: bool,
