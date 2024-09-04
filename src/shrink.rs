@@ -1,7 +1,7 @@
 use crate::clust::Clustering;
 use crate::prelude::*;
 use rand::prelude::*;
-use rand_distr::{Beta, Distribution};
+use rand_distr::{Distribution, Gamma};
 
 #[derive(Debug, Clone)]
 pub struct Shrinkage(Vec<ScalarShrinkage>);
@@ -50,15 +50,9 @@ impl Shrinkage {
         }
     }
 
-    pub fn randomize_common<T: Rng>(
-        &mut self,
-        max: ScalarShrinkage,
-        shape1: Shape,
-        shape2: Shape,
-        rng: &mut T,
-    ) {
-        let beta = Beta::new(shape1.get(), shape2.get()).unwrap();
-        let value = ScalarShrinkage::new_unchecked(max * beta.sample(rng));
+    pub fn randomize_common<T: Rng>(&mut self, shape1: Shape, shape2: Shape, rng: &mut T) {
+        let gamma = Gamma::new(shape1.get(), shape2.get()).unwrap();
+        let value = ScalarShrinkage::new_unchecked(gamma.sample(rng));
         for x in &mut self.0 {
             if x.get() > 0.0 {
                 *x = value;
@@ -68,18 +62,17 @@ impl Shrinkage {
 
     pub fn randomize_common_cluster<T: Rng>(
         &mut self,
-        max: ScalarShrinkage,
         shape1: Shape,
         shape2: Shape,
         clustering: &Clustering,
         rng: &mut T,
     ) {
-        let beta = Beta::new(shape1.get(), shape2.get()).unwrap();
+        let gamma = Gamma::new(shape1.get(), shape2.get()).unwrap();
         for k in clustering.available_labels_for_allocation() {
             if clustering.size_of(k) == 0 {
                 continue;
             }
-            let value = ScalarShrinkage::new_unchecked(max * beta.sample(rng));
+            let value = ScalarShrinkage::new_unchecked(gamma.sample(rng));
             for i in clustering.items_of(k) {
                 if self.0[i].get() > 0.0 {
                     self.0[i] = value;
@@ -88,17 +81,11 @@ impl Shrinkage {
         }
     }
 
-    pub fn randomize_idiosyncratic<T: Rng>(
-        &mut self,
-        max: ScalarShrinkage,
-        shape1: Shape,
-        shape2: Shape,
-        rng: &mut T,
-    ) {
-        let beta = Beta::new(shape1.get(), shape2.get()).unwrap();
+    pub fn randomize_idiosyncratic<T: Rng>(&mut self, shape1: Shape, shape2: Shape, rng: &mut T) {
+        let gamma = Gamma::new(shape1.get(), shape2.get()).unwrap();
         for x in &mut self.0 {
             if x.get() > 0.0 {
-                *x = ScalarShrinkage::new_unchecked(max * beta.sample(rng))
+                *x = ScalarShrinkage::new_unchecked(gamma.sample(rng))
             }
         }
     }
