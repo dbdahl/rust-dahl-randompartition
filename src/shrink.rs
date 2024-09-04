@@ -50,8 +50,8 @@ impl Shrinkage {
         }
     }
 
-    pub fn randomize_common<T: Rng>(&mut self, shape1: Shape, shape2: Shape, rng: &mut T) {
-        let gamma = Gamma::new(shape1.get(), shape2.get()).unwrap();
+    pub fn randomize_common<T: Rng>(&mut self, shape: Shape, rate: Rate, rng: &mut T) {
+        let gamma = Gamma::new(shape.get(), 1.0 / rate.get()).unwrap();
         let value = ScalarShrinkage::new_unchecked(gamma.sample(rng));
         for x in &mut self.0 {
             if x.get() > 0.0 {
@@ -62,12 +62,12 @@ impl Shrinkage {
 
     pub fn randomize_common_cluster<T: Rng>(
         &mut self,
-        shape1: Shape,
-        shape2: Shape,
+        shape: Shape,
+        rate: Rate,
         clustering: &Clustering,
         rng: &mut T,
     ) {
-        let gamma = Gamma::new(shape1.get(), shape2.get()).unwrap();
+        let gamma = Gamma::new(shape.get(), 1.0 / rate.get()).unwrap();
         for k in clustering.available_labels_for_allocation() {
             if clustering.size_of(k) == 0 {
                 continue;
@@ -81,8 +81,8 @@ impl Shrinkage {
         }
     }
 
-    pub fn randomize_idiosyncratic<T: Rng>(&mut self, shape1: Shape, shape2: Shape, rng: &mut T) {
-        let gamma = Gamma::new(shape1.get(), shape2.get()).unwrap();
+    pub fn randomize_idiosyncratic<T: Rng>(&mut self, shape: Shape, rate: Rate, rng: &mut T) {
+        let gamma = Gamma::new(shape.get(), 1.0 / rate.get()).unwrap();
         for x in &mut self.0 {
             if x.get() > 0.0 {
                 *x = ScalarShrinkage::new_unchecked(gamma.sample(rng))
