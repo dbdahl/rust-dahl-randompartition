@@ -108,11 +108,11 @@ mod tests {
         let n_items = 5;
         let discount = Discount::new(0.1).unwrap();
         let concentration = Concentration::new_with_discount(2.0, discount).unwrap();
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         for anchor in Clustering::iter(n_items) {
             let anchor = Clustering::from_vector(anchor);
             let rate = loop {
-                let x = rng.gen_range(0.0..10.0);
+                let x = rng.random_range(0.0..10.0);
                 if x > 0.0 {
                     break x;
                 }

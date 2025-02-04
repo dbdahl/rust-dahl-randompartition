@@ -1,6 +1,6 @@
 use crate::perm::Permutation;
 
-use rand::distributions::{Distribution, WeightedIndex};
+use rand::distr::weighted::WeightedIndex;
 use rand::prelude::*;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -585,7 +585,7 @@ pub struct ClusterLabelsIterator<'a> {
     done: bool,
 }
 
-impl<'a> Iterator for ClusterLabelsIterator<'a> {
+impl Iterator for ClusterLabelsIterator<'_> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -90,12 +90,11 @@ impl NormalizedProbabilityMassFunction for UpParameters {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::prelude::*;
 
     #[test]
     fn test_goodness_of_fit_constructive() {
         let parameters = UpParameters::new(5);
-        let sample_closure = || parameters.sample(&mut thread_rng());
+        let sample_closure = || parameters.sample(&mut rand::rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
             100000,

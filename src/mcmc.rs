@@ -169,7 +169,7 @@ where
             .partial_shuffle(n_items_per_update, rng);
         let log_pmf_proposal = prior.log_pmf(clustering);
         let log_hastings_ratio = log_pmf_proposal - log_pmf_current;
-        if 0.0 <= log_hastings_ratio || rng.gen_range(0.0..1.0_f64).ln() < log_hastings_ratio {
+        if 0.0 <= log_hastings_ratio || rng.random_range(0.0..1.0_f64).ln() < log_hastings_ratio {
             n_acceptances += 1;
             log_pmf_current = log_pmf_proposal;
         } else {
@@ -300,7 +300,6 @@ where
 mod tests_mcmc {
     use super::*;
     use crate::crp::CrpParameters;
-    use rand::prelude::*;
 
     #[test]
     fn test_crp_neal_algorithm3() {
@@ -318,7 +317,7 @@ mod tests_mcmc {
                 &permutation,
                 &neal_functions,
                 &log_posterior_predictive,
-                &mut thread_rng(),
+                &mut rand::rng(),
             );
             sum += current.n_clusters();
         }

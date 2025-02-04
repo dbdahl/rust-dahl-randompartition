@@ -155,7 +155,7 @@ impl<'a> SquareMatrixBorrower<'a> {
     }
 }
 
-impl<'a> FullConditional for EpaParameters<'a> {
+impl FullConditional for EpaParameters<'_> {
     fn log_full_conditional<'b>(
         &'b self,
         item: usize,
@@ -172,21 +172,21 @@ impl<'a> FullConditional for EpaParameters<'a> {
     }
 }
 
-impl<'a> PartitionSampler for EpaParameters<'a> {
+impl PartitionSampler for EpaParameters<'_> {
     fn sample<T: Rng>(&self, rng: &mut T) -> Clustering {
         engine(self, None, Some(rng)).0
     }
 }
 
-impl<'a> ProbabilityMassFunction for EpaParameters<'a> {
+impl ProbabilityMassFunction for EpaParameters<'_> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
         engine::<Pcg64Mcg>(self, Some(partition.allocation()), None).1
     }
 }
 
-impl<'a> NormalizedProbabilityMassFunction for EpaParameters<'a> {}
+impl NormalizedProbabilityMassFunction for EpaParameters<'_> {}
 
-impl<'a> HasPermutation for EpaParameters<'a> {
+impl HasPermutation for EpaParameters<'_> {
     fn permutation(&self) -> &Permutation {
         &self.permutation
     }
@@ -249,7 +249,7 @@ mod tests {
     #[test]
     fn test_goodness_of_fit_constructive() {
         let n_items = 4;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         let permutation = Permutation::random(n_items, &mut rng);
         let discount = Discount::new(0.3).unwrap();
         let concentration = Concentration::new_with_discount(1.5, discount).unwrap();
@@ -276,7 +276,7 @@ mod tests {
         let similarity_borrower = similarity.view();
         let parameters =
             EpaParameters::new(similarity_borrower, permutation, concentration, discount).unwrap();
-        let sample_closure = || parameters.sample(&mut thread_rng());
+        let sample_closure = || parameters.sample(&mut rand::rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
             10000,
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn test_pmf() {
         let n_items = 4;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         let permutation = Permutation::random(n_items, &mut rng);
         let discount = Discount::new(0.3).unwrap();
         let concentration = Concentration::new_with_discount(1.5, discount).unwrap();

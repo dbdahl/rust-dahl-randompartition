@@ -1,4 +1,5 @@
 use rand::prelude::*;
+use rand::Rng;
 
 /// A data structure representation a permutation of integers.
 ///
@@ -172,15 +173,15 @@ impl Permutation {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::perm::Permutation;
-    use rand::{thread_rng, Rng};
 
     #[test]
     fn partial_shuffle() {
-        let rng = &mut thread_rng();
+        let rng = &mut rand::rng();
         for _ in 0..500 {
-            let n_items = rng.gen_range(1..100_usize);
-            let k = rng.gen_range(0..n_items);
+            let n_items = rng.random_range(1..100_usize);
+            let k = rng.random_range(0..n_items);
             let mut perm = Permutation::random(n_items, rng);
             perm.partial_shuffle(k, rng);
             let perm2 = Permutation::from_vector(perm.x);
@@ -190,10 +191,10 @@ mod tests {
 
     #[test]
     fn partial_shuffle_undo() {
-        let rng = &mut thread_rng();
+        let rng = &mut rand::rng();
         for _ in 0..500 {
-            let n_items = rng.gen_range(1..100_usize);
-            let k = rng.gen_range(0..n_items);
+            let n_items = rng.random_range(1..100_usize);
+            let k = rng.random_range(0..n_items);
             let mut perm = Permutation::random(n_items, rng);
             let original = perm.clone();
             perm.partial_shuffle(k, rng);

@@ -182,11 +182,11 @@ mod tests {
     #[test]
     fn test_goodness_of_fit_constructive() {
         let n_items = 4;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
             let shrinkage = loop {
-                let x = rng.gen_range(0.0..10.0);
+                let x = rng.random_range(0.0..10.0);
                 if x > 0.0 {
                     break ScalarShrinkage::new(x).unwrap();
                 }
@@ -199,7 +199,7 @@ mod tests {
                 permutation,
             )
             .unwrap();
-            let sample_closure = || parameters.sample(&mut thread_rng());
+            let sample_closure = || parameters.sample(&mut rand::rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
                 10000,
@@ -215,11 +215,11 @@ mod tests {
     #[test]
     fn test_pmf() {
         let n_items = 5;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         for baseline in Clustering::iter(n_items) {
             let baseline = Clustering::from_vector(baseline);
             let shrinkage = loop {
-                let x = rng.gen_range(0.0..10.0);
+                let x = rng.random_range(0.0..10.0);
                 if x > 0.0 {
                     break ScalarShrinkage::new(x).unwrap();
                 }

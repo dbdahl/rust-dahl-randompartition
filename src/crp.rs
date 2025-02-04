@@ -149,12 +149,11 @@ impl NormalizedProbabilityMassFunction for CrpParameters {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::prelude::*;
 
     #[test]
     fn test_goodness_of_fit_constructive() {
         let parameters = CrpParameters::new(5, Concentration::new(2.0).unwrap());
-        let sample_closure = || parameters.sample(&mut thread_rng());
+        let sample_closure = || parameters.sample(&mut rand::rng());
         let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
         crate::testing::assert_goodness_of_fit(
             100000,

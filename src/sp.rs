@@ -368,12 +368,12 @@ mod tests {
         let n_items = 4;
         let discount = Discount::new(0.1).unwrap();
         let concentration = Concentration::new_with_discount(2.0, discount).unwrap();
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         for target in Clustering::iter(n_items) {
             let target = Clustering::from_vector(target);
             let mut vec = Vec::with_capacity(target.n_clusters());
             for _ in 0..target.n_items() {
-                vec.push(rng.gen_range(0.0..10.0));
+                vec.push(rng.random_range(0.0..10.0));
             }
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
@@ -382,7 +382,7 @@ mod tests {
                 CrpParameters::new_with_discount(n_items, concentration, discount).unwrap();
             let parameters =
                 SpParameters::new(target, shrinkage, permutation, grit, baseline, false).unwrap();
-            let sample_closure = || parameters.sample(&mut thread_rng());
+            let sample_closure = || parameters.sample(&mut rand::rng());
             let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
             crate::testing::assert_goodness_of_fit(
                 10000,
@@ -400,12 +400,12 @@ mod tests {
         let n_items = 5;
         let discount = Discount::new(0.1).unwrap();
         let concentration = Concentration::new_with_discount(2.0, discount).unwrap();
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         for target in Clustering::iter(n_items) {
             let target = Clustering::from_vector(target);
             let mut vec = Vec::with_capacity(target.n_clusters());
             for _ in 0..target.n_items() {
-                vec.push(rng.gen_range(0.0..10.0));
+                vec.push(rng.random_range(0.0..10.0));
             }
             let shrinkage = Shrinkage::from(&vec[..]).unwrap();
             let permutation = Permutation::random(n_items, &mut rng);
