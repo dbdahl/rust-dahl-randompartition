@@ -85,7 +85,7 @@ impl SquareMatrix {
         &mut self.data[..]
     }
 
-    pub fn view(&mut self) -> SquareMatrixBorrower {
+    pub fn view(&mut self) -> SquareMatrixBorrower<'_> {
         SquareMatrixBorrower::from_slice(&mut self.data[..], self.n_items)
     }
 
@@ -117,7 +117,7 @@ impl<'a> SquareMatrixBorrower<'a> {
     ///
     /// You're on your own.
     pub unsafe fn from_ptr(data: *mut f64, n_items: usize) -> Self {
-        let data = slice::from_raw_parts_mut(data, n_items * n_items);
+        let data = unsafe { slice::from_raw_parts_mut(data, n_items * n_items) };
         Self { data, n_items }
     }
 
@@ -129,7 +129,7 @@ impl<'a> SquareMatrixBorrower<'a> {
     ///
     /// You're on your own.
     pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &f64 {
-        self.data.get_unchecked(self.n_items * j + i)
+        unsafe { self.data.get_unchecked(self.n_items * j + i) }
     }
 
     pub fn data(&self) -> &[f64] {

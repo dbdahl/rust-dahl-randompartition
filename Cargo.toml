@@ -2,23 +2,23 @@
 name = "dahl-randompartition"
 version = "0.1.0"
 authors = ["David B. Dahl <dahl@stat.byu.edu>"]
-edition = "2021"
+edition = "2024"
 description = "An efficient representation of a set partition."
 homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
-rust-version = "1.81"
+rust-version = "1.88"
 
 [dependencies]
-rand = "0.9.0"
-rand_pcg = "0.9.0"
-rand_distr = "0.5.0"
+rand = "0.10.0"
+rand_pcg = "0.10.0"
+rand_distr = "0.6.0"
 statrs = "0.18.0"
 
-dahl-bellnumber = { git="https://github.com/dbdahl/rust-dahl-bellnumber.git", rev="b521e67" }
+dahl-bellnumber = { git="https://github.com/dbdahl/rust-dahl-bellnumber.git", rev="71cadf5" }
 # dahl-bellnumber = { path="/home/dahl/docs/devel/rust-dahl-bellnumber" }
 
 # dahl-salso = "0.6.6"
-dahl-salso = { git="https://github.com/dbdahl/rust-dahl-salso.git", rev="b438a37" }
+dahl-salso = { git="https://github.com/dbdahl/rust-dahl-salso.git", rev="c93de29" }
 # dahl-salso = { path="/home/dahl/docs/devel/rust-dahl-salso" }
 
 slice_sampler = { git="https://github.com/dbdahl/rust_slice_sampler.git", rev="bacf2b5" }

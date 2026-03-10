@@ -5,9 +5,9 @@ use crate::distr::{
 };
 use crate::perm::Permutation;
 use crate::prelude::*;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use slice_sampler::univariate::stepping_out::{
-    univariate_slice_sampler_stepping_out_and_shrinkage as slice_sampler, TuningParameters,
+    TuningParameters, univariate_slice_sampler_stepping_out_and_shrinkage as slice_sampler,
 };
 use statrs::distribution::{Beta, Continuous, Gamma};
 

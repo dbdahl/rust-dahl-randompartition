@@ -219,7 +219,7 @@ impl Clustering {
         &self,
         target: Option<&[usize]>,
         item: usize,
-    ) -> ClusterLabelsIterator {
+    ) -> ClusterLabelsIterator<'_> {
         let new_label = match target {
             Some(target) => {
                 let what = target[item];
@@ -238,7 +238,7 @@ impl Clustering {
         }
     }
 
-    pub fn available_labels_for_reallocation(&self, item: usize) -> ClusterLabelsIterator {
+    pub fn available_labels_for_reallocation(&self, item: usize) -> ClusterLabelsIterator<'_> {
         let new_label = if self.size_of(self.allocation[item]) > 1 {
             Some(self.new_label())
         } else {
@@ -644,7 +644,10 @@ mod tests {
         let mut clustering = Clustering::singleton_clusters(5);
         let new_label = 6;
         clustering.allocate(1, new_label);
-        check_output(&clustering, "Clustering { allocation: [0, 6, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 0, 1], active_labels: [0, 6, 2, 3, 4], available_labels: [5, 1] }");
+        check_output(
+            &clustering,
+            "Clustering { allocation: [0, 6, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 0, 1], active_labels: [0, 6, 2, 3, 4], available_labels: [5, 1] }",
+        );
     }
 
     #[test]
@@ -652,16 +655,25 @@ mod tests {
         let mut clustering = Clustering::singleton_clusters(5);
         let new_label = clustering.new_label();
         clustering.allocate(1, new_label);
-        check_output(&clustering, "Clustering { allocation: [0, 5, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 1], active_labels: [0, 5, 2, 3, 4], available_labels: [1] }");
+        check_output(
+            &clustering,
+            "Clustering { allocation: [0, 5, 2, 3, 4], sizes: [1, 0, 1, 1, 1, 1], active_labels: [0, 5, 2, 3, 4], available_labels: [1] }",
+        );
         clustering.allocate(3, 2);
-        check_output(&clustering, "Clustering { allocation: [0, 5, 2, 2, 4], sizes: [1, 0, 2, 0, 1, 1], active_labels: [0, 5, 2, 4], available_labels: [1, 3] }");
+        check_output(
+            &clustering,
+            "Clustering { allocation: [0, 5, 2, 2, 4], sizes: [1, 0, 2, 0, 1, 1], active_labels: [0, 5, 2, 4], available_labels: [1, 3] }",
+        );
     }
 
     #[test]
     fn test_add_to_available_cluster() {
         let mut clustering = Clustering::from_vector(vec![0, 5, 2, 2, 4]);
         clustering.allocate(3, 1);
-        check_output(&clustering, "Clustering { allocation: [0, 5, 2, 1, 4], sizes: [1, 1, 1, 0, 1, 1], active_labels: [0, 2, 4, 5, 1], available_labels: [3] }");
+        check_output(
+            &clustering,
+            "Clustering { allocation: [0, 5, 2, 1, 4], sizes: [1, 1, 1, 0, 1, 1], active_labels: [0, 2, 4, 5, 1], available_labels: [3] }",
+        );
     }
 
     #[test]
