@@ -36,9 +36,7 @@ impl Shrinkage {
     }
 
     pub fn set_constant(&mut self, new_value: ScalarShrinkage) {
-        for y in &mut self.0 {
-            *y = new_value;
-        }
+        self.0.fill(new_value);
     }
 
     pub fn rescale_by_reference(&mut self, reference: usize, new_value: ScalarShrinkage) {

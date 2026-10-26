@@ -14,12 +14,8 @@ rand_pcg = "0.10.0"
 rand_distr = "0.6.0"
 statrs = "0.18.0"
 
-dahl-bellnumber = { git="https://github.com/dbdahl/rust-dahl-bellnumber.git", rev="792af17" }
-# dahl-bellnumber = { path="/home/dahl/docs/devel/rust-dahl-bellnumber" }
-
-# dahl-salso = "0.6.6"
-dahl-salso = { git="https://github.com/dbdahl/rust-dahl-salso.git", rev="cdabc9c" }
-# dahl-salso = { path="/home/dahl/docs/devel/rust-dahl-salso" }
+dahl-bellnumber = "0.1.4" 
+dahl-salso = "0.8.0"
 
 slice_sampler = { git="https://github.com/dbdahl/rust_slice_sampler.git", rev="aa8f4ec" }
 fastrand = "2.0"

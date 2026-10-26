@@ -1,5 +1,5 @@
-use rand::prelude::*;
 use rand::Rng;
+use rand::prelude::*;
 
 /// A data structure representation a permutation of integers.
 ///

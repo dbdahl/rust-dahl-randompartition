@@ -8,11 +8,7 @@ macro_rules! constrained_f64 {
 
         impl $name {
             pub fn new($x: f64) -> Option<Self> {
-                if $closure {
-                    Some(Self($x))
-                } else {
-                    None
-                }
+                if $closure { Some(Self($x)) } else { None }
             }
 
             pub(crate) fn new_unchecked(x: f64) -> Self {
@@ -146,11 +142,7 @@ constrained_f64!(Grit, x, true);
 
 impl Concentration {
     pub fn new_with_discount(x: f64, discount: Discount) -> Option<Self> {
-        if x > -discount {
-            Some(Self(x))
-        } else {
-            None
-        }
+        if x > -discount { Some(Self(x)) } else { None }
     }
 }
 
