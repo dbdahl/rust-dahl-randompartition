@@ -216,7 +216,10 @@ pub fn engine<T: Rng>(
             .available_labels_for_allocation_with_target(target, ii)
             .map(|label| {
                 let n_items_in_cluster = clustering.size_of(label);
-                let weight = if n_items_in_cluster == 0 {
+                // The first item always starts a cluster.
+                let weight = if i == 0 {
+                    1.0
+                } else if n_items_in_cluster == 0 {
                     concentration + discount * qt
                 } else {
                     kt * parameters
@@ -294,7 +297,6 @@ mod tests {
         let mut rng = rand::rng();
         let permutation = Permutation::random(n_items, &mut rng);
         let discount = Discount::new(0.3).unwrap();
-        let concentration = Concentration::new_with_discount(1.5, discount).unwrap();
         let mut similarity = SquareMatrix::zeros(n_items);
         {
             let data = similarity.data_mut();
@@ -316,9 +318,18 @@ mod tests {
             data[15] = 0.0;
         }
         let similarity_borrower = similarity.view();
-        let parameters =
-            EpaParameters::new(similarity_borrower, permutation, concentration, discount).unwrap();
-        let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
-        crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
+        // The concentration is greater than minus the discount.
+        for concentration in [1.5, -0.2] {
+            let concentration = Concentration::new_with_discount(concentration, discount).unwrap();
+            let parameters = EpaParameters::new(
+                similarity_borrower.clone(),
+                permutation.clone(),
+                concentration,
+                discount,
+            )
+            .unwrap();
+            let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
+            crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
+        }
     }
 }
