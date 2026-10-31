@@ -11,6 +11,7 @@ use crate::prelude::{Concentration, Discount};
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 use std::slice;
+use std::sync::Arc;
 
 type SimilarityBorrower<'a> = SquareMatrixBorrower<'a>;
 
@@ -96,21 +97,41 @@ impl SquareMatrix {
 
 #[derive(Debug, Clone)]
 pub struct SquareMatrixBorrower<'a> {
-    data: &'a [f64],
+    data: Data<'a>,
     n_items: usize,
+}
+
+// Shared data makes clones cheap and needs no lifetime.
+#[derive(Debug, Clone)]
+enum Data<'a> {
+    Borrowed(&'a [f64]),
+    Shared(Arc<[f64]>),
 }
 
 impl std::ops::Index<(usize, usize)> for SquareMatrixBorrower<'_> {
     type Output = f64;
     fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
-        &self.data[self.n_items * j + i]
+        &self.slice()[self.n_items * j + i]
+    }
+}
+
+impl SquareMatrixBorrower<'static> {
+    pub fn from_shared(data: Arc<[f64]>, n_items: usize) -> Self {
+        assert_eq!(data.len(), n_items * n_items);
+        Self {
+            data: Data::Shared(data),
+            n_items,
+        }
     }
 }
 
 impl<'a> SquareMatrixBorrower<'a> {
     pub fn from_slice(data: &'a mut [f64], n_items: usize) -> Self {
         assert_eq!(data.len(), n_items * n_items);
-        Self { data, n_items }
+        Self {
+            data: Data::Borrowed(data),
+            n_items,
+        }
     }
 
     /// # Safety
@@ -118,7 +139,17 @@ impl<'a> SquareMatrixBorrower<'a> {
     /// You're on your own.
     pub unsafe fn from_ptr(data: *mut f64, n_items: usize) -> Self {
         let data = unsafe { slice::from_raw_parts_mut(data, n_items * n_items) };
-        Self { data, n_items }
+        Self {
+            data: Data::Borrowed(data),
+            n_items,
+        }
+    }
+
+    fn slice(&self) -> &[f64] {
+        match &self.data {
+            Data::Borrowed(data) => data,
+            Data::Shared(data) => data,
+        }
     }
 
     pub fn n_items(&self) -> usize {
@@ -129,27 +160,29 @@ impl<'a> SquareMatrixBorrower<'a> {
     ///
     /// You're on your own.
     pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &f64 {
-        unsafe { self.data.get_unchecked(self.n_items * j + i) }
+        unsafe { self.slice().get_unchecked(self.n_items * j + i) }
     }
 
     pub fn data(&self) -> &[f64] {
-        self.data
+        self.slice()
     }
 
     pub fn sum_of_triangle(&self) -> f64 {
+        let data = self.slice();
         let mut sum = 0.0;
         for i in 0..self.n_items {
             for j in 0..i {
-                sum += unsafe { *self.get_unchecked((i, j)) };
+                sum += unsafe { *data.get_unchecked(self.n_items * j + i) };
             }
         }
         sum
     }
 
     pub fn sum_of_row_subset(&self, row: usize, columns: &[usize]) -> f64 {
+        let data = self.slice();
         let mut sum = 0.0;
         for j in columns {
-            sum += unsafe { *self.get_unchecked((row, *j)) };
+            sum += unsafe { *data.get_unchecked(self.n_items * *j + row) };
         }
         sum
     }
@@ -317,19 +350,23 @@ mod tests {
             data[11] = 0.6;
             data[15] = 0.0;
         }
-        let similarity_borrower = similarity.view();
-        // The concentration is greater than minus the discount.
-        for concentration in [1.5, -0.2] {
-            let concentration = Concentration::new_with_discount(concentration, discount).unwrap();
-            let parameters = EpaParameters::new(
-                similarity_borrower.clone(),
-                permutation.clone(),
-                concentration,
-                discount,
-            )
-            .unwrap();
-            let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
-            crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
+        let shared = SquareMatrixBorrower::from_shared(similarity.data().into(), n_items);
+        let borrowed = similarity.view();
+        for similarity_borrower in [borrowed, shared] {
+            // The concentration is greater than minus the discount.
+            for concentration in [1.5, -0.2] {
+                let concentration =
+                    Concentration::new_with_discount(concentration, discount).unwrap();
+                let parameters = EpaParameters::new(
+                    similarity_borrower.clone(),
+                    permutation.clone(),
+                    concentration,
+                    discount,
+                )
+                .unwrap();
+                let log_prob_closure = |clustering: &mut Clustering| parameters.log_pmf(clustering);
+                crate::testing::assert_pmf_sums_to_one(n_items, log_prob_closure, 0.0000001);
+            }
         }
     }
 }
