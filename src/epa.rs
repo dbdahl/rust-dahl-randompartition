@@ -117,7 +117,10 @@ impl std::ops::Index<(usize, usize)> for SquareMatrixBorrower<'_> {
 
 impl SquareMatrixBorrower<'static> {
     pub fn from_shared(data: Arc<[f64]>, n_items: usize) -> Self {
-        assert_eq!(data.len(), n_items * n_items);
+        let n_elements = n_items
+            .checked_mul(n_items)
+            .expect("matrix dimensions overflow");
+        assert_eq!(data.len(), n_elements);
         Self {
             data: Data::Shared(data),
             n_items,
@@ -127,7 +130,10 @@ impl SquareMatrixBorrower<'static> {
 
 impl<'a> SquareMatrixBorrower<'a> {
     pub fn from_slice(data: &'a mut [f64], n_items: usize) -> Self {
-        assert_eq!(data.len(), n_items * n_items);
+        let n_elements = n_items
+            .checked_mul(n_items)
+            .expect("matrix dimensions overflow");
+        assert_eq!(data.len(), n_elements);
         Self {
             data: Data::Borrowed(data),
             n_items,
@@ -281,6 +287,20 @@ pub fn engine<T: Rng>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[should_panic(expected = "matrix dimensions overflow")]
+    fn test_from_shared_rejects_dimension_overflow() {
+        let n_items = 1usize << (usize::BITS / 2);
+        SquareMatrixBorrower::from_shared(Arc::from([]), n_items);
+    }
+
+    #[test]
+    #[should_panic(expected = "matrix dimensions overflow")]
+    fn test_from_slice_rejects_dimension_overflow() {
+        let n_items = 1usize << (usize::BITS / 2);
+        SquareMatrixBorrower::from_slice(&mut [], n_items);
+    }
 
     #[test]
     fn test_goodness_of_fit_constructive() {
