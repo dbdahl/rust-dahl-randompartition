@@ -234,6 +234,41 @@ impl HasPermutation for EpaParameters<'_> {
     }
 }
 
+/// The share of item `row`'s attraction to the `earlier` items that goes to
+/// `cluster`, some of them, for when the usual weight isn't finite: the sum
+/// of its similarities to `cluster` over the sum to `earlier`.
+///
+/// - If the similarities to `earlier` are all 0, as when `exp()` underflows,
+///   the item is attracted to the earlier items alike, as in the
+///   Ewens-Pitman distribution, the limit as they shrink together. The
+///   probability of a new cluster, and so the distribution of the number of
+///   clusters, still doesn't depend on the similarities.
+/// - If their sum overflows, both sums are taken over similarities scaled by
+///   a power of 2, which is exact but for terms too small to matter.
+fn attraction_share(
+    similarity: &SimilarityBorrower,
+    row: usize,
+    cluster: &[usize],
+    earlier: &[usize],
+) -> f64 {
+    let total = similarity.sum_of_row_subset(row, earlier);
+    if total == 0.0 {
+        return cluster.len() as f64 / earlier.len() as f64;
+    }
+    if total.is_infinite() {
+        // Each sum is then at most half the largest finite number.
+        let scale = 0.5 / earlier.len().next_power_of_two() as f64;
+        let sum = |items: &[usize]| {
+            items
+                .iter()
+                .map(|&j| similarity[(row, j)] * scale)
+                .sum::<f64>()
+        };
+        return sum(cluster) / sum(earlier);
+    }
+    similarity.sum_of_row_subset(row, cluster) / total
+}
+
 pub fn engine<T: Rng>(
     parameters: &EpaParameters,
     target: Option<&[usize]>,
@@ -247,23 +282,24 @@ pub fn engine<T: Rng>(
     for i in 0..ni {
         let ii = parameters.permutation.get(i);
         let qt = clustering.n_clusters() as f64;
-        let kt = ((i as f64) - discount * qt)
-            / parameters
-                .similarity
-                .sum_of_row_subset(ii, parameters.permutation.as_slice_until(i));
+        let earlier = parameters.permutation.as_slice_until(i);
+        let numerator = (i as f64) - discount * qt;
+        let total = parameters.similarity.sum_of_row_subset(ii, earlier);
+        let kt = numerator / total;
         let labels_and_weights = clustering
             .available_labels_for_allocation_with_target(target, ii)
             .map(|label| {
                 let n_items_in_cluster = clustering.size_of(label);
+                let items = &clustering.items_of(label)[..];
                 // The first item always starts a cluster.
                 let weight = if i == 0 {
                     1.0
                 } else if n_items_in_cluster == 0 {
                     concentration + discount * qt
+                } else if kt.is_finite() && total.is_finite() {
+                    kt * parameters.similarity.sum_of_row_subset(ii, items)
                 } else {
-                    kt * parameters
-                        .similarity
-                        .sum_of_row_subset(ii, &clustering.items_of(label)[..])
+                    numerator * attraction_share(&parameters.similarity, ii, items, earlier)
                 };
                 (label, weight)
             });
@@ -342,6 +378,59 @@ mod tests {
             1,
             0.001,
         );
+    }
+
+    // The degenerate sums that `attraction_share` handles: whole numbers,
+    // so that scaling them by a power of 2 is exact, even to subnormal
+    // numbers, and whose sums of two or more overflow when scaled by 2^1020.
+    #[test]
+    fn test_degenerate_similarities() {
+        let n_items = 4;
+        let mut rng = rand::rng();
+        let permutation = Permutation::random(n_items, &mut rng);
+        let discount = Discount::new(0.3).unwrap();
+        let concentration = Concentration::new_with_discount(1.5, discount).unwrap();
+        let (a, b, c, d, e, f) = (15.0, 10.0, 8.0, 9.0, 12.0, 14.0);
+        let base = [
+            0.0, a, b, c, //
+            a, 0.0, d, e, //
+            b, d, 0.0, f, //
+            c, e, f, 0.0,
+        ];
+        let log_pmfs = |data: &[f64]| -> Vec<f64> {
+            let similarity = SquareMatrixBorrower::from_shared(data.into(), n_items);
+            let parameters =
+                EpaParameters::new(similarity, permutation.clone(), concentration, discount)
+                    .unwrap();
+            let mut rng = rand::rng();
+            for _ in 0..100 {
+                parameters.sample(&mut rng);
+            }
+            Clustering::iter(n_items)
+                .map(|p| parameters.log_pmf(&Clustering::from_vector(p)))
+                .collect()
+        };
+        let assert_close = |x: &[f64], y: &[f64]| {
+            for (x, y) in x.iter().zip(y) {
+                assert!((x - y).abs() < 1e-12, "{x} differs from {y}");
+            }
+        };
+        let expected = log_pmfs(&base);
+        // The smallest subnormal number, and a scale at which sums overflow.
+        for factor in [f64::from_bits(1), 2f64.powi(1020)] {
+            assert_close(&log_pmfs(&base.map(|x| x * factor)), &expected);
+        }
+        // With every similarity 0, as with equal ones, the distribution is
+        // the Ewens-Pitman distribution.
+        assert_close(&log_pmfs(&[0.0; 16]), &log_pmfs(&[1.0; 16]));
+        // An item with no similarity to the others.
+        let mut isolated = base;
+        for j in 1..n_items {
+            isolated[j] = 0.0;
+            isolated[n_items * j] = 0.0;
+        }
+        let total: f64 = log_pmfs(&isolated).iter().map(|x| x.exp()).sum();
+        assert!((total - 1.0).abs() < 1e-12, "{total}");
     }
 
     #[test]
