@@ -17,5 +17,5 @@ statrs = "0.18.0"
 dahl-bellnumber = "0.1.4" 
 dahl-salso = "0.8.0"
 
-slice_sampler = { git="https://github.com/dbdahl/rust_slice_sampler.git", rev="1e10a840" }
+slice_sampler = { git="https://github.com/dbdahl/rust_slice_sampler.git", rev="407d5a3" }
 fastrand = "2.0"

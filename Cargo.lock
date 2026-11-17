@@ -447,7 +447,7 @@ dependencies = [
 [[package]]
 name = "slice_sampler"
 version = "0.1.2"
-source = "git+https://github.com/dbdahl/rust_slice_sampler.git?rev=1e10a840#1e10a840fd3a0348fd7151c6a94b05cb6bfb9e53"
+source = "git+https://github.com/dbdahl/rust_slice_sampler.git?rev=407d5a3#407d5a34a2280025b44e58ccb7e1369b2b2a2556"
 dependencies = [
  "fastrand",
 ]
