@@ -39,8 +39,22 @@ impl Shrinkage {
         self.0.fill(new_value);
     }
 
+    /// Multiplies every item's shrinkage by the factor that makes the reference
+    /// item's `new_value`.
+    ///
+    /// # Panics
+    ///
+    /// If the reference item's shrinkage or `new_value` isn't positive and
+    /// finite, since the factor would then be 0, infinite, or NaN, and the items'
+    /// shrinkages could never be rescaled again.
     pub fn rescale_by_reference(&mut self, reference: usize, new_value: ScalarShrinkage) {
-        let multiplicative_factor = new_value.get() / self.0[reference];
+        let old_value = self.0[reference].get();
+        let new_value = new_value.get();
+        assert!(
+            old_value > 0.0 && old_value.is_finite() && new_value > 0.0 && new_value.is_finite(),
+            "rescaling the shrinkage from the reference item's {old_value} to {new_value} needs both to be positive and finite"
+        );
+        let multiplicative_factor = new_value / old_value;
         if (1.0 - multiplicative_factor).abs() > 0.000_000_1 {
             for y in &mut self.0 {
                 *y = ScalarShrinkage::new_unchecked(*y * multiplicative_factor);
