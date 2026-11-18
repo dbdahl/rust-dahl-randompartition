@@ -10,7 +10,21 @@ use slice_sampler::univariate::stepping_out::{
     TuningParameters, univariate_slice_sampler_stepping_out_and_shrinkage as slice_sampler,
 };
 use statrs::distribution::{Beta, Continuous, Gamma};
+use std::convert::Infallible;
 
+// The partition updates take the likelihood as a closure. Each has a `try_`
+// form, whose closure returns a `Result` and which stops at its first error,
+// for a closure that can fail, such as one that calls an R function. The form
+// without the prefix wraps it, for a closure that can't fail; `Infallible`
+// compiles away. On an error, the failed visit's allocation is restored and
+// completed visits are kept. The state remains a valid partition, possibly
+// partway through a sweep; the closure isn't called again.
+
+/// Runs `n_updates` Gibbs sweeps over `state`, visiting every item in the
+/// order of `permutation`, under `prior`, with the log likelihood of the
+/// whole partition, `log_likelihood(item, state)`, given that `item` has just
+/// been allocated. [`try_update_partition_gibbs`] takes a `log_likelihood`
+/// that may fail.
 pub fn update_partition_gibbs<T, U, V>(
     n_updates: u32,
     state: &mut Clustering,
@@ -23,17 +37,57 @@ pub fn update_partition_gibbs<T, U, V>(
     U: FnMut(usize, &Clustering) -> f64,
     V: Rng,
 {
+    let Ok(()) = try_update_partition_gibbs(
+        n_updates,
+        state,
+        permutation,
+        prior,
+        &mut |item: usize, state: &Clustering| Ok::<_, Infallible>(log_likelihood(item, state)),
+        rng,
+    );
+}
+
+/// [`update_partition_gibbs`] with a `log_likelihood` that may fail.
+///
+/// # Errors
+///
+/// Returns the first error from `log_likelihood` without calling it again.
+/// The failed item's allocation is restored to its value before that visit.
+/// Completed visits, including earlier sweeps, are kept; visits within each
+/// sweep follow `permutation`. The remaining items keep their allocations
+/// from the start of the current sweep.
+///
+/// `state` remains a valid partition, but its internal label ordering may
+/// change. Consumed random numbers and callback side effects are not rolled
+/// back.
+pub fn try_update_partition_gibbs<T, U, V, E>(
+    n_updates: u32,
+    state: &mut Clustering,
+    permutation: &Permutation,
+    prior: &T,
+    log_likelihood: &mut U,
+    rng: &mut V,
+) -> Result<(), E>
+where
+    T: FullConditional,
+    U: FnMut(usize, &Clustering) -> Result<f64, E>,
+    V: Rng,
+{
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
-            let labels_and_log_weights: Vec<_> = prior
-                .log_full_conditional(ii, state)
-                .into_iter()
-                .map(|(label, log_prior)| {
-                    state.allocate(ii, label);
-                    (label, log_likelihood(ii, state) + log_prior)
-                })
-                .collect();
+            let original = state.get(ii);
+            let mut labels_and_log_weights = prior.log_full_conditional(ii, state);
+            for (label, log_weight) in &mut labels_and_log_weights {
+                state.allocate(ii, *label);
+                match log_likelihood(ii, state) {
+                    Ok(x) => *log_weight += x,
+                    Err(error) => {
+                        state.allocate(ii, original);
+                        return Err(error);
+                    }
+                }
+            }
             let pair = state.select(
                 labels_and_log_weights.into_iter(),
                 true,
@@ -45,8 +99,14 @@ pub fn update_partition_gibbs<T, U, V>(
             state.allocate(ii, pair.0);
         }
     }
+    Ok(())
 }
 
+/// Runs `n_updates` sweeps of Neal's (2000) algorithm 3 over `state`, visiting
+/// every item in the order of `permutation`, under `prior`, with the log
+/// posterior predictive density of an item given the items of a cluster,
+/// `log_posterior_predictive(item, items)`. [`try_update_neal_algorithm3`]
+/// takes a `log_posterior_predictive` that may fail.
 pub fn update_neal_algorithm3<T, U, V>(
     n_updates: u32,
     state: &mut Clustering,
@@ -59,23 +119,70 @@ pub fn update_neal_algorithm3<T, U, V>(
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
+    let Ok(()) = try_update_neal_algorithm3(
+        n_updates,
+        state,
+        permutation,
+        prior,
+        &mut |item: usize, items: &[usize]| {
+            Ok::<_, Infallible>(log_posterior_predictive(item, items))
+        },
+        rng,
+    );
+}
+
+/// [`update_neal_algorithm3`] with a `log_posterior_predictive` that may fail.
+///
+/// # Errors
+///
+/// Returns the first error from `log_posterior_predictive` without calling it
+/// again. The failed item's allocation is unchanged. Completed visits,
+/// including earlier sweeps, are kept; visits within each sweep follow
+/// `permutation`. The remaining items keep their allocations from the start
+/// of the current sweep. Consumed random numbers and callback side effects
+/// are not rolled back.
+pub fn try_update_neal_algorithm3<T, U, V, E>(
+    n_updates: u32,
+    state: &mut Clustering,
+    permutation: &Permutation,
+    prior: &T,
+    log_posterior_predictive: &mut U,
+    rng: &mut V,
+) -> Result<(), E>
+where
+    T: FullConditional,
+    U: FnMut(usize, &[usize]) -> Result<f64, E>,
+    V: Rng,
+{
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
-            let labels_and_log_weights =
-                prior
-                    .log_full_conditional(ii, state)
-                    .into_iter()
-                    .map(|(label, log_prior)| {
-                        let indices = &state.items_of_without(label, ii)[..];
-                        (label, log_posterior_predictive(ii, indices) + log_prior)
-                    });
-            let pair = state.select(labels_and_log_weights, true, false, 0, Some(rng), false);
+            let mut labels_and_log_weights = prior.log_full_conditional(ii, state);
+            for (label, log_weight) in &mut labels_and_log_weights {
+                let indices = &state.items_of_without(*label, ii)[..];
+                *log_weight += log_posterior_predictive(ii, indices)?;
+            }
+            let pair = state.select(
+                labels_and_log_weights.into_iter(),
+                true,
+                false,
+                0,
+                Some(rng),
+                false,
+            );
             state.allocate(ii, pair.0);
         }
     }
+    Ok(())
 }
 
+/// Runs `n_updates` sweeps of Neal's (2000) algorithm 8 over `state`, visiting
+/// every item in the order of `permutation`, under `prior`, with the log
+/// likelihood of an item in a cluster,
+/// `log_likelihood_contribution_fn(item, cache, label, is_new)`, where `cache`
+/// is `common_item_cacher(item)`, computed once for each visit to the item,
+/// and `is_new` says that the cluster is empty. [`try_update_neal_algorithm8`]
+/// takes a `log_likelihood_contribution_fn` that may fail.
 pub fn update_neal_algorithm8<T, U, W, V, X>(
     n_updates: u32,
     state: &mut Clustering,
@@ -91,31 +198,75 @@ pub fn update_neal_algorithm8<T, U, W, V, X>(
     V: Rng,
     X: Sized,
 {
+    let Ok(()) = try_update_neal_algorithm8(
+        n_updates,
+        state,
+        permutation,
+        prior,
+        &mut |item: usize, cache: &X, label: usize, is_new: bool| {
+            Ok::<_, Infallible>(log_likelihood_contribution_fn(item, cache, label, is_new))
+        },
+        common_item_cacher,
+        rng,
+    );
+}
+
+/// [`update_neal_algorithm8`] with a `log_likelihood_contribution_fn` that may
+/// fail. `common_item_cacher` can't.
+///
+/// # Errors
+///
+/// Returns the first error from `log_likelihood_contribution_fn` without
+/// calling it again. The failed item's allocation is unchanged. Completed
+/// visits, including earlier sweeps, are kept; visits within each sweep follow
+/// `permutation`. The remaining items keep their allocations from the start
+/// of the current sweep. Consumed random numbers and side effects of either
+/// callback are not rolled back.
+pub fn try_update_neal_algorithm8<T, U, W, V, X, E>(
+    n_updates: u32,
+    state: &mut Clustering,
+    permutation: &Permutation,
+    prior: &T,
+    log_likelihood_contribution_fn: &mut U,
+    common_item_cacher: W,
+    rng: &mut V,
+) -> Result<(), E>
+where
+    T: FullConditional,
+    U: FnMut(usize, &X, usize, bool) -> Result<f64, E>,
+    W: Fn(usize) -> X,
+    V: Rng,
+    X: Sized,
+{
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
             let cache = common_item_cacher(ii);
-            let labels_and_log_weights =
-                prior
-                    .log_full_conditional(ii, state)
-                    .into_iter()
-                    .map(|(label, log_prior)| {
-                        (
-                            label,
-                            log_likelihood_contribution_fn(
-                                ii,
-                                &cache,
-                                label,
-                                state.size_of(label) == 0,
-                            ) + log_prior,
-                        )
-                    });
-            let pair = state.select(labels_and_log_weights, true, false, 0, Some(rng), false);
+            let mut labels_and_log_weights = prior.log_full_conditional(ii, state);
+            for (label, log_weight) in &mut labels_and_log_weights {
+                let is_new = state.size_of(*label) == 0;
+                *log_weight += log_likelihood_contribution_fn(ii, &cache, *label, is_new)?;
+            }
+            let pair = state.select(
+                labels_and_log_weights.into_iter(),
+                true,
+                false,
+                0,
+                Some(rng),
+                false,
+            );
             state.allocate(ii, pair.0);
         }
     }
+    Ok(())
 }
 
+/// Runs `n_updates` Gibbs sweeps over `state`, as
+/// [`update_partition_gibbs`] does, but with the log likelihood of the whole
+/// partition, `log_likelihood_contribution_fn(state)`, given that the item
+/// being updated has just been allocated.
+/// [`try_update_neal_algorithm_full`] takes a `log_likelihood_contribution_fn`
+/// that may fail.
 pub fn update_neal_algorithm_full<T, U, V>(
     n_updates: u32,
     state: &mut Clustering,
@@ -128,22 +279,49 @@ pub fn update_neal_algorithm_full<T, U, V>(
     U: FnMut(&Clustering) -> f64,
     V: Rng,
 {
-    for _ in 0..n_updates {
-        for i in 0..state.n_items() {
-            let ii = permutation.get(i);
-            let labels_and_log_weights = prior
-                .log_full_conditional(ii, state)
-                .into_iter()
-                .map(|(label, log_prior)| {
-                    state.allocate(ii, label);
-                    (label, log_likelihood_contribution_fn(state) + log_prior)
-                })
-                .collect::<Vec<_>>()
-                .into_iter();
-            let pair = state.select(labels_and_log_weights, true, false, 0, Some(rng), false);
-            state.allocate(ii, pair.0);
-        }
-    }
+    let Ok(()) = try_update_neal_algorithm_full(
+        n_updates,
+        state,
+        permutation,
+        prior,
+        &mut |state: &Clustering| Ok::<_, Infallible>(log_likelihood_contribution_fn(state)),
+        rng,
+    );
+}
+
+/// [`update_neal_algorithm_full`] with a `log_likelihood_contribution_fn` that
+/// may fail.
+///
+/// # Errors
+///
+/// Returns the first error from `log_likelihood_contribution_fn` without
+/// calling it again. The state and side effects follow the same error
+/// contract as [`try_update_partition_gibbs`]: the failed item's allocation
+/// is restored, completed visits (including earlier sweeps) are kept in
+/// `permutation` order, and the remaining items keep their allocations from
+/// the start of the current sweep. Internal label ordering may change;
+/// consumed random numbers and callback side effects are not rolled back.
+pub fn try_update_neal_algorithm_full<T, U, V, E>(
+    n_updates: u32,
+    state: &mut Clustering,
+    permutation: &Permutation,
+    prior: &T,
+    log_likelihood_contribution_fn: &mut U,
+    rng: &mut V,
+) -> Result<(), E>
+where
+    T: FullConditional,
+    U: FnMut(&Clustering) -> Result<f64, E>,
+    V: Rng,
+{
+    try_update_partition_gibbs(
+        n_updates,
+        state,
+        permutation,
+        prior,
+        &mut |_, state: &Clustering| log_likelihood_contribution_fn(state),
+        rng,
+    )
 }
 
 pub fn update_permutation<T, V>(
