@@ -66,8 +66,8 @@ impl PredictiveProbabilityFunction for CrpParameters {
             .collect()
     }
 
-    fn crp_concentration_ln(&self) -> f64 {
-        self.concentration.ln()
+    fn zero_discount_crp_log_concentration(&self) -> Option<f64> {
+        (self.discount.get() == 0.0).then(|| self.concentration.ln())
     }
 }
 

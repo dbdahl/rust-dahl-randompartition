@@ -185,6 +185,10 @@ impl Clustering {
         }
     }
 
+    pub(crate) fn sizes(&self) -> &[usize] {
+        &self.sizes
+    }
+
     pub fn size_of(&self, label: usize) -> usize {
         match self.sizes.get(label) {
             Some(size) => *size,

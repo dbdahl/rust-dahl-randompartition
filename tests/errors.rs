@@ -6,6 +6,7 @@
 use dahl_randompartition::clust::Clustering;
 use dahl_randompartition::crp::CrpParameters;
 use dahl_randompartition::distr::FullConditional;
+use dahl_randompartition::mcmc::UpdateError;
 use dahl_randompartition::mcmc::{
     try_update_neal_algorithm_full, try_update_neal_algorithm3, try_update_neal_algorithm8,
     try_update_partition_gibbs, update_neal_algorithm_full, update_neal_algorithm3,
@@ -45,7 +46,7 @@ enum Update {
 }
 
 struct Run {
-    result: Result<(), usize>,
+    result: Result<(), UpdateError<usize>>,
     allocation: Vec<usize>,
     calls: usize,
     // The visit, an index into 'starts', during which each call was made.
@@ -191,7 +192,11 @@ fn check(update: Update) {
     assert!(success.calls > 0);
     for k in 1..=success.calls {
         let failure = run(update, k);
-        assert_eq!(failure.result, Err(k), "{update:?}, call {k}");
+        assert_eq!(
+            failure.result,
+            Err(UpdateError::Likelihood(k)),
+            "{update:?}, call {k}"
+        );
         assert_eq!(
             failure.calls, k,
             "{update:?} called its closure after call {k} failed"
@@ -294,4 +299,101 @@ fn successful_updates_preserve_seeded_behavior() {
         assert_eq!(infallible.allocation(), &allocation, "{update:?}");
         assert_eq!(next_random, expected_next_random, "{update:?}");
     }
+}
+
+#[test]
+fn gibbs_preserves_an_unallocated_item_on_failure() {
+    let prior = CrpParameters::new(3, Concentration::new(1.0).unwrap());
+    let order = Permutation::natural_and_fixed(3);
+    // An unallocated item's candidates are the active labels, two here.
+    let mut state = Clustering::from_vector(vec![0, 0, 1]);
+    state.remove(0);
+    assert_eq!(prior.log_full_conditional(0, &state).len(), 2);
+    let before = state.allocation().clone();
+    let mut rng = Pcg64Mcg::seed_from_u64(1);
+    let failed =
+        try_update_partition_gibbs(1, &mut state, &order, &prior, &mut |_, _| Err(()), &mut rng);
+    assert_eq!(failed, Err(UpdateError::Likelihood(())));
+    assert_eq!(state.allocation(), &before);
+    let fail = try_update_partition_gibbs(
+        1,
+        &mut state,
+        &order,
+        &prior,
+        &mut |_, _| Ok::<_, ()>(f64::NEG_INFINITY),
+        &mut rng,
+    );
+    assert_eq!(fail, Err(UpdateError::InvalidWeights { item: 0 }));
+    assert_eq!(state.allocation(), &before);
+    update_partition_gibbs(1, &mut state, &order, &prior, &mut |_, _| 0.0, &mut rng);
+    assert_eq!(state.n_items_allocated(), 3);
+}
+
+// One item has a single candidate label, so each update's move is forced,
+// whatever its weight, and takes no random number, as before 'UpdateError'.
+#[test]
+fn a_single_candidate_is_a_forced_move_whatever_its_weight() {
+    let prior = CrpParameters::new(1, Concentration::new(1.0).unwrap());
+    let order = Permutation::natural_and_fixed(1);
+    let start = Clustering::one_cluster(1);
+    assert_eq!(prior.log_full_conditional(0, &start).len(), 1);
+    for weight in [f64::NEG_INFINITY, f64::INFINITY, f64::NAN] {
+        let mut rng = Pcg64Mcg::seed_from_u64(1);
+        let expected_next_random = rng.clone().next_u64();
+        let mut state = start.clone();
+        let results = [
+            try_update_partition_gibbs(
+                1,
+                &mut state,
+                &order,
+                &prior,
+                &mut |_, _| Ok::<_, ()>(weight),
+                &mut rng,
+            ),
+            try_update_neal_algorithm3(
+                1,
+                &mut state,
+                &order,
+                &prior,
+                &mut |_, _| Ok::<_, ()>(weight),
+                &mut rng,
+            ),
+            try_update_neal_algorithm8(
+                1,
+                &mut state,
+                &order,
+                &prior,
+                &mut |_, _: &(), _, _| Ok::<_, ()>(weight),
+                |_| (),
+                &mut rng,
+            ),
+            try_update_neal_algorithm_full(
+                1,
+                &mut state,
+                &order,
+                &prior,
+                &mut |_| Ok::<_, ()>(weight),
+                &mut rng,
+            ),
+        ];
+        assert!(results.iter().all(Result::is_ok), "{weight}: {results:?}");
+        assert_eq!(state.allocation(), start.allocation(), "{weight}");
+        assert_eq!(rng.next_u64(), expected_next_random, "{weight}");
+    }
+}
+
+// The message shows the likelihood's error, and the chain continues from its
+// source, so that no message appears twice.
+#[test]
+fn a_likelihood_error_appears_once_in_the_chain() {
+    use std::error::Error;
+    let inner = std::io::Error::other("boom");
+    let error = UpdateError::Likelihood(inner);
+    assert_eq!(error.to_string(), "the likelihood failed: boom");
+    assert!(error.source().is_none());
+    let invalid = UpdateError::<std::io::Error>::InvalidWeights { item: 2 };
+    assert_eq!(
+        invalid.to_string(),
+        "invalid conditional weights for item 2"
+    );
 }

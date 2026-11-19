@@ -46,6 +46,14 @@ impl<D: PredictiveProbabilityFunction + Clone> SpParameters<D> {
         }
     }
 
+    fn shortcut_log_concentration(&self) -> Option<f64> {
+        if self.shortcut {
+            self.baseline_ppf.zero_discount_crp_log_concentration()
+        } else {
+            None
+        }
+    }
+
     fn prepare_for_partial(
         &self,
         item: usize,
@@ -88,10 +96,9 @@ impl<D: PredictiveProbabilityFunction + Clone> FullConditional for SpParameters<
     // Implement starting only at item and subsequent items.
     fn log_full_conditional(&self, item: usize, clustering: &Clustering) -> Vec<(usize, f64)> {
         let mut target = clustering.allocation().clone();
-        if self.shortcut {
+        if let Some(concentration_ln) = self.shortcut_log_concentration() {
             let anchor =
                 Clustering::relabel(self.anchor.allocation(), 0, Some(&self.permutation), false).0;
-            let concentration_ln = self.baseline_ppf.crp_concentration_ln();
             let candidate_labels = clustering.available_labels_for_reallocation(item);
             let n_clusters = clustering.n_clusters();
             let new_label = clustering.new_label();
@@ -207,7 +214,7 @@ fn log_pmf_spcrp<D: PredictiveProbabilityFunction + Clone>(
 
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpParameters<D> {
     fn log_pmf(&self, partition: &Clustering) -> f64 {
-        if self.shortcut {
+        if let Some(concentration_ln) = self.shortcut_log_concentration() {
             let anchor =
                 Clustering::relabel(self.anchor.allocation(), 0, Some(&self.permutation), false).0;
             log_pmf_spcrp(
@@ -217,7 +224,7 @@ impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpPar
                 partition.n_clusters(),
                 anchor.allocation(),
                 anchor.n_clusters(),
-                self.baseline_ppf.crp_concentration_ln(),
+                concentration_ln,
             )
         } else {
             engine_full::<D, Pcg64Mcg>(self, Some(partition.allocation()), None).1
@@ -227,7 +234,7 @@ impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunction for SpPar
 
 impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunctionPartial for SpParameters<D> {
     fn log_pmf_partial(&self, item: usize, partition: &Clustering) -> f64 {
-        if self.shortcut {
+        if let Some(concentration_ln) = self.shortcut_log_concentration() {
             let anchor =
                 Clustering::relabel(self.anchor.allocation(), 0, Some(&self.permutation), false).0;
             log_pmf_spcrp(
@@ -237,7 +244,7 @@ impl<D: PredictiveProbabilityFunction + Clone> ProbabilityMassFunctionPartial fo
                 partition.n_clusters(),
                 anchor.allocation(),
                 anchor.n_clusters(),
-                self.baseline_ppf.crp_concentration_ln(),
+                concentration_ln,
             )
         } else {
             let (partial_clustering, counts_marginal, counts_joint) =

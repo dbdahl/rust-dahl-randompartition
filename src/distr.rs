@@ -39,8 +39,11 @@ pub trait PredictiveProbabilityFunction {
             .collect()
     }
 
-    fn crp_concentration_ln(&self) -> f64 {
-        f64::NEG_INFINITY
+    /// The log concentration of a CRP without discount, for which the
+    /// shrinkage partition has a shortcut, or `None` for any other
+    /// distribution.
+    fn zero_discount_crp_log_concentration(&self) -> Option<f64> {
+        None
     }
 }
 

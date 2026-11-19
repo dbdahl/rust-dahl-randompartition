@@ -5,6 +5,7 @@ use crate::distr::{
 };
 use crate::perm::Permutation;
 use crate::prelude::*;
+use rand::distr::{Distribution, weighted::WeightedIndex};
 use rand::{Rng, RngExt};
 use slice_sampler::univariate::stepping_out::{
     TuningParameters, univariate_slice_sampler_stepping_out_and_shrinkage as slice_sampler,
@@ -19,6 +20,73 @@ use std::convert::Infallible;
 // compiles away. On an error, the failed visit's allocation is restored and
 // completed visits are kept. The state remains a valid partition, possibly
 // partway through a sweep; the closure isn't called again.
+
+/// Why a partition update could not complete a visit.
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpdateError<E> {
+    /// The likelihood closure failed, with its first error. The update
+    /// doesn't call it again.
+    Likelihood(E),
+    /// The conditional log weights of this zero-based item, among two or
+    /// more candidate labels, contained NaN or positive infinity, or all
+    /// were negative infinity.
+    InvalidWeights { item: usize },
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for UpdateError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Likelihood(error) => write!(f, "the likelihood failed: {error}"),
+            Self::InvalidWeights { item } => {
+                write!(f, "invalid conditional weights for item {item}")
+            }
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for UpdateError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            // Display already shows the likelihood's error, so the chain
+            // continues from its source, and no message appears twice, as
+            // for rust_slice_sampler's 'SliceError'.
+            Self::Likelihood(error) => error.source(),
+            Self::InvalidWeights { .. } => None,
+        }
+    }
+}
+
+fn infallible(result: Result<(), UpdateError<Infallible>>) {
+    if let Err(error) = result {
+        panic!("{error}");
+    }
+}
+
+// A single candidate is a forced move: it takes no random number, and its
+// weight, even -inf or NaN, doesn't matter, as in 'Clustering::select'.
+// Otherwise, subtracting the maximum makes the largest weight one.
+fn draw_label<E>(
+    item: usize,
+    candidates: &[(usize, f64)],
+    rng: &mut impl Rng,
+) -> Result<usize, UpdateError<E>> {
+    if let [(label, _)] = candidates {
+        return Ok(*label);
+    }
+    let invalid = || UpdateError::InvalidWeights { item };
+    let max = candidates
+        .iter()
+        .map(|&(_, w)| w)
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !max.is_finite() {
+        return Err(invalid());
+    }
+    let weights = candidates.iter().map(|&(_, w)| (w - max).exp());
+    let index = WeightedIndex::new(weights)
+        .map_err(|_| invalid())?
+        .sample(rng);
+    Ok(candidates[index].0)
+}
 
 /// Runs `n_updates` Gibbs sweeps over `state`, visiting every item in the
 /// order of `permutation`, under `prior`, with the log likelihood of the
@@ -37,20 +105,21 @@ pub fn update_partition_gibbs<T, U, V>(
     U: FnMut(usize, &Clustering) -> f64,
     V: Rng,
 {
-    let Ok(()) = try_update_partition_gibbs(
+    infallible(try_update_partition_gibbs(
         n_updates,
         state,
         permutation,
         prior,
         &mut |item: usize, state: &Clustering| Ok::<_, Infallible>(log_likelihood(item, state)),
         rng,
-    );
+    ));
 }
 
 /// [`update_partition_gibbs`] with a `log_likelihood` that may fail.
 ///
 /// # Errors
 ///
+/// Invalid conditional weights return [`UpdateError::InvalidWeights`].
 /// Returns the first error from `log_likelihood` without calling it again.
 /// The failed item's allocation is restored to its value before that visit.
 /// Completed visits, including earlier sweeps, are kept; visits within each
@@ -67,7 +136,7 @@ pub fn try_update_partition_gibbs<T, U, V, E>(
     prior: &T,
     log_likelihood: &mut U,
     rng: &mut V,
-) -> Result<(), E>
+) -> Result<(), UpdateError<E>>
 where
     T: FullConditional,
     U: FnMut(usize, &Clustering) -> Result<f64, E>,
@@ -76,7 +145,7 @@ where
     for _ in 0..n_updates {
         for i in 0..state.n_items() {
             let ii = permutation.get(i);
-            let original = state.get(ii);
+            let original = state.allocation()[ii];
             let mut labels_and_log_weights = prior.log_full_conditional(ii, state);
             for (label, log_weight) in &mut labels_and_log_weights {
                 state.allocate(ii, *label);
@@ -84,19 +153,14 @@ where
                     Ok(x) => *log_weight += x,
                     Err(error) => {
                         state.allocate(ii, original);
-                        return Err(error);
+                        return Err(UpdateError::Likelihood(error));
                     }
                 }
             }
-            let pair = state.select(
-                labels_and_log_weights.into_iter(),
-                true,
-                false,
-                0,
-                Some(rng),
-                false,
-            );
-            state.allocate(ii, pair.0);
+            let label = draw_label(ii, &labels_and_log_weights, rng).inspect_err(|_| {
+                state.allocate(ii, original);
+            })?;
+            state.allocate(ii, label);
         }
     }
     Ok(())
@@ -119,7 +183,7 @@ pub fn update_neal_algorithm3<T, U, V>(
     U: Fn(usize, &[usize]) -> f64,
     V: Rng,
 {
-    let Ok(()) = try_update_neal_algorithm3(
+    infallible(try_update_neal_algorithm3(
         n_updates,
         state,
         permutation,
@@ -128,13 +192,14 @@ pub fn update_neal_algorithm3<T, U, V>(
             Ok::<_, Infallible>(log_posterior_predictive(item, items))
         },
         rng,
-    );
+    ));
 }
 
 /// [`update_neal_algorithm3`] with a `log_posterior_predictive` that may fail.
 ///
 /// # Errors
 ///
+/// Invalid conditional weights return [`UpdateError::InvalidWeights`].
 /// Returns the first error from `log_posterior_predictive` without calling it
 /// again. The failed item's allocation is unchanged. Completed visits,
 /// including earlier sweeps, are kept; visits within each sweep follow
@@ -148,7 +213,7 @@ pub fn try_update_neal_algorithm3<T, U, V, E>(
     prior: &T,
     log_posterior_predictive: &mut U,
     rng: &mut V,
-) -> Result<(), E>
+) -> Result<(), UpdateError<E>>
 where
     T: FullConditional,
     U: FnMut(usize, &[usize]) -> Result<f64, E>,
@@ -160,17 +225,10 @@ where
             let mut labels_and_log_weights = prior.log_full_conditional(ii, state);
             for (label, log_weight) in &mut labels_and_log_weights {
                 let indices = &state.items_of_without(*label, ii)[..];
-                *log_weight += log_posterior_predictive(ii, indices)?;
+                *log_weight +=
+                    log_posterior_predictive(ii, indices).map_err(UpdateError::Likelihood)?;
             }
-            let pair = state.select(
-                labels_and_log_weights.into_iter(),
-                true,
-                false,
-                0,
-                Some(rng),
-                false,
-            );
-            state.allocate(ii, pair.0);
+            state.allocate(ii, draw_label(ii, &labels_and_log_weights, rng)?);
         }
     }
     Ok(())
@@ -198,7 +256,7 @@ pub fn update_neal_algorithm8<T, U, W, V, X>(
     V: Rng,
     X: Sized,
 {
-    let Ok(()) = try_update_neal_algorithm8(
+    infallible(try_update_neal_algorithm8(
         n_updates,
         state,
         permutation,
@@ -208,7 +266,7 @@ pub fn update_neal_algorithm8<T, U, W, V, X>(
         },
         common_item_cacher,
         rng,
-    );
+    ));
 }
 
 /// [`update_neal_algorithm8`] with a `log_likelihood_contribution_fn` that may
@@ -216,6 +274,7 @@ pub fn update_neal_algorithm8<T, U, W, V, X>(
 ///
 /// # Errors
 ///
+/// Invalid conditional weights return [`UpdateError::InvalidWeights`].
 /// Returns the first error from `log_likelihood_contribution_fn` without
 /// calling it again. The failed item's allocation is unchanged. Completed
 /// visits, including earlier sweeps, are kept; visits within each sweep follow
@@ -230,7 +289,7 @@ pub fn try_update_neal_algorithm8<T, U, W, V, X, E>(
     log_likelihood_contribution_fn: &mut U,
     common_item_cacher: W,
     rng: &mut V,
-) -> Result<(), E>
+) -> Result<(), UpdateError<E>>
 where
     T: FullConditional,
     U: FnMut(usize, &X, usize, bool) -> Result<f64, E>,
@@ -245,17 +304,10 @@ where
             let mut labels_and_log_weights = prior.log_full_conditional(ii, state);
             for (label, log_weight) in &mut labels_and_log_weights {
                 let is_new = state.size_of(*label) == 0;
-                *log_weight += log_likelihood_contribution_fn(ii, &cache, *label, is_new)?;
+                *log_weight += log_likelihood_contribution_fn(ii, &cache, *label, is_new)
+                    .map_err(UpdateError::Likelihood)?;
             }
-            let pair = state.select(
-                labels_and_log_weights.into_iter(),
-                true,
-                false,
-                0,
-                Some(rng),
-                false,
-            );
-            state.allocate(ii, pair.0);
+            state.allocate(ii, draw_label(ii, &labels_and_log_weights, rng)?);
         }
     }
     Ok(())
@@ -279,14 +331,14 @@ pub fn update_neal_algorithm_full<T, U, V>(
     U: FnMut(&Clustering) -> f64,
     V: Rng,
 {
-    let Ok(()) = try_update_neal_algorithm_full(
+    infallible(try_update_neal_algorithm_full(
         n_updates,
         state,
         permutation,
         prior,
         &mut |state: &Clustering| Ok::<_, Infallible>(log_likelihood_contribution_fn(state)),
         rng,
-    );
+    ));
 }
 
 /// [`update_neal_algorithm_full`] with a `log_likelihood_contribution_fn` that
@@ -294,6 +346,7 @@ pub fn update_neal_algorithm_full<T, U, V>(
 ///
 /// # Errors
 ///
+/// Invalid conditional weights return [`UpdateError::InvalidWeights`].
 /// Returns the first error from `log_likelihood_contribution_fn` without
 /// calling it again. The state and side effects follow the same error
 /// contract as [`try_update_partition_gibbs`]: the failed item's allocation
@@ -308,7 +361,7 @@ pub fn try_update_neal_algorithm_full<T, U, V, E>(
     prior: &T,
     log_likelihood_contribution_fn: &mut U,
     rng: &mut V,
-) -> Result<(), E>
+) -> Result<(), UpdateError<E>>
 where
     T: FullConditional,
     U: FnMut(&Clustering) -> Result<f64, E>,

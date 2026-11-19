@@ -3,11 +3,6 @@
 use crate::clust::Clustering;
 use crate::distr::{FullConditional, ProbabilityMassFunction};
 
-use dahl_salso::clustering::Clusterings;
-use dahl_salso::clustering::WorkingClustering;
-use dahl_salso::log2cache::Log2Cache;
-use dahl_salso::optimize::{BinderCMLossComputer, CMLossComputer, VICMLossComputer};
-
 #[derive(Debug, Clone)]
 pub struct CppParameters<D: ProbabilityMassFunction> {
     pub anchor: Clustering,
@@ -15,8 +10,7 @@ pub struct CppParameters<D: ProbabilityMassFunction> {
     baseline_pmf: D,
     use_vi: bool,
     a: f64,
-    log2cache: Log2Cache,
-    baseline_as_clusterings: Clusterings,
+    count_terms: Vec<f64>,
 }
 
 impl<D: ProbabilityMassFunction> CppParameters<D> {
@@ -27,21 +21,23 @@ impl<D: ProbabilityMassFunction> CppParameters<D> {
         use_vi: bool,
         a: f64,
     ) -> Option<Self> {
-        if rate.is_nan() || rate.is_infinite() || rate < 0.0 {
+        if anchor.n_items() == 0 || !rate.is_finite() || rate < 0.0 || !a.is_finite() || a < 0.0 {
             return None;
         }
-        let labels: Vec<_> = anchor.allocation().iter().map(|x| *x as i32).collect();
-        let n_items = anchor.n_items();
-        let baseline_as_clusterings =
-            Clusterings::from_i32_column_major_order(&labels[..], n_items);
+        // Binder uses squared counts; variation of information uses n log2(n).
+        let mut count_terms = Vec::with_capacity(anchor.n_items() + 1);
+        count_terms.push(0.0);
+        count_terms.extend((1..=anchor.n_items()).map(|n| {
+            let n = n as f64;
+            if use_vi { n * n.log2() } else { n * n }
+        }));
         Some(Self {
             anchor,
             rate,
             baseline_pmf,
             use_vi,
             a,
-            log2cache: Log2Cache::new(n_items),
-            baseline_as_clusterings,
+            count_terms,
         })
     }
 }
@@ -69,27 +65,53 @@ impl<D: ProbabilityMassFunction> ProbabilityMassFunction for CppParameters<D> {
     }
 }
 
+// Group the target labels by anchor cluster, then reuse one row of counts.
+// The last bin in each label space is for a partially allocated clustering.
+fn joint_sum(anchor: &Clustering, target: &Clustering, terms: &[f64]) -> f64 {
+    let mut ends = Vec::with_capacity(anchor.sizes().len() + 1);
+    let mut offset = 0;
+    for &size in anchor.sizes() {
+        ends.push(offset);
+        offset += size;
+    }
+    ends.push(offset);
+    let mut grouped = vec![0; anchor.n_items()];
+    for (&a, &b) in anchor.allocation().iter().zip(target.allocation()) {
+        let end = &mut ends[a.min(anchor.sizes().len())];
+        grouped[*end] = b.min(target.sizes().len());
+        *end += 1;
+    }
+    let mut counts = vec![0usize; target.sizes().len() + 1];
+    let mut joint = 0.0;
+    let mut start = 0;
+    for end in ends {
+        let labels = &grouped[start..end];
+        for &label in labels {
+            counts[label] += 1;
+        }
+        for &label in labels {
+            // terms[0] is zero, so each occupied cell contributes once.
+            joint += terms[std::mem::take(&mut counts[label])];
+        }
+        start = end;
+    }
+    joint
+}
+
 fn log_pmf<D: ProbabilityMassFunction>(target: &Clustering, parameters: &CppParameters<D>) -> f64 {
-    let computer: Box<dyn CMLossComputer> = if parameters.use_vi {
-        Box::new(VICMLossComputer::new(parameters.a, &parameters.log2cache))
+    let anchor = &parameters.anchor;
+    let n = anchor.n_items();
+    assert_eq!(target.n_items(), n);
+    let terms = &parameters.count_terms;
+    let marginal =
+        |p: &Clustering| -> f64 { p.active_labels().iter().map(|&k| terms[p.size_of(k)]).sum() };
+    let joint = joint_sum(anchor, target, terms);
+    let a = parameters.a;
+    let distance = if parameters.use_vi {
+        ((2.0 - a) * marginal(target) + (a * marginal(anchor) - 2.0 * joint)) / n as f64
     } else {
-        Box::new(BinderCMLossComputer::new(parameters.a))
+        (a * marginal(anchor) + (2.0 - a) * marginal(target) - 2.0 * joint) / terms[n]
     };
-    let target_as_vector: Vec<_> = target
-        .allocation()
-        .iter()
-        .map(|x| *x as dahl_salso::LabelType)
-        .collect();
-    let target_as_working = WorkingClustering::from_vector(
-        target_as_vector,
-        (target.max_label() + 1) as dahl_salso::LabelType,
-    );
-    let distance = computer.compute_loss(
-        &target_as_working,
-        &parameters
-            .baseline_as_clusterings
-            .make_confusion_matrices(&target_as_working),
-    );
     let log_multiplier = -parameters.rate * distance;
     let log_baseline_pmf = parameters.baseline_pmf.log_pmf(target);
     log_baseline_pmf + log_multiplier
@@ -101,6 +123,23 @@ mod tests {
     use crate::crp::CrpParameters;
     use crate::prelude::*;
     use rand::prelude::*;
+
+    #[test]
+    fn loss_uses_partitions_independently_of_label_width() {
+        let n = 65_536;
+        let anchor = Clustering::from_vector((0..n).map(|i| i % 2).collect());
+        let sparse = Clustering::from_vector((0..n).map(|i| (i % 2) * n).collect());
+        for vi in [false, true] {
+            let baseline = CrpParameters::new(n, Concentration::new(1.0).unwrap());
+            let p = CppParameters::new(anchor.clone(), 2.0, baseline, vi, 1.0).unwrap();
+            assert_eq!(p.log_pmf(&anchor), p.log_pmf(&sparse));
+
+            let singletons = Clustering::singleton_clusters(n);
+            let baseline = CrpParameters::new(n, Concentration::new(1.0).unwrap());
+            let p = CppParameters::new(singletons.clone(), 2.0, baseline.clone(), vi, 1.0).unwrap();
+            assert_eq!(p.log_pmf(&singletons), baseline.log_pmf(&singletons));
+        }
+    }
 
     #[test]
     #[should_panic]
